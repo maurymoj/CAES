@@ -8,7 +8,7 @@ clc
 % close all
 %-------------------- Problem parameters ------------------------------%
 % Ambient conditions
-T_a = 15+273.15; % T = 15 oC - ~288 K
+T_a = 15 + 273.15; % T = 15 oC - ~288 K
 P_a = 101325 ; % P = 101.325 kPa
 G = 1;      % Specific gas gravity - for air G = 1
 
@@ -31,16 +31,17 @@ L_m = 120000; % Total distance [m]
 
 eps = 0.04e-3; % Absolute roughness 0.04 mm
 
-E = 0.95;   % Pipeline efficiency
+E = 0.75;   % Pipeline efficiency
     % Usually varies from 0.6 to 0.92 as a function of liquid presence and age
     % "Handbook of natural gas transmission and processing"
 
 H_1 = 0;
-H_2 = 1000;
+H_2 = 1;
 
 % Generate multiple plots while varying one variable var (can be any
 % parameter set in the initial statements)
 Var = {10 20 50 100 200 500}; % Values to be taken by var
+% Var = {1};
 LStyle = {'b','r','k','b--','r--','k--'};
 
 % % Sanity check with book equation comparisons
@@ -102,7 +103,7 @@ for j=1:length(Var)
     f = zeros(length(L),1);
     s = zeros(length(L),1);
     h = zeros(length(L),1);
-    phi = zeros(length(L),1);
+    psi = zeros(length(L),1);
     P = zeros(length(L),1);
     T = T_f*ones(length(L),1);      % Assuming isothermal flow
     
@@ -124,7 +125,7 @@ for j=1:length(Var)
         % Exergy
         % phi = h-h0 + T0*(s-s0)+u^2/2+gz
         % Negligible height difference
-        phi(i) = h(i)-h0 + T0*(s(i)-s0)+u(i)^2/2;
+        psi(i) = h(i)-h0 + T0*(s(i)-s0)+u(i)^2/2;
         % Considering height difference
         % phi(i) = h(i)-h0 + T0*(s(i)-s0)+u(i)^2/2+g*z(i)
     
@@ -179,7 +180,7 @@ for j=1:length(Var)
     nu(end) = py.CoolProp.CoolProp.PropsSI('V','P',P(end),'T',T_f,'Air');
     Z(end) = py.CoolProp.CoolProp.PropsSI('Z','P',P(end),'T',T_f,'Air');
     u(end) = 14.7349*( Q_a_day/D_mm^2 )*( P_a/T_a )*(Z(end)*T_f/P(end)); % Q_b has to be converted to m3/day and D to mm
-    phi(end) = h(end)-h0 + T0*(s(end)-s0)+u(end)^2/2;
+    psi(end) = h(end)-h0 + T0*(s(end)-s0)+u(end)^2/2;
     
     % Plots
     % figure('Color',[1 1 1])
@@ -202,9 +203,9 @@ for j=1:length(Var)
     ylabel('U [m/s]')
     
     figure(x_fig)   % Entropy profile
-    plot(L/1000,phi,LStyle{j})
+    plot(L/1000,psi,LStyle{j})
     xlabel('L [km]')
-    ylabel('\Phi [kJ]')
+    ylabel('\Psi[kJ/kg]')
 
 end
 
@@ -243,7 +244,7 @@ L_m = 120000; % Total distance [m]
 
 eps = 0.04e-3; % Absolute roughness 0.04 mm
 
-E = 0.95;   % Pipeline efficiency
+E = 0.75;   % Pipeline efficiency
     % Usually varies from 0.6 to 0.92 as a function of liquid presence and age
     % "Handbook of natural gas transmission and processing"
 
@@ -252,13 +253,14 @@ H_1 = 0;
 H_2 = 1;
 
 % Soil temperature, assumed constant along the pipeline
-T_s = 5+273.15; % 5 °C (Nasr and Connor "Natural Gas Engineering and Safety Challenges")
+T_s = 5 + 273.15; % 5 °C (Nasr and Connor "Natural Gas Engineering and Safety Challenges")
 
 
 % Generate multiple plots while varying one variable var (can be any
 % parameter set in the initial statements)
-Var = {10 20 50 100 200 500}; % Values to be taken by var
-LStyle = {'b','r','k','b--','r--','k--'};
+% Var = {10 20 50 100 200 500}; % Values to be taken by var - Height
+Var = {278.15 283 288 293 298 323 373}; % Values to be taken by var - Inlet Temperature
+LStyle = {'b','r','k','b--','r--','k--','b-.'};
 
 %----------------------------------------------------------------------%
 
@@ -286,8 +288,9 @@ gam = cp/cv;
 
 m_dot = rho_a*Q_a;
 
-% for j=1:length(Var)
+for j=1:length(Var)
     % H_2 = Var{j};
+    T_in = Var{j};
 
     A = pi*D^2/4; % mm2
     L = 0:dL:L_m; % 70 km pipe with increments of 1 km
@@ -310,7 +313,7 @@ m_dot = rho_a*Q_a;
     f = zeros(length(L),1);
     s = zeros(length(L),1);
     h = zeros(length(L),1);
-    phi = zeros(length(L),1);
+    psi = zeros(length(L),1);
     P = zeros(length(L),1);
     T = T_a*ones(length(L),1);
     
@@ -320,10 +323,15 @@ m_dot = rho_a*Q_a;
     for i=1:length(L)-1
         dT = 10;
         count_T = 0;
-        T_old = 0.98*T(i);
+        % T_old = 0.98*T(i);
+        T_old = max(0.98*T(i),T_s);
         while (dT > 0.0001 & count_T < 1000) 
             
-            T_f = T_s + (T(i)-T_old)/log((T(i)-T_s)/(T_old-T_s)); % assuming soil T below gas temp and joule-thompson effect negligible
+            if T_old == T_s
+                T_f = T_s;
+            else
+                T_f = T_s + (T(i)-T_old)/log((T(i)-T_s)/(T_old-T_s)); % assuming soil T below gas temp and joule-thompson effect negligible
+            end
 
             rho(i) = py.CoolProp.CoolProp.PropsSI('D','P',P(i),'T',T_f,'Air');
             nu(i) = py.CoolProp.CoolProp.PropsSI('V','P',P(i),'T',T_f,'Air');
@@ -339,7 +347,7 @@ m_dot = rho_a*Q_a;
             % Exergy
             % phi = h-h0 + T0*(s-s0)+u^2/2+gz
             % Negligible height difference
-            phi(i) = h(i)-h0 + T0*(s(i)-s0)+u(i)^2/2;
+            psi(i) = h(i)-h0 + T0*(s(i)-s0)+u(i)^2/2;
             % Considering height difference
             % phi(i) = h(i)-h0 + T0*(s(i)-s0)+u(i)^2/2+g*z(i)
         
@@ -401,19 +409,24 @@ m_dot = rho_a*Q_a;
             a = pi*D*U/(m_dot*C_p);
             T(i+1) = T_s + (T(i) - T_s)*exp(-a*dL);
             dT = (T(i+1) - T_old)/T_old;
-            T_old = T(i+1);
+            T_old = max(T(i+1),T_s);
             count_T = count + 1; 
         end
     end
     
-    T_f = T_s + ( T(end-1)-T(end) )/log((T(end-1)-T_s)/(T(end)-T_s)); % assuming soil T below gas temp and joule-thompson effect negligible
+    if T(end) == T_s
+       T_f = T_s;
+    else
+        T_f = T_s + ( T(end-1)-T(end) )/log((T(end-1)-T_s)/(T(end)-T_s)); % assuming soil T below gas temp and joule-thompson effect negligible
+    end
+
     rho(end) = py.CoolProp.CoolProp.PropsSI('D','P',P(end),'T',T_f,'Air');
     h(end) = py.CoolProp.CoolProp.PropsSI('H','P',P(end),'T',T_f,'Air');
     s(end) = py.CoolProp.CoolProp.PropsSI('S','P',P(end),'T',T_f,'Air');
     nu(end) = py.CoolProp.CoolProp.PropsSI('V','P',P(end),'T',T_f,'Air');
     Z(end) = py.CoolProp.CoolProp.PropsSI('Z','P',P(end),'T',T_f,'Air');
     u(end) = 14.7349*( Q_a_day/D_mm^2 )*( P_a/T_a )*(Z(end)*T_f/P(end)); % Q_b has to be converted to m3/day and D to mm
-    phi(end) = h(end)-h0 + T0*(s(end)-s0)+u(end)^2/2;
+    psi(end) = h(end)-h0 + T0*(s(end)-s0)+u(end)^2/2;
     
     % Plots
     % figure('Color',[1 1 1])
@@ -421,7 +434,7 @@ m_dot = rho_a*Q_a;
     % xlabel('L [m]')
     % ylabel('P [Pa]')
     figure(P_fig)   % Pressure drop profile
-    plot(L/1000,P/1000) % kPa x km
+    plot(L/1000,P/1000,LStyle{j}) % kPa x km
     % plot(L/1000,P/1000,LStyle{j}) % kPa x km
     xlabel('L [km]')
     ylabel('P [kPa]')
@@ -432,32 +445,35 @@ m_dot = rho_a*Q_a;
     
     % figure('Color',[1 1 1])
     figure(U_fig)   % Velocity profile
-    plot(L/1000,u)
+    plot(L/1000,u,LStyle{j})
     % plot(L/1000,u,LStyle{j})
     xlabel('L [km]')
     ylabel('U [m/s]')
     
     figure(x_fig)   % Entropy profile
-    plot(L/1000,phi)
+    plot(L/1000,psi,LStyle{j})
     % plot(L/1000,phi,LStyle{j})
     xlabel('L [km]')
-    ylabel('\Phi [kJ]')
+    ylabel('\Psi [kJ]')
 
     figure(T_fig)   % Temperature profile
-    plot(L/1000,T)
+    plot(L/1000,T,LStyle{j})
     % plot(L/1000,phi,LStyle{j})
     xlabel('L [km]')
-    ylabel('T [°C]')
-% end
+    ylabel('T [K]')
+end
 
-% figure(P_fig)
-% legend(string(Var))
-% 
-% figure(U_fig)
-% legend(string(Var))
-% 
-% figure(x_fig)
-% legend(string(Var))
+figure(P_fig)
+legend(string(Var))
+
+figure(U_fig)
+legend(string(Var))
+
+figure(x_fig)
+legend(string(Var))
+
+figure(T_fig)
+legend(string(Var))
 
 %% Erosional velocity Ve
 % usually velocity should be limited to 20 m/s. Operational velocity is
