@@ -1,7 +1,6 @@
 % pressure over 70 km pipeline
 pyversion c:\Anaconda3\python.exe % Sets Python 3.11 as a interpreter
 
-
 %% Steady-state analysis with constant T - 1 km pipe - Panhandle B flow equation
 clear
 clc
@@ -79,8 +78,8 @@ cp = py.CoolProp.CoolProp.PropsSI('C','P',P_a,'T',T_a,'Air');
 cv = py.CoolProp.CoolProp.PropsSI('Cvmass','P',P_a,'T',T_a,'Air');
 gam = cp/cv;
 
-for j=1:length(Var)
-    H_2 = Var{j};
+% for j=1:length(Var)
+%     H_2 = Var{j};
 
     A = pi*D^2/4; % mm2
     L = 0:dL:L_m; % 70 km pipe with increments of 1 km
@@ -165,7 +164,8 @@ for j=1:length(Var)
             s_H = 0.0684*G*(dh)/(T_f*Z_f);
             L_e = dL*(exp(s_H)-1)/s_H;
             P(i+1) = sqrt( (P_1_kPa^2 - ( Q_a_day/(1.002e-2*E*(T_a/P_a_kPa)^1.02*D_mm^2.53) )^(1/0.51)*G^0.961*T_f*(L_e/1000)*Z_f )/exp(s_H) );
-            
+            % Panhandle B equation - valid for large diameter, high pressure flows with 4M < Re < 40M
+
             dP = (P(i+1) - P_2_kPa)/P_2_kPa;
             P_2_kPa = P(i+1);
             count = count + 1;
@@ -188,6 +188,7 @@ for j=1:length(Var)
     % xlabel('L [m]')
     % ylabel('P [Pa]')
     figure(P_fig)   % Pressure drop profile
+    % plot(L/1000,P/1000) % kPa x km
     plot(L/1000,P/1000,LStyle{j}) % kPa x km
     xlabel('L [km]')
     ylabel('P [kPa]')
@@ -198,25 +199,27 @@ for j=1:length(Var)
     
     % figure('Color',[1 1 1])
     figure(U_fig)   % Velocity profile
+    % plot(L/1000,u)
     plot(L/1000,u,LStyle{j})
     xlabel('L [km]')
-    ylabel('U [m/s]')
+    ylabel('u [m/s]')
     
     figure(x_fig)   % Entropy profile
+    % plot(L/1000,psi)
     plot(L/1000,psi,LStyle{j})
     xlabel('L [km]')
     ylabel('\Psi[kJ/kg]')
 
-end
-
-figure(P_fig)
-legend(string(Var))
-
-figure(U_fig)
-legend(string(Var))
-
-figure(x_fig)
-legend(string(Var))
+% end
+% 
+% figure(P_fig)
+% legend(string(Var))
+% 
+% figure(U_fig)
+% legend(string(Var))
+% 
+% figure(x_fig)
+% legend(string(Var))
 
 %% Steady-state analysis with variable T - 1 km pipe - Panhandle B flow equation
 clear
@@ -435,7 +438,6 @@ for j=1:length(Var)
     % ylabel('P [Pa]')
     figure(P_fig)   % Pressure drop profile
     plot(L/1000,P/1000,LStyle{j}) % kPa x km
-    % plot(L/1000,P/1000,LStyle{j}) % kPa x km
     xlabel('L [km]')
     ylabel('P [kPa]')
     % plot(L/1610,P*0.000145038 - 14.73) % psig x mi
@@ -446,19 +448,16 @@ for j=1:length(Var)
     % figure('Color',[1 1 1])
     figure(U_fig)   % Velocity profile
     plot(L/1000,u,LStyle{j})
-    % plot(L/1000,u,LStyle{j})
     xlabel('L [km]')
-    ylabel('U [m/s]')
+    ylabel('u [m/s]')
     
     figure(x_fig)   % Entropy profile
     plot(L/1000,psi,LStyle{j})
-    % plot(L/1000,phi,LStyle{j})
     xlabel('L [km]')
-    ylabel('\Psi [kJ]')
+    ylabel('\Psi [kJ/kg]')
 
     figure(T_fig)   % Temperature profile
     plot(L/1000,T,LStyle{j})
-    % plot(L/1000,phi,LStyle{j})
     xlabel('L [km]')
     ylabel('T [K]')
 end
@@ -481,13 +480,19 @@ legend(string(Var))
 % Ambient conditions
 T_a = 15+273.15; % T = 15 oC - ~288 K
 P_a = 101325 ; % P = 101.325 kPa
-rho = py.CoolProp.CoolProp.PropsSI('D','P',P_a,'T',T_a,'Air');
+T = 323;
+P = 7000000;
+
+rho_a = py.CoolProp.CoolProp.PropsSI('D','P',P_a,'T',T_a,'Air');
+rho = py.CoolProp.CoolProp.PropsSI('D','P',P,'T',T,'Air');
+
 cte = 100;  % cte ranges from 100 to 250
             % cte = 100 for continuous service
             %       125 for noncontinuous service
             %       120-200 for continuous, noncorrosive or corrosive
             %       controlled, if no solid particles are present
             % "Handbook of Natural Gas Transmission and Processing"
+Ve_a = 1.22*cte/sqrt(rho_a) 
 Ve = 1.22*cte/sqrt(rho) 
 % Equation in Nasr and Connor, 2014 - Natural Gas Engineering and Safety 
 % Challenges
