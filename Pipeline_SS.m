@@ -13,7 +13,7 @@ P_a = 101325 ; % P = 101.325 kPa
 G = 1;      % Specific gas gravity - for air G = 1
 
 P_in = 7e6; % 7 MPa
-T_1 = 5 + 273.15; % Common operational condition assumtion Nasr and Connor "Natural Gas Engineering and Safety Challenges"
+T_1 = 5 + 273.15; % Common operational condition assumption Nasr and Connor "Natural Gas Engineering and Safety Challenges"
 T_f = T_1; % Isothermal assumption
     % !!! High temperatures on the outlet of compressor stations,
     % which can persist for up to 50 km. !!!
@@ -66,7 +66,7 @@ grid on
 U_fig = figure('Color',[1 1 1]);
 hold on
 grid on
-x_fig = figure('Color',[1 1 1]);
+psi_fig = figure('Color',[1 1 1]);
 hold on
 grid on
 
@@ -125,7 +125,7 @@ for j=1:length(Var)
         % Exergy
         % phi = h-h0 + T0*(s-s0)+u^2/2+gz
         % Negligible height difference
-        psi(i) = h(i)-h0 + T0*(s(i)-s0)+u(i)^2/2;
+        psi(i) = h(i)-h0 - T0*(s(i)-s0)+u(i)^2/2;
         % Considering height difference
         % phi(i) = h(i)-h0 + T0*(s(i)-s0)+u(i)^2/2+g*z(i)
     
@@ -180,17 +180,17 @@ for j=1:length(Var)
     nu(end) = py.CoolProp.CoolProp.PropsSI('V','P',P(end),'T',T_f,'Air');
     Z(end) = py.CoolProp.CoolProp.PropsSI('Z','P',P(end),'T',T_f,'Air');
     u(end) = 14.7349*( Q_a_day/D_mm^2 )*( P_a/T_a )*(Z(end)*T_f/P(end)); % Q_b has to be converted to m3/day and D to mm
-    psi(end) = h(end)-h0 + T0*(s(end)-s0)+u(end)^2/2;
+    psi(end) = h(end)-h0 - T0*(s(end)-s0)+u(end)^2/2; % +gz ?
     
     % Plots
-    % figure('Color',[1 1 1])
+    
     % plot(L,P)           % Pa x m 
     % xlabel('L [m]')
     % ylabel('P [Pa]')
     figure(P_fig)   % Pressure drop profile
     plot(L/1000,P/1000,LStyle{j}) % kPa x km
     xlabel('L [km]')
-    ylabel('P [kPa]')
+    ylabel('P [kPa]')   
     % plot(L/1610,P*0.000145038 - 14.73) % psig x mi
     % xlabel('L [mi]')
     % ylabel('P [psig]')
@@ -200,13 +200,12 @@ for j=1:length(Var)
     figure(U_fig)   % Velocity profile
     plot(L/1000,u,LStyle{j})
     xlabel('L [km]')
-    ylabel('U [m/s]')
+    ylabel('u [m/s]')
     
-    figure(x_fig)   % Entropy profile
-    plot(L/1000,psi,LStyle{j})
+    figure(psi_fig)   % Entropy profile
+    plot(L/1000,psi/1000,LStyle{j})
     xlabel('L [km]')
-    ylabel('\Psi[kJ/kg]')
-
+    ylabel('\Psi [kJ/kg]')
 end
 
 figure(P_fig)
@@ -215,13 +214,13 @@ legend(string(Var))
 figure(U_fig)
 legend(string(Var))
 
-figure(x_fig)
+figure(psi_fig)
 legend(string(Var))
 
 %% Steady-state analysis with variable T - 1 km pipe - Panhandle B flow equation
 clear
 clc
-close all
+% close all
 %-------------------- Problem parameters ------------------------------%
 % Ambient conditions
 T_a = 15+273.15; % T = 15 oC - ~288 K
@@ -229,7 +228,7 @@ P_a = 101325 ; % P = 101.325 kPa
 G = 1;      % Specific gas gravity - for air G = 1
 
 P_in = 7e6; % 7 MPa
-T_in = 15 + 273.15; % Compressor output temperature
+T_in = 50 + 273.15; % Compressor output temperature
 
 % Flow rate
 Q_a = 14*1000000/(24*3600); % Conversion from mcmd (millions of cubic meters
@@ -239,7 +238,7 @@ Q_a = 14*1000000/(24*3600); % Conversion from mcmd (millions of cubic meters
 
 % Pipe
 D = 0.9; % 900 mm
-dL = 1000;    % Distance increment
+dL = 1000;    % Distance increment [m]
 L_m = 120000; % Total distance [m]
 
 eps = 0.04e-3; % Absolute roughness 0.04 mm
@@ -259,6 +258,7 @@ T_s = 5 + 273.15; % 5 °C (Nasr and Connor "Natural Gas Engineering and Safety C
 % Generate multiple plots while varying one variable var (can be any
 % parameter set in the initial statements)
 % Var = {10 20 50 100 200 500}; % Values to be taken by var - Height
+% Var = {278.15 283 288 293 298 323 373}; % Values to be taken by var - Inlet Temperature
 Var = {278.15 283 288 293 298 323 373}; % Values to be taken by var - Inlet Temperature
 LStyle = {'b','r','k','b--','r--','k--','b-.'};
 
@@ -270,7 +270,10 @@ grid on
 U_fig = figure('Color',[1 1 1]);
 hold on
 grid on
-x_fig = figure('Color',[1 1 1]);
+psi_fig = figure('Color',[1 1 1]);
+hold on
+grid on
+psi_comp_fig = figure('Color',[1 1 1]);
 hold on
 grid on
 T_fig = figure('Color',[1 1 1]);
@@ -287,7 +290,7 @@ cv = py.CoolProp.CoolProp.PropsSI('Cvmass','P',P_a,'T',T_a,'Air');
 gam = cp/cv;
 
 m_dot = rho_a*Q_a;
-
+% j=1;
 for j=1:length(Var)
     % H_2 = Var{j};
     T_in = Var{j};
@@ -347,7 +350,7 @@ for j=1:length(Var)
             % Exergy
             % phi = h-h0 + T0*(s-s0)+u^2/2+gz
             % Negligible height difference
-            psi(i) = h(i)-h0 + T0*(s(i)-s0)+u(i)^2/2;
+            psi(i) = h(i)-h0 - T0*(s(i)-s0)+u(i)^2/2;
             % Considering height difference
             % phi(i) = h(i)-h0 + T0*(s(i)-s0)+u(i)^2/2+g*z(i)
         
@@ -400,7 +403,8 @@ for j=1:length(Var)
             % Convection heat transfer assuming constant pipe temperature (5 °C)
             Pr = py.CoolProp.CoolProp.PropsSI('Prandtl','P',P_f*1000,'T',T_f,'Air');
             k_fl = py.CoolProp.CoolProp.PropsSI('conductivity','P',P_f*1000,'T',T_f,'Air');
-            Nu = 0.023*Re(i)^0.8*Pr^0.4; % Adjusted Colburn equation for cooling - "Themal fluid sciences - Cengel"
+            Nu = 0.046*Re(i)^0.8*Pr^0.4; % Adjusted Colburn equation for cooling - "Themal fluid sciences - Cengel"
+            % Nu = 0.023*Re(i)^0.8*Pr^0.4; % Adjusted Colburn equation for cooling - "Themal fluid sciences - Cengel"
                                          % Not ideal for non-smooth
                                          % pipes !!!
             U = Nu*k_fl/dL;
@@ -426,7 +430,7 @@ for j=1:length(Var)
     nu(end) = py.CoolProp.CoolProp.PropsSI('V','P',P(end),'T',T_f,'Air');
     Z(end) = py.CoolProp.CoolProp.PropsSI('Z','P',P(end),'T',T_f,'Air');
     u(end) = 14.7349*( Q_a_day/D_mm^2 )*( P_a/T_a )*(Z(end)*T_f/P(end)); % Q_b has to be converted to m3/day and D to mm
-    psi(end) = h(end)-h0 + T0*(s(end)-s0)+u(end)^2/2;
+    psi(end) = h(end)-h0 - T0*(s(end)-s0)+u(end)^2/2;
     
     % Plots
     % figure('Color',[1 1 1])
@@ -448,19 +452,30 @@ for j=1:length(Var)
     plot(L/1000,u,LStyle{j})
     % plot(L/1000,u,LStyle{j})
     xlabel('L [km]')
-    ylabel('U [m/s]')
+    ylabel('u [m/s]')
     
-    figure(x_fig)   % Entropy profile
-    plot(L/1000,psi,LStyle{j})
+    figure(psi_fig) % Exergy profile
+    plot(L/1000,psi/1000,LStyle{j})
     % plot(L/1000,phi,LStyle{j})
     xlabel('L [km]')
-    ylabel('\Psi [kJ]')
+    ylabel('\Psi [kJ/kg]')
 
     figure(T_fig)   % Temperature profile
     plot(L/1000,T,LStyle{j})
     % plot(L/1000,phi,LStyle{j})
     xlabel('L [km]')
     ylabel('T [K]')
+
+    % figure(psi_comp_fig) % Exergy profile
+    % plot(L/1000,(h-h0)./1000,LStyle{1})
+    % plot(L/1000,(-T0*(s-s0))./1000,LStyle{2})
+    % plot(L/1000,(u.^2/2)./1000,LStyle{3})
+    % title('T_{in} = ',T_in)
+    % legend('h-h0','-T0 (s-s0)','u^2/2')
+    % 
+    % % plot(L/1000,phi,LStyle{j})
+    % xlabel('L [km]')
+    % ylabel('\Psi components[kJ/kg]')
 end
 
 figure(P_fig)
@@ -469,7 +484,7 @@ legend(string(Var))
 figure(U_fig)
 legend(string(Var))
 
-figure(x_fig)
+figure(psi_fig)
 legend(string(Var))
 
 figure(T_fig)
