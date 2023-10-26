@@ -35,13 +35,19 @@ E = 0.75;   % Pipeline efficiency
     % "Handbook of natural gas transmission and processing"
 
 H_1 = 0;
-H_2 = 1;
+H_2 = 500;
 
 % Generate multiple plots while varying one variable var (can be any
 % parameter set in the initial statements)
-% Var = {1 50 100 200 300 400 500}; % Values to be taken by var
-Var = {1};
+% Var = {1 50 100 200 300 400 500}; % Values to be taken by H
+% Var = {500};                        % Value for H
+%
+Var = {30000 60000 90000 120000}; % Values for height increment period
+
 LStyle = {'b','r','k','b--','r--','k--','b-.'};
+
+% T_sin = 6000; % Period of sinusoidal height increment
+dh_sin = 50;    % Amplitude of sinusoidal height increment
 
 % % Sanity check with book equation comparisons
 % G = 0.6
@@ -78,8 +84,9 @@ cp = py.CoolProp.CoolProp.PropsSI('C','P',P_a,'T',T_a,'Air');
 cv = py.CoolProp.CoolProp.PropsSI('Cvmass','P',P_a,'T',T_a,'Air');
 gam = cp/cv;
 
-% for j=1:length(Var)
-%     H_2 = Var{j};
+for j=1:length(Var)
+    % H_2 = Var{j};
+    T_sin = Var{j};
 
     A = pi*D^2/4; % mm2
     L = 0:dL:L_m; % 70 km pipe with increments of 1 km
@@ -161,7 +168,7 @@ gam = cp/cv;
             % Negligible height difference
             % P(i+1) = sqrt( P_1_kPa^2 - ( Q_a_day/(1.002e-2*E*(T_a/P_a_kPa)^1.02*D_mm^2.53) )^(1/0.51)*G^0.961*T_f*(dL/1000)*Z_f );
             % considering height difference
-            s_H = 0.0684*G*(dh)/(T_f*Z_f);
+            s_H = 0.0684*G*(dh+dh_sin*sin(2*pi/T_sin*(i*dL) ))/(T_f*Z_f);
             L_e = dL*(exp(s_H)-1)/s_H;
             P(i+1) = sqrt( (P_1_kPa^2 - ( Q_a_day/(1.002e-2*E*(T_a/P_a_kPa)^1.02*D_mm^2.53) )^(1/0.51)*G^0.961*T_f*(L_e/1000)*Z_f )/exp(s_H) );
             % Panhandle B equation - valid for large diameter, high pressure flows with 4M < Re < 40M
@@ -218,6 +225,11 @@ legend(string(Var))
 
 figure(psi_fig)
 legend(string(Var))
+
+% figure('Color',[1 1 1]) % Height profile
+% plot(L/1000, (1:length(L))*dh + dh_sin*sin(2*pi/30000*dL*(1:length(L))))
+% xlabel('L [km]')
+% ylabel('H [m]')
 
 %% Steady-state analysis with variable T - 1 km pipe - Panhandle B flow equation
 clear
