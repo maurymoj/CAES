@@ -40,9 +40,9 @@ H_2 = 1;
 
 % Generate multiple plots while varying one variable var (can be any
 % parameter set in the initial statements)
-Var = {10 20 50 100 200 500}; % Values to be taken by var
-% Var = {1};
-LStyle = {'b','r','k','b--','r--','k--'};
+% Var = {1 50 100 200 300 400 500}; % Values to be taken by var
+Var = {1};
+LStyle = {'b','r','k','b--','r--','k--','b-.'};
 
 % % Sanity check with book equation comparisons
 % G = 0.6
@@ -151,9 +151,9 @@ for j=1:length(Var)
         count = 0;
         
         while (dP > 0.0001 & count < 10)
-            P_f = 2/3*( P_1_kPa + P_2_kPa-(P_1_kPa*P_2_kPa)/(P_1_kPa+P_2_kPa) );
+            P_f_kPa = 2/3*( P_1_kPa + P_2_kPa-(P_1_kPa*P_2_kPa)/(P_1_kPa+P_2_kPa) );
             % P_f = (P_1_kPa + P_2_kPa)/2;
-            Z_f = py.CoolProp.CoolProp.PropsSI('Z','P',P_f*1000,'T',T_f,'Air');
+            Z_f = py.CoolProp.CoolProp.PropsSI('Z','P',P_f_kPa*1000,'T',T_f,'Air');
             % Z_f = 1/(1+
             % ((P_f*0.000145038-14.73)*344400*10^(1.785*G)/(T_f*1.8)^3.825));
             % - Compressibility formula for natural gas
@@ -228,7 +228,7 @@ P_a = 101325 ; % P = 101.325 kPa
 G = 1;      % Specific gas gravity - for air G = 1
 
 P_in = 7e6; % 7 MPa
-T_in = 50 + 273.15; % Compressor output temperature
+T_in = 5 + 273.15; % Compressor output temperature
 
 % Flow rate
 Q_a = 14*1000000/(24*3600); % Conversion from mcmd (millions of cubic meters
@@ -240,6 +240,7 @@ Q_a = 14*1000000/(24*3600); % Conversion from mcmd (millions of cubic meters
 D = 0.9; % 900 mm
 dL = 1000;    % Distance increment [m]
 L_m = 120000; % Total distance [m]
+% L_m = 240000; % Total distance [m]
 
 eps = 0.04e-3; % Absolute roughness 0.04 mm
 
@@ -259,7 +260,9 @@ T_s = 5 + 273.15; % 5 °C (Nasr and Connor "Natural Gas Engineering and Safety C
 % parameter set in the initial statements)
 % Var = {10 20 50 100 200 500}; % Values to be taken by var - Height
 % Var = {278.15 283 288 293 298 323 373}; % Values to be taken by var - Inlet Temperature
-Var = {278.15 283 288 293 298 323 373}; % Values to be taken by var - Inlet Temperature
+% Var = {278.15 298 318 338 358 378}; % Values to be taken by var - Inlet Temperature
+% Var = {100 + 273.15};
+Var = {50 + 273.15};
 LStyle = {'b','r','k','b--','r--','k--','b-.'};
 
 %----------------------------------------------------------------------%
@@ -326,7 +329,6 @@ for j=1:length(Var)
     for i=1:length(L)-1
         dT = 10;
         count_T = 0;
-        % T_old = 0.98*T(i);
         T_old = max(0.98*T(i),T_s);
         while (dT > 0.0001 & count_T < 1000) 
             
@@ -376,9 +378,9 @@ for j=1:length(Var)
             count = 0;
             
             while (dP > 0.0001 & count < 1000)
-                P_f = 2/3*( P_1_kPa + P_2_kPa-(P_1_kPa*P_2_kPa)/(P_1_kPa+P_2_kPa) );
+                P_f_kPa = 2/3*( P_1_kPa + P_2_kPa-(P_1_kPa*P_2_kPa)/(P_1_kPa+P_2_kPa) );
                 % P_f = (P_1_kPa + P_2_kPa)/2;
-                Z_f = py.CoolProp.CoolProp.PropsSI('Z','P',P_f*1000,'T',T_f,'Air');
+                Z_f = py.CoolProp.CoolProp.PropsSI('Z','P',P_f_kPa*1000,'T',T_f,'Air');
                 % Z_f = 1/(1+
                 % ((P_f*0.000145038-14.73)*344400*10^(1.785*G)/(T_f*1.8)^3.825));
                 % - Compressibility formula for natural gas
@@ -397,19 +399,48 @@ for j=1:length(Var)
             end
             P(i+1) = 1000*P(i+1); % conversion back to Pa
             
-
             %-----------------------------------------------------------------
             % Temperature profile
             % Convection heat transfer assuming constant pipe temperature (5 °C)
-            Pr = py.CoolProp.CoolProp.PropsSI('Prandtl','P',P_f*1000,'T',T_f,'Air');
-            k_fl = py.CoolProp.CoolProp.PropsSI('conductivity','P',P_f*1000,'T',T_f,'Air');
-            Nu = 0.046*Re(i)^0.8*Pr^0.4; % Adjusted Colburn equation for cooling - "Themal fluid sciences - Cengel"
-            % Nu = 0.023*Re(i)^0.8*Pr^0.4; % Adjusted Colburn equation for cooling - "Themal fluid sciences - Cengel"
-                                         % Not ideal for non-smooth
-                                         % pipes !!!
-            U = Nu*k_fl/dL;
+            Pr = py.CoolProp.CoolProp.PropsSI('Prandtl','P',P_f_kPa*1000,'T',T_f,'Air');
+            k_fl = py.CoolProp.CoolProp.PropsSI('conductivity','P',P_f_kPa*1000,'T',T_f,'Air');
+
+            % Bhatti and Shah
+            % Appropriate for rough pipes and Re > 10000, 0.5 < Pr < 10,
+            % 0.002 < e/D < 0.05
+            Re_e=Re(i)*epsD*sqrt(f(i)/8);
+            Nu = ( (f(i)/8)*Re(i)*Pr )/( 1+sqrt(f(i)/8)*(4.5*Re_e^0.2*sqrt(Pr)-8.48) );
+            if Re(i) < 10000
+                warning('Re < 10000, Nu correlation not appropriate')
+            elseif (Pr < 0.5) || (Pr > 10)
+                warning('Pr outside the Nu correlation appropriate region (0.5 < Pr < 10)')
+            end
+
+            % Gnielinski Nu equation, 
+            % Appropriate for 0.5 < Pr < 2000, 3000 < Re < 5e6
+            % Adequate for a first approx. for rough tubes, but not ideal
+            % Nu = ( (f(i)/8)*(Re(i)-1000)*Pr )/( 1+12.7*(f(i)/8)^0.5*(Pr^(2/3)-1) );
+            % if (Re(i) < 3000) || (Re(i) > 5e6)
+            %     warning('Re outside the Nu correlation appropriate region (3000 < Re < 5e6)')
+            % elseif (Pr < 0.5) || (Pr > 2000)
+            %     warning('Pr outside the Nu correlation appropriate region (0.5 < Pr < 2000)')
+            % end
+            
+            % Adjusted Colburn Nu equation for cooling - "Themal fluid sciences - Cengel"
+            % Appropriate for 0.6 < Pr < 160, Re > 10000
+            % Nu = 0.023*Re(i)^0.8*Pr^0.4; % Adjusted Colburn equation for cooling - "Thermal fluid sciences - Cengel" not ideal for non-smooth pipes!!
+            % if (Re(i) < 10000)
+            %     warning('Re outside the Nu correlation appropriate region (Re > 10000)')
+            % elseif (Pr < 0.6) || (Pr > 160)
+            %     warning('Pr outside the Nu correlation appropriate region (0.6 < Pr < 160)')
+            % end
+
+            % Nu_C(i) = Nu;
+            % Nu = Nu_B(i);
+            U = Nu*k_fl/D;
+            
             %-----------------------------------------------------------------
-            C_p = py.CoolProp.CoolProp.PropsSI('C','P',P_f*1000,'T',T_f,'Air');
+            C_p = py.CoolProp.CoolProp.PropsSI('C','P',P_f_kPa*1000,'T',T_f,'Air');
             a = pi*D*U/(m_dot*C_p);
             T(i+1) = T_s + (T(i) - T_s)*exp(-a*dL);
             dT = (T(i+1) - T_old)/T_old;
@@ -421,7 +452,7 @@ for j=1:length(Var)
     if T(end) == T_s
        T_f = T_s;
     else
-        T_f = T_s + ( T(end-1)-T(end) )/log((T(end-1)-T_s)/(T(end)-T_s)); % assuming soil T below gas temp and joule-thompson effect negligible
+       T_f = T_s + ( T(end-1)-T(end) )/log( (T(end-1)-T_s)/(T(end)-T_s) ); % assuming soil T below gas temp and joule-thompson effect negligible
     end
 
     rho(end) = py.CoolProp.CoolProp.PropsSI('D','P',P(end),'T',T_f,'Air');
@@ -466,10 +497,10 @@ for j=1:length(Var)
     xlabel('L [km]')
     ylabel('T [K]')
 
-    % figure(psi_comp_fig) % Exergy profile
-    % plot(L/1000,(h-h0)./1000,LStyle{1})
-    % plot(L/1000,(-T0*(s-s0))./1000,LStyle{2})
-    % plot(L/1000,(u.^2/2)./1000,LStyle{3})
+    figure(psi_comp_fig) % Exergy profile
+    plot(L/1000,(h-h0)./1000,LStyle{1})
+    plot(L/1000,(-T0*(s-s0))./1000,LStyle{2})
+    plot(L/1000,(u.^2/2)./1000,LStyle{3})
     % title('T_{in} = ',T_in)
     % legend('h-h0','-T0 (s-s0)','u^2/2')
     % 
@@ -490,6 +521,8 @@ legend(string(Var))
 figure(T_fig)
 legend(string(Var))
 
+figure(psi_comp_fig)
+legend('h-h0','-T0 (s-s0)','u^2/2')
 %% Erosional velocity Ve
 % usually velocity should be limited to 20 m/s. Operational velocity is
 % usually limited to 50% of Ve
