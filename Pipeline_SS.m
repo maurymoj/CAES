@@ -45,8 +45,8 @@ dh_sin = 50;    % Amplitude of sinusoidal height increment
 % Var = {1 50 100 200 300 400 500}; % Values to be taken by H
 % Var = {500};                        % Value for H
 %
-% Var = {30000 60000 90000 120000}; % Values for height increment period
-Var = {0 25 50 75 100}; % Values for height increment period
+Var = {30000 60000 90000 120000}; % Values for height increment period
+% Var = {0 25 50 75 100}; % Values for height increment period
 
 LStyle = {'b','r','k','b--','r--','k--','b-.'};
 
@@ -92,8 +92,8 @@ gam = cp/cv;
 
 for j=1:length(Var)
     % H_2 = Var{j};
-    % T_sin = Var{j};
-    dh_sin = Var{j};
+    T_sin = Var{j};
+    % dh_sin = Var{j};
 
     A = pi*D^2/4; % mm2
     L = 0:dL:L_m; % 70 km pipe with increments of 1 km
@@ -224,7 +224,7 @@ for j=1:length(Var)
     ylabel('\Psi [kJ/kg]')
 
     figure(h_fig) % Height profile
-    plot(L/1000, (1:length(L))*dh + dh_sin*sin(2*pi/30000*dL*(1:length(L))))
+    plot(L/1000, (1:length(L))*dh + dh_sin*sin(2*pi/T_sin*dL*(1:length(L))))
     xlabel('L [km]')
     ylabel('H [m]')
 end
