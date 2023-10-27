@@ -212,72 +212,62 @@ for j=1:length(Var)
     
     % Plots
     
-    % Individual plots
     % plot(L,P)           % Pa x m 
     % xlabel('L [m]')
     % ylabel('P [Pa]')
-    % figure(P_fig)   % Pressure drop profile
+    figure(P_fig)   % Pressure drop profile
     % plot(L/1000,P/1000) % kPa x km
-    % plot(L/1000,P/1000,LStyle{j}) % kPa x km
-    % xlabel('L [km]')
-    % ylabel('P [kPa]')   
+    plot(L/1000,P/1000,LStyle{j}) % kPa x km
+    xlabel('L [km]')
+    ylabel('P [kPa]')   
     % plot(L/1610,P*0.000145038 - 14.73) % psig x mi
     % xlabel('L [mi]')
     % ylabel('P [psig]')
     % ylim([1150 1450])
+    
     % figure('Color',[1 1 1])
-    % figure(U_fig)   % Velocity profile
+    figure(U_fig)   % Velocity profile
     % plot(L/1000,u)
-    % plot(L/1000,u,LStyle{j})
-    % xlabel('L [km]')
-    % ylabel('u [m/s]')
-    % figure(psi_fig)   % Entropy profile
-    % plot(L/1000,psi/1000,LStyle{j})
-    % xlabel('L [km]')
-    % ylabel('\Psi [kJ/kg]')
-    % figure(h_fig) % Height profile
-    % plot(L/1000, (1:length(L))*dh + dh_sin*sin(2*pi/T_sin*dL*(1:length(L))))
-    % xlabel('L [km]')
-    % ylabel('H [m]')
+    plot(L/1000,u,LStyle{j})
+    xlabel('L [km]')
+    ylabel('u [m/s]')
+    
+    figure(psi_fig)   % Entropy profile
+    plot(L/1000,psi/1000,LStyle{j})
+    xlabel('L [km]')
+    ylabel('\Psi [kJ/kg]')
 
-    % Subplot structure
+    figure(h_fig) % Height profile
+    plot(L/1000, (1:length(L))*dh + dh_sin*sin(2*pi/T_sin*dL*(1:length(L))))
+    xlabel('L [km]')
+    ylabel('H [m]')
+
     figure(sp)
     subplot(2,2,1)
     plot(L/1000,P/1000,LStyle{j}) % kPa x km
     xlabel('L [km]')
     ylabel('P [kPa]') 
-    % Velocity profile
     subplot(2,2,2)
     plot(L/1000,u,LStyle{j})
     xlabel('L [km]')
     ylabel('u [m/s]')
     subplot(2,2,3)
-    % Entropy profile
-    plot(L/1000,psi/1000,LStyle{j})
-    xlabel('L [km]')
-    ylabel('\Psi [kJ/kg]')
     subplot(2,2,4)
-    % Height profile
-    plot(L/1000, (1:length(L))*dh + dh_sin*sin(2*pi/T_sin*dL*(1:length(L))),LStyle{j})
-    xlabel('L [km]')
-    ylabel('H [m]')
 
 end
 
-% figure(P_fig)
-% legend(string(Var))
-% 
-% figure(U_fig)
-% legend(string(Var))
-% 
-% figure(psi_fig)
-% legend(string(Var))
-% 
-% figure(h_fig)
-% legend(string(Var))
+figure(P_fig)
+legend(string(Var))
 
-figure(sp)
-legend(string(Var),'Location','northwest')
+figure(U_fig)
+legend(string(Var))
+
+figure(psi_fig)
+legend(string(Var))
+
+figure(h_fig)
+legend(string(Var))
+
 % figure('Color',[1 1 1]) % Height profile
 % plot(L/1000, (1:length(L))*dh + dh_sin*sin(2*pi/30000*dL*(1:length(L))))
 % xlabel('L [km]')
