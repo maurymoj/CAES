@@ -37,17 +37,20 @@ E = 0.75;   % Pipeline efficiency
 H_1 = 0;
 H_2 = 500;
 
+T_sin = 60000; % Period of sinusoidal height increment
+dh_sin = 50;    % Amplitude of sinusoidal height increment
+
 % Generate multiple plots while varying one variable var (can be any
 % parameter set in the initial statements)
 % Var = {1 50 100 200 300 400 500}; % Values to be taken by H
 % Var = {500};                        % Value for H
 %
-Var = {30000 60000 90000 120000}; % Values for height increment period
+% Var = {30000 60000 90000 120000}; % Values for height increment period
+Var = {0 25 50 75 100}; % Values for height increment period
 
 LStyle = {'b','r','k','b--','r--','k--','b-.'};
 
-% T_sin = 6000; % Period of sinusoidal height increment
-dh_sin = 50;    % Amplitude of sinusoidal height increment
+
 
 % % Sanity check with book equation comparisons
 % G = 0.6
@@ -74,6 +77,9 @@ grid on
 psi_fig = figure('Color',[1 1 1]);
 hold on
 grid on
+h_fig = figure('Color',[1 1 1]);
+hold on
+grid on
 
 rho_a = py.CoolProp.CoolProp.PropsSI('D','P',P_a,'T',T_a,'Air');
 T0 = T_a;
@@ -86,7 +92,8 @@ gam = cp/cv;
 
 for j=1:length(Var)
     % H_2 = Var{j};
-    T_sin = Var{j};
+    % T_sin = Var{j};
+    dh_sin = Var{j};
 
     A = pi*D^2/4; % mm2
     L = 0:dL:L_m; % 70 km pipe with increments of 1 km
@@ -215,6 +222,11 @@ for j=1:length(Var)
     plot(L/1000,psi/1000,LStyle{j})
     xlabel('L [km]')
     ylabel('\Psi [kJ/kg]')
+
+    figure(h_fig) % Height profile
+    plot(L/1000, (1:length(L))*dh + dh_sin*sin(2*pi/30000*dL*(1:length(L))))
+    xlabel('L [km]')
+    ylabel('H [m]')
 end
 
 figure(P_fig)
@@ -224,6 +236,9 @@ figure(U_fig)
 legend(string(Var))
 
 figure(psi_fig)
+legend(string(Var))
+
+figure(h_fig)
 legend(string(Var))
 
 % figure('Color',[1 1 1]) % Height profile
