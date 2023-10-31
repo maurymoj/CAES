@@ -1,7 +1,8 @@
 % pressure over 70 km pipeline
 pyversion c:\Anaconda3\python.exe % Sets Python 3.11 as a interpreter
 
-%% Steady-state analysis with constant T - 1 km pipe - Panhandle B flow equation
+% This is a commit test
+%% Steady-state analysis with constant T - X km pipe - Panhandle B flow equation
 clear
 clc
 % close all
