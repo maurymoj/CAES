@@ -46,6 +46,7 @@ dh_sin = 50;    % Amplitude of sinusoidal height increment
 % Var = {500};                        % Value for H
 %
 Var = {30000 60000 90000 120000}; % Values for height increment period
+% Var = {0};
 % Var = {0 25 50 75 100}; % Values for height increment period
 
 LStyle = {'b','r','k','b--','r--','k--','b-.'};
@@ -68,19 +69,21 @@ LStyle = {'b','r','k','b--','r--','k--','b-.'};
 
 %----------------------------------------------------------------------%
 
-P_fig = figure('Color',[1 1 1]);
-hold on
-grid on
-U_fig = figure('Color',[1 1 1]);
-hold on
-grid on
-psi_fig = figure('Color',[1 1 1]);
-hold on
-grid on
-h_fig = figure('Color',[1 1 1]);
-hold on
-grid on
+% Individual Figures
+% P_fig = figure('Color',[1 1 1]);
+% hold on
+% grid on
+% U_fig = figure('Color',[1 1 1]);
+% hold on
+% grid on
+% psi_fig = figure('Color',[1 1 1]);
+% hold on
+% grid on
+% h_fig = figure('Color',[1 1 1]);
+% hold on
+% grid on
 
+% 1 Figure with subplots
 sp = figure('Color',[1 1 1]);
 subplot(2,2,1)
 hold on
@@ -179,12 +182,19 @@ for j=1:length(Var)
         
         while (dP > 0.0001 & count < 10)
             P_f_kPa = 2/3*( P_1_kPa + P_2_kPa-(P_1_kPa*P_2_kPa)/(P_1_kPa+P_2_kPa) );
-            % P_f = (P_1_kPa + P_2_kPa)/2;
             Z_f = py.CoolProp.CoolProp.PropsSI('Z','P',P_f_kPa*1000,'T',T_f,'Air');
+            % - Compressibility formula for natural gas
             % Z_f = 1/(1+
             % ((P_f*0.000145038-14.73)*344400*10^(1.785*G)/(T_f*1.8)^3.825));
-            % - Compressibility formula for natural gas
-        
+            
+            % P from General Flow Equation
+            % Negligible height difference
+            % P(i+1) = sqrt( P_1_kPa^2 - ( Q_a_day/(1.1494e-3*(T_a/P_a_kPa)*D_mm^2.5) )^2*G*T_f*(dL/1000)*Z_f*f(i) );
+            % % Considering height difference
+            % s_H = 0.0684*G*(dh+dh_sin*sin(2*pi/T_sin*(i*dL) ))/(T_f*Z_f);
+            % L_e = dL*(exp(s_H)-1)/s_H;
+            % P(i+1) = sqrt( (P_1_kPa^2 - ( Q_a_day/(1.1494e-3*(T_a/P_a_kPa)*D_mm^2.5) )^2*G*T_f*(L_e/1000)*Z_f*f(i) )/exp(s_H) );
+
             % P from Panhandle B equation
             % Negligible height difference
             % P(i+1) = sqrt( P_1_kPa^2 - ( Q_a_day/(1.002e-2*E*(T_a/P_a_kPa)^1.02*D_mm^2.53) )^(1/0.51)*G^0.961*T_f*(dL/1000)*Z_f );
@@ -193,6 +203,8 @@ for j=1:length(Var)
             L_e = dL*(exp(s_H)-1)/s_H;
             P(i+1) = sqrt( (P_1_kPa^2 - ( Q_a_day/(1.002e-2*E*(T_a/P_a_kPa)^1.02*D_mm^2.53) )^(1/0.51)*G^0.961*T_f*(L_e/1000)*Z_f )/exp(s_H) );
             % Panhandle B equation - valid for large diameter, high pressure flows with 4M < Re < 40M
+            
+            % CHECK CONDITIONS OF EQUATIONS
 
             dP = (P(i+1) - P_2_kPa)/P_2_kPa;
             P_2_kPa = P(i+1);
