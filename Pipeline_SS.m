@@ -26,7 +26,7 @@ Q_a = 14*1000000/(24*3600); % Conversion from mcmd (millions of cubic meters
 % Pipe
 D = 0.9; % 900 mm
 dL = 1000;    % Distance increment
-L_m = 120000; % Total distance [m]
+L_m = 70000; % Total distance [m]
 
 eps = 0.04e-3; % Absolute roughness 0.04 mm
 
@@ -35,19 +35,20 @@ E = 0.75;   % Pipeline efficiency
     % "Handbook of natural gas transmission and processing"
 
 H_1 = 0;
-H_2 = 500;
+H_2 = 130;
 
-T_sin = 60000; % Period of sinusoidal height increment
+T_sin = 30000; % Period of sinusoidal height increment
 dh_sin = 50;    % Amplitude of sinusoidal height increment
 
 % Generate multiple plots while varying one variable var (can be any
 % parameter set in the initial statements)
 % Var = {1 50 100 200 300 400 500}; % Values to be taken by H
-% Var = {500};                        % Value for H
+% Var = {130};                        % Value for H
 %
-Var = {30000 60000 90000 120000}; % Values for height increment period
+% Var = {30000 60000 90000 120000}; % Values for height increment period
+% Var = {60000};
 % Var = {0};
-% Var = {0 25 50 75 100}; % Values for height increment period
+Var = {0 25 50 75 100}; % Values for height increment amplitude
 
 LStyle = {'b','r','k','b--','r--','k--','b-.'};
 
@@ -107,16 +108,22 @@ cp = py.CoolProp.CoolProp.PropsSI('C','P',P_a,'T',T_a,'Air');
 cv = py.CoolProp.CoolProp.PropsSI('Cvmass','P',P_a,'T',T_a,'Air');
 gam = cp/cv;
 
+load('StF_Ab.mat');
+
 for j=1:length(Var)
     % H_2 = Var{j};
-    T_sin = Var{j};
-    % dh_sin = Var{j};
+    % T_sin = Var{j};
+    dh_sin = Var{j};
 
     A = pi*D^2/4; % mm2
     L = 0:dL:L_m; % 70 km pipe with increments of 1 km
-    dh = (H_2-H_1)/length(L);
-    D_mm = 1000*D;% mm
+    % Elevation profile from St. Fergus -> Aberdeen
+    H = interp1(x_SfA*1000,H_SfA,L,"linear","extrap");
+    dh_SfA = diff(H);
     
+    dh = (H_2-H_1)/length(L);
+
+    D_mm = 1000*D;% mm
     epsD = eps/D;
     f_guess = (2*log10(1/epsD)+1.14)^(-2); % Initial estimation using Nikuradse eq.
     
@@ -157,7 +164,7 @@ for j=1:length(Var)
         % Negligible height difference
         psi(i) = h(i)-h0 - T0*(s(i)-s0)+u(i)^2/2;
         % Considering height difference
-        % phi(i) = h(i)-h0 + T0*(s(i)-s0)+u(i)^2/2+g*z(i)
+        % psi(i) = h(i)-h0 + T0*(s(i)-s0)+u(i)^2/2+g*z(i)
     
         Re(i) = 0.5134*( P_a_kPa/T_a )*( G*Q_a_day/(nu_Po(i)*D_mm) ); % P converted to kPa, Q to m3/day, nu to poise (1 Pa s = 10 poise), and D to mm
     
@@ -187,11 +194,15 @@ for j=1:length(Var)
             % Z_f = 1/(1+
             % ((P_f*0.000145038-14.73)*344400*10^(1.785*G)/(T_f*1.8)^3.825));
             
+            % dh = dh_SfA(i); % Custom elevation profile
+
             % P from General Flow Equation
             % Negligible height difference
             % P(i+1) = sqrt( P_1_kPa^2 - ( Q_a_day/(1.1494e-3*(T_a/P_a_kPa)*D_mm^2.5) )^2*G*T_f*(dL/1000)*Z_f*f(i) );
             % % Considering height difference
-            % s_H = 0.0684*G*(dh+dh_sin*sin(2*pi/T_sin*(i*dL) ))/(T_f*Z_f);
+            % s_H = 0.0684*G*(dh)/(T_f*Z_f);                                % Constant gradient / Custom gradient 
+            % s_H = 0.0684*G*(dh+dh_sin*sin(2*pi/T_sin*(i*dL) ))/(T_f*Z_f); % Sinusoidal profile
+            % s_H = 0.0684*G*(dh))/(T_f*Z_f); % Profile St. F. -> Ab 
             % L_e = dL*(exp(s_H)-1)/s_H;
             % P(i+1) = sqrt( (P_1_kPa^2 - ( Q_a_day/(1.1494e-3*(T_a/P_a_kPa)*D_mm^2.5) )^2*G*T_f*(L_e/1000)*Z_f*f(i) )/exp(s_H) );
 
@@ -199,7 +210,8 @@ for j=1:length(Var)
             % Negligible height difference
             % P(i+1) = sqrt( P_1_kPa^2 - ( Q_a_day/(1.002e-2*E*(T_a/P_a_kPa)^1.02*D_mm^2.53) )^(1/0.51)*G^0.961*T_f*(dL/1000)*Z_f );
             % considering height difference
-            s_H = 0.0684*G*(dh+dh_sin*sin(2*pi/T_sin*(i*dL) ))/(T_f*Z_f);
+            % s_H = 0.0684*G*(dh)/(T_f*Z_f);                                % Constant gradient / Custom gradient
+            s_H = 0.0684*G*(dh+dh_sin*sin(2*pi/T_sin*(i*dL) ))/(T_f*Z_f);   % Sinusoidal profile
             L_e = dL*(exp(s_H)-1)/s_H;
             P(i+1) = sqrt( (P_1_kPa^2 - ( Q_a_day/(1.002e-2*E*(T_a/P_a_kPa)^1.02*D_mm^2.53) )^(1/0.51)*G^0.961*T_f*(L_e/1000)*Z_f )/exp(s_H) );
             % Panhandle B equation - valid for large diameter, high pressure flows with 4M < Re < 40M
@@ -270,7 +282,9 @@ for j=1:length(Var)
     ylabel('\Psi [kJ/kg]')
     subplot(2,2,4)
     % Height profile
+    % plot(L/1000, (1:length(L))*dh,LStyle{j})
     plot(L/1000, (1:length(L))*dh + dh_sin*sin(2*pi/T_sin*dL*(1:length(L))),LStyle{j})
+    % plot(L/1000, H,LStyle{j})
     xlabel('L [km]')
     ylabel('H [m]')
 
@@ -295,6 +309,8 @@ legend(string(Var),'Location','northwest')
 % xlabel('L [km]')
 % ylabel('H [m]')
 
+
+
 %% Steady-state analysis with variable T - 1 km pipe - Panhandle B flow equation
 clear
 clc
@@ -317,7 +333,7 @@ Q_a = 14*1000000/(24*3600); % Conversion from mcmd (millions of cubic meters
 % Pipe
 D = 0.9; % 900 mm
 dL = 1000;    % Distance increment [m]
-L_m = 120000; % Total distance [m]
+L_m = 70000; % Total distance [m]
 % L_m = 240000; % Total distance [m]
 
 eps = 0.04e-3; % Absolute roughness 0.04 mm
@@ -328,7 +344,7 @@ E = 0.75;   % Pipeline efficiency
 
 % Elevation
 H_1 = 0;
-H_2 = 1;
+H_2 = 130;
 
 % Soil temperature, assumed constant along the pipeline
 T_s = 5 + 273.15; % 5 °C (Nasr and Connor "Natural Gas Engineering and Safety Challenges")
@@ -345,19 +361,37 @@ LStyle = {'b','r','k','b--','r--','k--','b-.'};
 
 %----------------------------------------------------------------------%
 
-P_fig = figure('Color',[1 1 1]);
+% P_fig = figure('Color',[1 1 1]);
+% hold on
+% grid on
+% U_fig = figure('Color',[1 1 1]);
+% hold on
+% grid on
+% psi_fig = figure('Color',[1 1 1]);
+% hold on
+% grid on
+% psi_comp_fig = figure('Color',[1 1 1]);
+% hold on
+% grid on
+% h_fig = figure('Color',[1 1 1]);
+% hold on
+% grid on
+% T_fig = figure('Color',[1 1 1]);
+% hold on
+% grid on
+
+% 1 Figure with subplots
+sp = figure('Color',[1 1 1]);
+subplot(2,2,1)
 hold on
 grid on
-U_fig = figure('Color',[1 1 1]);
+subplot(2,2,2)
 hold on
 grid on
-psi_fig = figure('Color',[1 1 1]);
+subplot(2,2,3)
 hold on
 grid on
-psi_comp_fig = figure('Color',[1 1 1]);
-hold on
-grid on
-T_fig = figure('Color',[1 1 1]);
+subplot(2,2,4)
 hold on
 grid on
 
@@ -372,12 +406,17 @@ gam = cp/cv;
 
 m_dot = rho_a*Q_a;
 % j=1;
+load('StF_Ab.mat');
+
 for j=1:length(Var)
     % H_2 = Var{j};
     T_in = Var{j};
 
     A = pi*D^2/4; % mm2
     L = 0:dL:L_m; % 70 km pipe with increments of 1 km
+    H = interp1(x_SfA*1000,H_SfA,L,"linear","extrap");
+    dh_SfA = diff(H);    
+    
     dh = (H_2-H_1)/length(L);
     D_mm = 1000*D;% mm
     
@@ -463,6 +502,8 @@ for j=1:length(Var)
                 % ((P_f*0.000145038-14.73)*344400*10^(1.785*G)/(T_f*1.8)^3.825));
                 % - Compressibility formula for natural gas
 
+                dh = dh_SfA(i); % Custom elevation profile
+
                 % P from Panhandle B equation
                 % Negligible height difference
                 % P(i+1) = sqrt( P_1_kPa^2 - ( Q_a_day/(1.002e-2*E*(T_a/P_a_kPa)^1.02*D_mm^2.53) )^(1/0.51)*G^0.961*T_f*(dL/1000)*Z_f );
@@ -546,58 +587,85 @@ for j=1:length(Var)
     % plot(L,P)           % Pa x m 
     % xlabel('L [m]')
     % ylabel('P [Pa]')
-    figure(P_fig)   % Pressure drop profile
-    plot(L/1000,P/1000,LStyle{j}) % kPa x km
-    xlabel('L [km]')
-    ylabel('P [kPa]')
+    % figure(P_fig)   % Pressure drop profile
+    % plot(L/1000,P/1000,LStyle{j}) % kPa x km
+    % xlabel('L [km]')
+    % ylabel('P [kPa]')
     % plot(L/1610,P*0.000145038 - 14.73) % psig x mi
     % xlabel('L [mi]')
     % ylabel('P [psig]')
     % ylim([1150 1450])
     
     % figure('Color',[1 1 1])
-    figure(U_fig)   % Velocity profile
-    plot(L/1000,u,LStyle{j})
-    xlabel('L [km]')
-    ylabel('u [m/s]')
+    % figure(U_fig)   % Velocity profile
+    % plot(L/1000,u,LStyle{j})
+    % xlabel('L [km]')
+    % ylabel('u [m/s]')
     
-    figure(psi_fig) % Exergy profile
-    plot(L/1000,psi/1000,LStyle{j})
-    % plot(L/1000,phi,LStyle{j})
-    xlabel('L [km]')
-    ylabel('\Psi [kJ/kg]')
+    % figure(psi_fig) % Exergy profile
+    % plot(L/1000,psi/1000,LStyle{j})
+    % % plot(L/1000,phi,LStyle{j})
+    % xlabel('L [km]')
+    % ylabel('\Psi [kJ/kg]')
 
-    figure(T_fig)   % Temperature profile
-    plot(L/1000,T,LStyle{j})
-    xlabel('L [km]')
-    ylabel('T [K]')
-
-    figure(psi_comp_fig) % Exergy profile
-    plot(L/1000,(h-h0)./1000,LStyle{1})
-    plot(L/1000,(-T0*(s-s0))./1000,LStyle{2})
-    plot(L/1000,(u.^2/2)./1000,LStyle{3})
+    % figure(T_fig)   % Temperature profile
+    % plot(L/1000,T,LStyle{j})
+    % xlabel('L [km]')
+    % ylabel('T [K]')
+    % 
+    % figure(psi_comp_fig) % Exergy profile
+    % plot(L/1000,(h-h0)./1000,LStyle{1})
+    % plot(L/1000,(-T0*(s-s0))./1000,LStyle{2})
+    % plot(L/1000,(u.^2/2)./1000,LStyle{3})
     % title('T_{in} = ',T_in)
     % legend('h-h0','-T0 (s-s0)','u^2/2')
     % 
     % % plot(L/1000,phi,LStyle{j})
     % xlabel('L [km]')
     % ylabel('\Psi components[kJ/kg]')
+
+    % Subplot structure
+    figure(sp)
+    subplot(2,2,1)
+    plot(L/1000,P/1000,LStyle{j}) % kPa x km
+    xlabel('L [km]')
+    ylabel('P [kPa]') 
+    % Velocity profile
+    subplot(2,2,2)
+    plot(L/1000,u,LStyle{j})
+    xlabel('L [km]')
+    ylabel('u [m/s]')
+    subplot(2,2,3)
+    % Entropy profile
+    plot(L/1000,psi/1000,LStyle{j})
+    xlabel('L [km]')
+    ylabel('\Psi [kJ/kg]')
+    subplot(2,2,4)
+    % Height profile
+    % plot(L/1000, (1:length(L))*dh,LStyle{j})
+    % plot(L/1000, (1:length(L))*dh + dh_sin*sin(2*pi/T_sin*dL*(1:length(L))),LStyle{j})
+    plot(L/1000, H,LStyle{j})
+    xlabel('L [km]')
+    ylabel('H [m]')
 end
 
-figure(P_fig)
-legend(string(Var))
+% figure(P_fig)
+% legend(string(Var))
+% 
+% figure(U_fig)
+% legend(string(Var))
+% 
+% figure(psi_fig)
+% legend(string(Var))
+% 
+% figure(T_fig)
+% legend(string(Var))
+% 
+% figure(psi_comp_fig)
+% legend('h-h0','-T0 (s-s0)','u^2/2')
 
-figure(U_fig)
-legend(string(Var))
-
-figure(psi_fig)
-legend(string(Var))
-
-figure(T_fig)
-legend(string(Var))
-
-figure(psi_comp_fig)
-legend('h-h0','-T0 (s-s0)','u^2/2')
+figure(sp)
+legend(string(Var),'Location','northwest')
 %% Erosional velocity Ve
 % usually velocity should be limited to 20 m/s. Operational velocity is
 % usually limited to 50% of Ve
