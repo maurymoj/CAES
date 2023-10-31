@@ -26,7 +26,7 @@ Q_a = 14*1000000/(24*3600); % Conversion from mcmd (millions of cubic meters
 % Pipe
 D = 0.9; % 900 mm
 dL = 1000;    % Distance increment
-L_m = 120000; % Total distance [m]
+L_m = 70000; % Total distance [m]
 
 eps = 0.04e-3; % Absolute roughness 0.04 mm
 
@@ -107,6 +107,8 @@ cp = py.CoolProp.CoolProp.PropsSI('C','P',P_a,'T',T_a,'Air');
 cv = py.CoolProp.CoolProp.PropsSI('Cvmass','P',P_a,'T',T_a,'Air');
 gam = cp/cv;
 
+load('StF_Ab.mat');
+
 for j=1:length(Var)
     % H_2 = Var{j};
     T_sin = Var{j};
@@ -114,7 +116,11 @@ for j=1:length(Var)
 
     A = pi*D^2/4; % mm2
     L = 0:dL:L_m; % 70 km pipe with increments of 1 km
+    H = interp1(x_SfA*1000,H_SfA,L,"linear","extrap");
+    dh_SfA = diff(H);
+    
     dh = (H_2-H_1)/length(L);
+
     D_mm = 1000*D;% mm
     
     epsD = eps/D;
@@ -187,11 +193,15 @@ for j=1:length(Var)
             % Z_f = 1/(1+
             % ((P_f*0.000145038-14.73)*344400*10^(1.785*G)/(T_f*1.8)^3.825));
             
+            % dh = dh_SfA(i); % Custom elevation profile
+
             % P from General Flow Equation
             % Negligible height difference
             % P(i+1) = sqrt( P_1_kPa^2 - ( Q_a_day/(1.1494e-3*(T_a/P_a_kPa)*D_mm^2.5) )^2*G*T_f*(dL/1000)*Z_f*f(i) );
             % % Considering height difference
-            % s_H = 0.0684*G*(dh+dh_sin*sin(2*pi/T_sin*(i*dL) ))/(T_f*Z_f);
+            % s_H = 0.0684*G*(dh)/(T_f*Z_f);                                % Constant gradient / Custom gradient 
+            % s_H = 0.0684*G*(dh+dh_sin*sin(2*pi/T_sin*(i*dL) ))/(T_f*Z_f); % Sinusoidal profile
+            % s_H = 0.0684*G*(dh))/(T_f*Z_f); % Profile St. F. -> Ab 
             % L_e = dL*(exp(s_H)-1)/s_H;
             % P(i+1) = sqrt( (P_1_kPa^2 - ( Q_a_day/(1.1494e-3*(T_a/P_a_kPa)*D_mm^2.5) )^2*G*T_f*(L_e/1000)*Z_f*f(i) )/exp(s_H) );
 
@@ -199,7 +209,8 @@ for j=1:length(Var)
             % Negligible height difference
             % P(i+1) = sqrt( P_1_kPa^2 - ( Q_a_day/(1.002e-2*E*(T_a/P_a_kPa)^1.02*D_mm^2.53) )^(1/0.51)*G^0.961*T_f*(dL/1000)*Z_f );
             % considering height difference
-            s_H = 0.0684*G*(dh+dh_sin*sin(2*pi/T_sin*(i*dL) ))/(T_f*Z_f);
+            s_H = 0.0684*G*(dh)/(T_f*Z_f);                                % Constant gradient / Custom gradient
+            % s_H = 0.0684*G*(dh+dh_sin*sin(2*pi/T_sin*(i*dL) ))/(T_f*Z_f);   % Sinusoidal profile
             L_e = dL*(exp(s_H)-1)/s_H;
             P(i+1) = sqrt( (P_1_kPa^2 - ( Q_a_day/(1.002e-2*E*(T_a/P_a_kPa)^1.02*D_mm^2.53) )^(1/0.51)*G^0.961*T_f*(L_e/1000)*Z_f )/exp(s_H) );
             % Panhandle B equation - valid for large diameter, high pressure flows with 4M < Re < 40M
@@ -270,7 +281,8 @@ for j=1:length(Var)
     ylabel('\Psi [kJ/kg]')
     subplot(2,2,4)
     % Height profile
-    plot(L/1000, (1:length(L))*dh + dh_sin*sin(2*pi/T_sin*dL*(1:length(L))),LStyle{j})
+    % plot(L/1000, (1:length(L))*dh + dh_sin*sin(2*pi/T_sin*dL*(1:length(L))),LStyle{j})
+    plot(L/1000, H,LStyle{j})
     xlabel('L [km]')
     ylabel('H [m]')
 
@@ -294,6 +306,8 @@ legend(string(Var),'Location','northwest')
 % plot(L/1000, (1:length(L))*dh + dh_sin*sin(2*pi/30000*dL*(1:length(L))))
 % xlabel('L [km]')
 % ylabel('H [m]')
+
+
 
 %% Steady-state analysis with variable T - 1 km pipe - Panhandle B flow equation
 clear
