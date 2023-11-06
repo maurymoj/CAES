@@ -1,5 +1,6 @@
 % pressure over 70 km pipeline
 pyversion c:\Anaconda3\python.exe % Sets Python 3.11 as a interpreter
+CP = py.importlib.import_module('CoolProp.CoolProp');
 
 %% Steady-state analysis with constant T - X km pipe - Panhandle B flow equation
 clear
