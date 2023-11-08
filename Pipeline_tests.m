@@ -43,9 +43,9 @@ dh_sin = 50;    % Amplitude of sinusoidal height increment
 % Generate multiple plots while varying one variable var (can be any
 % parameter set in the initial statements)
 % Var = {1 50 100 200 300 400 500}; % Values to be taken by H
-Var = {130};                        % Value for H
+% Var = {130};                        % Value for H
 %
-% Var = {30000 60000 90000 120000}; % Values for height increment period
+Var = {15000 30000 60000}; % Values for height increment period
 % Var = {0};
 % Var = {0 25 50 75 100}; % Values for height increment amplitude
 
@@ -112,8 +112,8 @@ cv = py.CoolProp.CoolProp.PropsSI('Cvmass','P',P_a,'T',T_a,'Air');
 load('StF_Ab2.mat');
 
 for j=1:length(Var)
-    H_2 = Var{j};
-    % T_sin = Var{j};
+    % H_2 = Var{j};
+    T_sin = Var{j};
     % dh_sin = Var{j};
 
     A = pi*D^2/4; % mm2
@@ -203,7 +203,7 @@ for j=1:length(Var)
             % Z_f = 1/(1+
             % ((P_f*0.000145038-14.73)*344400*10^(1.785*G)/(T_f*1.8)^3.825));
             
-            dh = dh_SfA(i); % Custom elevation profile
+            % dh = dh_SfA(i); % Custom elevation profile
 
             % P from General Flow Equation
             % Negligible height difference
@@ -220,10 +220,11 @@ for j=1:length(Var)
             % P(i+1) = sqrt( P_1_kPa^2 - ( Q_a_day/(1.002e-2*E*(T_a/P_a_kPa)^1.02*D_mm^2.53) )^(1/0.51)*G^0.961*T_f*(dL/1000)*Z_f );
             % considering height difference
             % s_H = 0.0684*G*(dh)/(T_f*Z_f);                                % Constant gradient / Custom gradient
-            % s_H = 0.0684*G*(dh+dh_sin*sin(2*pi/T_sin*(i*dL) ))/(T_f*Z_f);   % Sinusoidal profile
-            s_H = 0.0684*G*(dh)/(T_f*Z_f);                                % Constant gradient / Custom gradient
-            % L_e = dL*(exp(s_H)-1)/s_H;
-            L_e = (dL/cos(atan(dh/dL)))*(exp(s_H)-1)/s_H;
+            s_H = 0.0684*G*(dh+dh_sin*sin(2*pi/T_sin*(i*dL) ))/(T_f*Z_f);   % Sinusoidal profile
+            % s_H = 0.0684*G*(dh)/(T_f*Z_f);                                % Constant gradient / Custom gradient
+            L_e = dL*(exp(s_H)-1)/s_H;
+            % L_e = (dL/cos(atan(dh/dL)))*(exp(s_H)-1)/s_H;
+            % L_e = (dL/cos( atan( (dh+dh_sin*sin(2*pi/T_sin*(i*dL)))/dL ))) *(exp(s_H)-1)/s_H;                   % Sinusoidal profile
             P(i+1) = sqrt( (P_1_kPa^2 - ( Q_a_day/(1.002e-2*E*(T_a/P_a_kPa)^1.02*D_mm^2.53) )^(1/0.51)*G^0.961*T_f*(L_e/1000)*Z_f )/exp(s_H) );
             % Panhandle B equation - valid for large diameter, high pressure flows with 4M < Re < 40M
             if (Re(i) < 4e6) || (Re(i) > 40e6)
@@ -301,10 +302,9 @@ for j=1:length(Var)
     subplot(2,2,4)
     % Height profile
     % plot(L/1000, (1:length(L))*dh,LStyle{j})
-    % plot(L/1000, (1:length(L))*dh + dh_sin*sin(2*pi/T_sin*dL*(1:length(L))),LStyle{j})
     % plot(L/1000, H,LStyle{j})
-    % plot(L/1000, (1:length(L))*dh + dh_sin*sin(2*pi/T_sin*dL*(1:length(L))),LStyle{j})
-    plot(L/1000, H,LStyle{j})
+    plot(L/1000, (1:length(L))*dh + dh_sin*sin(2*pi/T_sin*dL*(1:length(L))),LStyle{j})
+    % plot(L/1000, H,LStyle{j})
     xlabel('L [km]')
     ylabel('H [m]')
 

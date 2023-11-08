@@ -38,17 +38,28 @@ E = 0.75;   % Pipeline efficiency
 H_1 = 0;
 H_2 = 130;
 
-T_sin = 30000; % Period of sinusoidal height increment
-dh_sin = 50;    % Amplitude of sinusoidal height increment
+T_sin = 25000; % Period of sinusoidal height increment
+dh_amp = 25;    % Amplitude of sinusoidal height increment
+
+% Elevation profile
+% H_prof = "Horizontal";
+% H_prof = "Fixed_tilt";
+H_prof = "Sinusoidal";
+% H_prof = "Custom_prof";
+
+% Flow equation
+% Flow_eq = "GFE";
+Flow_eq = "PanB";
 
 % Generate multiple plots while varying one variable var (can be any
 % parameter set in the initial statements)
 % Var = {1 50 100 200 300 400 500}; % Values to be taken by H
-Var = {130};                        % Value for H
-%
+% Var = {130};                        % Value for H
 % Var = {30000 60000 90000 120000}; % Values for height increment period
 % Var = {0};
 % Var = {0 25 50 75 100}; % Values for height increment amplitude
+% Var = {"Horizontal","Fixed tilt","Sinusoidal","Custom prof"};
+Var = {"Horizontal","Fixed tilt","Custom prof"};
 
 LStyle = {'b','r','k','b--','r--','k--','b-.'};
 
@@ -69,9 +80,9 @@ LStyle = {'b','r','k','b--','r--','k--','b-.'};
 %----------------------------------------------------------------------%
 
 % Individual Figures
-% P_fig = figure('Color',[1 1 1]);
-% hold on
-% grid on
+P_fig = figure('Color',[1 1 1]);
+hold on
+grid on
 % U_fig = figure('Color',[1 1 1]);
 % hold on
 % grid on
@@ -81,10 +92,10 @@ LStyle = {'b','r','k','b--','r--','k--','b-.'};
 % h_fig = figure('Color',[1 1 1]);
 % hold on
 % grid on
-Psi_fig = figure('Color',[1 1 1]);
-hold on
-grid on
-
+% Psi_fig = figure('Color',[1 1 1]);
+% hold on
+% grid on
+% 
 
 % 1 Figure with subplots
 sp = figure('Color',[1 1 1]);
@@ -113,9 +124,10 @@ cv = py.CoolProp.CoolProp.PropsSI('Cvmass','P',P_a,'T',T_a,'Air');
 load('StF_Ab2.mat');
 
 for j=1:length(Var)
-    H_2 = Var{j};
+    % H_2 = Var{j};
     % T_sin = Var{j};
-    % dh_sin = Var{j};
+    % dh_amp = Var{j};
+    H_prof = Var{j};
 
     A = pi*D^2/4; % mm2
     L = 0:dL:L_m; % 70 km pipe with increments of 1 km
@@ -171,11 +183,12 @@ for j=1:length(Var)
 
         % Exergy
         % phi = h-h0 + T0*(s-s0)+u^2/2+gz
-        % Negligible height difference
-        psi(i) = h(i)-h0 - T0*(s(i)-s0)+u(i)^2/2;
         % Considering height difference
         % psi(i) = h(i)-h0 + T0*(s(i)-s0)+u(i)^2/2+g*z(i)
-    
+
+        % Negligible height difference
+        psi(i) = h(i)-h0 - T0*(s(i)-s0)+u(i)^2/2;
+        
         Re(i) = 0.5134*( P_a_kPa/T_a )*( G*Q_a_day/(nu_Po(i)*D_mm) ); % P converted to kPa, Q to m3/day, nu to poise (1 Pa s = 10 poise), and D to mm
     
         % Friction factor
@@ -200,35 +213,117 @@ for j=1:length(Var)
         while (dP > 0.0001 & count < 10)
             P_f_kPa = 2/3*( P_1_kPa + P_2_kPa-(P_1_kPa*P_2_kPa)/(P_1_kPa+P_2_kPa) );
             Z_f = py.CoolProp.CoolProp.PropsSI('Z','P',P_f_kPa*1000,'T',T_f,'Air');
-            % - Compressibility formula for natural gas
+            % Compressibility formula for natural gas
             % Z_f = 1/(1+
             % ((P_f*0.000145038-14.73)*344400*10^(1.785*G)/(T_f*1.8)^3.825));
             
-            dh = dh_SfA(i); % Custom elevation profile
+            if (H_prof == "Horizontal")
 
-            % P from General Flow Equation
-            % Negligible height difference
-            % P(i+1) = sqrt( P_1_kPa^2 - ( Q_a_day/(1.1494e-3*(T_a/P_a_kPa)*D_mm^2.5) )^2*G*T_f*(dL/1000)*Z_f*f(i) );
-            % % Considering height difference
-            % s_H = 0.0684*G*(dh)/(T_f*Z_f);                                % Constant gradient / Custom gradient 
-            % s_H = 0.0684*G*(dh+dh_sin*sin(2*pi/T_sin*(i*dL) ))/(T_f*Z_f); % Sinusoidal profile
-            % s_H = 0.0684*G*(dh))/(T_f*Z_f); % Profile St. F. -> Ab 
-            % L_e = dL*(exp(s_H)-1)/s_H;
-            % P(i+1) = sqrt( (P_1_kPa^2 - ( Q_a_day/(1.1494e-3*(T_a/P_a_kPa)*D_mm^2.5) )^2*G*T_f*(L_e/1000)*Z_f*f(i) )/exp(s_H) );
+                if Flow_eq == "GFE"
+                    % P from General Flow Equation
+                    % Negligible height difference
+                    % P(i+1) = sqrt( P_1_kPa^2 - ( Q_a_day/(1.1494e-3*(T_a/P_a_kPa)*D_mm^2.5) )^2*G*T_f*(dL/1000)*Z_f*f(i) );
+                elseif Flow_eq == "PanB"
+                    % P from Panhandle B equation
+                    % Negligible height difference
+                    P(i+1) = sqrt( P_1_kPa^2 - ( Q_a_day/(1.002e-2*E*(T_a/P_a_kPa)^1.02*D_mm^2.53) )^(1/0.51)*G^0.961*T_f*(dL/1000)*Z_f );
+                    
+                    % Panhandle B equation - valid for large diameter, high pressure flows with 4M < Re < 40M
+                    if (Re(i) < 4e6) || (Re(i) > 40e6)
+                        warning('Re outside the indicated region for the Panhandle B equation.')
+                    end
+                else
+                    % P from Panhandle B equation
+                    % Negligible height difference
+                    P(i+1) = sqrt( P_1_kPa^2 - ( Q_a_day/(1.002e-2*E*(T_a/P_a_kPa)^1.02*D_mm^2.53) )^(1/0.51)*G^0.961*T_f*(dL/1000)*Z_f );
 
-            % P from Panhandle B equation
-            % Negligible height difference
-            % P(i+1) = sqrt( P_1_kPa^2 - ( Q_a_day/(1.002e-2*E*(T_a/P_a_kPa)^1.02*D_mm^2.53) )^(1/0.51)*G^0.961*T_f*(dL/1000)*Z_f );
-            % considering height difference
-            % s_H = 0.0684*G*(dh)/(T_f*Z_f);                                % Constant gradient / Custom gradient
-            % s_H = 0.0684*G*(dh+dh_sin*sin(2*pi/T_sin*(i*dL) ))/(T_f*Z_f);   % Sinusoidal profile
-            s_H = 0.0684*G*(dh)/(T_f*Z_f);                                % Constant gradient / Custom gradient
-            % L_e = dL*(exp(s_H)-1)/s_H;
-            L_e = (dL/cos(atan(dh/dL)))*(exp(s_H)-1)/s_H;
-            P(i+1) = sqrt( (P_1_kPa^2 - ( Q_a_day/(1.002e-2*E*(T_a/P_a_kPa)^1.02*D_mm^2.53) )^(1/0.51)*G^0.961*T_f*(L_e/1000)*Z_f )/exp(s_H) );
-            % Panhandle B equation - valid for large diameter, high pressure flows with 4M < Re < 40M
-            if (Re(i) < 4e6) || (Re(i) > 40e6)
-                warning('Re outside the indicated region for the Panhandle B equation.')
+                    % Panhandle B equation - valid for large diameter, high pressure flows with 4M < Re < 40M
+                    if (Re(i) < 4e6) || (Re(i) > 40e6)
+                        warning('Re outside the indicated region for the Panhandle B equation.')
+                    end
+                end
+
+            elseif (H_prof == "Fixed tilt")
+                
+                s_H = 0.0684*G*dh/(T_f*Z_f);
+                % L_e = dL*(exp(s_H)-1)/s_H;
+                L_e = (dL/cos(atan(dh/dL)))*(exp(s_H)-1)/s_H;
+                
+                if Flow_eq == "GFE"
+                    % P from General Flow Equation
+                    P(i+1) = sqrt( (P_1_kPa^2 - ( Q_a_day/(1.1494e-3*(T_a/P_a_kPa)*D_mm^2.5) )^2*G*T_f*(L_e/1000)*Z_f*f(i) )/exp(s_H) );
+                elseif Flow_eq == "PanB"
+                    P(i+1) = sqrt( (P_1_kPa^2 - ( Q_a_day/(1.002e-2*E*(T_a/P_a_kPa)^1.02*D_mm^2.53) )^(1/0.51)*G^0.961*T_f*(L_e/1000)*Z_f )/exp(s_H) );
+
+                    % Panhandle B equation - valid for large diameter, high pressure flows with 4M < Re < 40M
+                    if (Re(i) < 4e6) || (Re(i) > 40e6)
+                        warning('Re outside the indicated region for the Panhandle B equation.')
+                    end
+                else
+                    % P from Panhandle B equation
+                    P(i+1) = sqrt( (P_1_kPa^2 - ( Q_a_day/(1.002e-2*E*(T_a/P_a_kPa)^1.02*D_mm^2.53) )^(1/0.51)*G^0.961*T_f*(L_e/1000)*Z_f )/exp(s_H) );
+
+                    % Panhandle B equation - valid for large diameter, high pressure flows with 4M < Re < 40M
+                    if (Re(i) < 4e6) || (Re(i) > 40e6)
+                        warning('Re outside the indicated region for the Panhandle B equation.')
+                    end
+                end
+
+            elseif H_prof == "Sinusoidal"
+                
+                dh_sin = dh+dh_amp*sin( 2*pi/T_sin*L(i) );
+                s_H = 0.0684*G*dh_sin/(T_f*Z_f); % Sinusoidal profile
+                % L_e = dL*(exp(s_H)-1)/s_H;
+                L_e = (dL/cos(atan(dh_sin/dL)))*(exp(s_H)-1)/s_H;
+                
+                if Flow_eq == "GFE"
+                    % P from General Flow Equation
+                    P(i+1) = sqrt( (P_1_kPa^2 - ( Q_a_day/(1.1494e-3*(T_a/P_a_kPa)*D_mm^2.5) )^2*G*T_f*(L_e/1000)*Z_f*f(i) )/exp(s_H) );
+                elseif Flow_eq == "PanB"
+                    P(i+1) = sqrt( (P_1_kPa^2 - ( Q_a_day/(1.002e-2*E*(T_a/P_a_kPa)^1.02*D_mm^2.53) )^(1/0.51)*G^0.961*T_f*(L_e/1000)*Z_f )/exp(s_H) );
+
+                    % Panhandle B equation - valid for large diameter, high pressure flows with 4M < Re < 40M
+                    if (Re(i) < 4e6) || (Re(i) > 40e6)
+                        warning('Re outside the indicated region for the Panhandle B equation.')
+                    end
+                else
+                    % P from Panhandle B equation
+                    P(i+1) = sqrt( (P_1_kPa^2 - ( Q_a_day/(1.002e-2*E*(T_a/P_a_kPa)^1.02*D_mm^2.53) )^(1/0.51)*G^0.961*T_f*(L_e/1000)*Z_f )/exp(s_H) );
+
+                    % Panhandle B equation - valid for large diameter, high pressure flows with 4M < Re < 40M
+                    if (Re(i) < 4e6) || (Re(i) > 40e6)
+                        warning('Re outside the indicated region for the Panhandle B equation.')
+                    end
+                end
+
+            elseif H_prof == "Custom prof"
+
+                dh = dh_SfA(i); % Custom elevation profile
+        
+                s_H = 0.0684*G*dh/(T_f*Z_f);
+                % L_e = dL*(exp(s_H)-1)/s_H;
+                L_e = (dL/cos(atan(dh/dL)))*(exp(s_H)-1)/s_H;
+
+                if Flow_eq == "GFE"
+                    % P from General Flow Equation
+                    P(i+1) = sqrt( (P_1_kPa^2 - ( Q_a_day/(1.1494e-3*(T_a/P_a_kPa)*D_mm^2.5) )^2*G*T_f*(L_e/1000)*Z_f*f(i) )/exp(s_H) );
+                elseif Flow_eq == "PanB"
+                    P(i+1) = sqrt( (P_1_kPa^2 - ( Q_a_day/(1.002e-2*E*(T_a/P_a_kPa)^1.02*D_mm^2.53) )^(1/0.51)*G^0.961*T_f*(L_e/1000)*Z_f )/exp(s_H) );
+
+                    % Panhandle B equation - valid for large diameter, high pressure flows with 4M < Re < 40M
+                    if (Re(i) < 4e6) || (Re(i) > 40e6)
+                        warning('Re outside the indicated region for the Panhandle B equation.')
+                    end
+                else
+                    % P from Panhandle B equation
+                    P(i+1) = sqrt( (P_1_kPa^2 - ( Q_a_day/(1.002e-2*E*(T_a/P_a_kPa)^1.02*D_mm^2.53) )^(1/0.51)*G^0.961*T_f*(L_e/1000)*Z_f )/exp(s_H) );
+
+                    % Panhandle B equation - valid for large diameter, high pressure flows with 4M < Re < 40M
+                    if (Re(i) < 4e6) || (Re(i) > 40e6)
+                        warning('Re outside the indicated region for the Panhandle B equation.')
+                    end
+                end
+
             end
             
             % CHECK CONDITIONS OF EQUATIONS
@@ -255,9 +350,9 @@ for j=1:length(Var)
     % plot(L,P)           % Pa x m 
     % xlabel('L [m]')
     % ylabel('P [Pa]')
-    % figure(P_fig)   % Pressure drop profile
-    % plot(L/1000,P/1000) % kPa x km
-    % plot(L/1000,P/1000,LStyle{j}) % kPa x km
+    figure(P_fig)   % Pressure drop profile
+    plot(L/1000,P/1000) % kPa x km
+    plot(L/1000,P/1000,LStyle{j}) % kPa x km
     % xlabel('L [km]')
     % ylabel('P [kPa]')   
     % plot(L/1610,P*0.000145038 - 14.73) % psig x mi
@@ -278,10 +373,10 @@ for j=1:length(Var)
     % plot(L/1000, (1:length(L))*dh + dh_sin*sin(2*pi/T_sin*dL*(1:length(L))))
     % xlabel('L [km]')
     % ylabel('H [m]')
-    figure(Psi_fig)
-    plot(L/1000,m_dot*psi/1000,LStyle{j})
-    xlabel('L [km]')
-    ylabel('\Psi [kW]')
+    % figure(Psi_fig)
+    % plot(L/1000,m_dot*psi/1000,LStyle{j})
+    % xlabel('L [km]')
+    % ylabel('\Psi [kW]')
 
     % Subplot structure
     figure(sp)
@@ -301,11 +396,18 @@ for j=1:length(Var)
     ylabel('\psi [kJ/kg]')
     subplot(2,2,4)
     % Height profile
-    % plot(L/1000, (1:length(L))*dh,LStyle{j})
-    % plot(L/1000, (1:length(L))*dh + dh_sin*sin(2*pi/T_sin*dL*(1:length(L))),LStyle{j})
-    % plot(L/1000, H,LStyle{j})
-    % plot(L/1000, (1:length(L))*dh + dh_sin*sin(2*pi/T_sin*dL*(1:length(L))),LStyle{j})
-    plot(L/1000, H,LStyle{j})
+    if H_prof == "Horizontal"
+        plot(L/1000,zeros(length(L),1),LStyle{j})
+    elseif H_prof == "Fixed tilt"
+        plot(L/1000, (1:length(L))*dh,LStyle{j})
+    elseif H_prof == "Sinusoidal"
+        plot(L/1000, (1:length(L))*dh + dh_amp*sin(2*pi/T_sin*dL*(1:length(L))),LStyle{j})
+    elseif H_prof == "Custom prof"
+        plot(L/1000, H,LStyle{j})
+    else
+        plot(L/1000, (1:length(L))*dh,LStyle{j})
+    end
+    
     xlabel('L [km]')
     ylabel('H [m]')
 
@@ -329,3 +431,12 @@ legend(string(Var),'Location','northwest')
 % plot(L/1000, (1:length(L))*dh + dh_sin*sin(2*pi/30000*dL*(1:length(L))))
 % xlabel('L [km]')
 % ylabel('H [m]')
+
+% Percentage loss per km
+figure('Color',[1 1 1])
+Psi = m_dot*psi/1e9;
+Psi_n = Psi./max(Psi);
+plot(L./1000,Psi_n)
+grid on
+xlabel('L [km]')
+ylabel('\Psi/\Psi_{max}')
