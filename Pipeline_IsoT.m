@@ -55,11 +55,14 @@ Flow_eq = "PanB";
 % Generate multiple plots while varying one variable var (can be any
 % parameter set in the initial statements)
 % Var = {1 50 100 200 300 400 500}; % Values to be taken by H
-Var = {50 100 150 200 250 300};     % Value for H
+% Var = {50 100 150 200 250 300};     % Value for H
 % Var = {30000 60000 90000 120000}; % Values for height increment period
 % Var = {0 25 50 75 100}; % Values for height increment amplitude
+% Elevation profile
 % Var = {"Horizontal","Fixed tilt","Sinusoidal","Custom prof"};
 % Var = {"Horizontal","Fixed tilt","Custom prof"};
+% Flow equation
+Var = {"GFE","PanB"};
 
 LStyle = {'b','r','k','b--','r--','k--','b-.'};
 
@@ -126,10 +129,11 @@ cv = CP.PropsSI('Cvmass','P',P_a,'T',T_a,'Air');
 load('StF_Ab2.mat');
 
 for j=1:length(Var)
-    H_2 = Var{j};
+    % H_2 = Var{j};
     % T_sin = Var{j};
     % dh_amp = Var{j};
     % H_prof = Var{j};
+    Flow_eq = Var{j};
 
     A = pi*D^2/4; % mm2
     L = 0:dL:L_m; % 70 km pipe with increments of 1 km
@@ -142,7 +146,7 @@ for j=1:length(Var)
 
     D_mm = 1000*D;% mm
     epsD = eps/D;
-    f_guess = (2*log10(1/epsD)+1.14)^(-2); % Initial estimation using Nikuradse eq.
+    f_guess = (2*log10(1/epsD)+1.14)^(-2); % Initial friction f estimation using Nikuradse eq.
     
     m_dot = rho_a*Q_a;
 
@@ -173,9 +177,11 @@ for j=1:length(Var)
         h(i) = CP.PropsSI('H','P',P(i),'T',T_f,'Air');
         s(i) = CP.PropsSI('S','P',P(i),'T',T_f,'Air');
         Z(i) = CP.PropsSI('Z','P',P(i),'T',T_f,'Air');
-        U_erosional(i) = 1.22*100/sqrt(rho(i)); % The constant 100, can be any value from 100 to 250, 
+        U_erosional(i) = 1.22*100/sqrt(rho(i)); % Erosional velocity - it is advised that the actual 
+                                                % velocity be up to 50% of the erosional velocity.
+                                                % The constant 100, can be any value from 100 to 250
 
-        nu_Po(i) = 10*nu(i);
+        nu_Po(i) = 10*nu(i);    % Conversion of nu to Poise
     
         % Velocity m/s
         u(i) = 14.7349*( Q_a_day/D_mm^2 )*( P_a/T_a )*(Z(i)*T_f/P(i)); % Q_b has to be converted to m3/day and D to mm
@@ -191,7 +197,7 @@ for j=1:length(Var)
         % Negligible height difference
         psi(i) = h(i)-h0 - T0*(s(i)-s0)+u(i)^2/2;
         
-        Re(i) = 0.5134*( P_a_kPa/T_a )*( G*Q_a_day/(nu_Po(i)*D_mm) ); % P converted to kPa, Q to m3/day, nu to poise (1 Pa s = 10 poise), and D to mm
+        Re(i) = 0.5134*( P_a_kPa/T_a )*( G*Q_a_day/(nu_Po(i)*D_mm) ); % P in kPa, Q in m3/day, nu in poise (1 Pa s = 10 poise), and D in mm
     
         % Friction factor
         % Iterations for the estimation of friction factor using Colebrook equation
@@ -214,7 +220,7 @@ for j=1:length(Var)
         
         while (dP > 0.0001 & count < 10)
             P_f_kPa = 2/3*( P_1_kPa + P_2_kPa-(P_1_kPa*P_2_kPa)/(P_1_kPa+P_2_kPa) );
-            Z_f = CP.PropsSI('Z','P',P_f_kPa*1000,'T',T_f,'Air');
+            Z_f = CP.PropsSI('Z','P',P_f_kPa*1000,'T',T_f,'Air'); % compressibility for air
             % Compressibility formula for natural gas
             % Z_f = 1/(1+
             % ((P_f*0.000145038-14.73)*344400*10^(1.785*G)/(T_f*1.8)^3.825));
