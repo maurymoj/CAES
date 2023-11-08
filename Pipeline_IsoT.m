@@ -5,7 +5,7 @@ pyversion c:\Anaconda3\python.exe % Sets Python 3.11 as a interpreter
 %% Steady-state analysis with constant T - X km pipe - Panhandle B flow equation
 clear
 clc
-% close all
+close all
 CP = py.importlib.import_module('CoolProp.CoolProp');
 %-------------------- Problem parameters ------------------------------%
 % Ambient conditions
@@ -28,7 +28,7 @@ Q_a = 14*1000000/(24*3600); % Conversion from mcmd (millions of cubic meters
 % Pipe
 D = 0.9; % 900 mm
 dL = 1000;    % Distance increment
-L_m = 70000; % Total distance [m]
+L_m = 100000; % Total distance [m]
 
 eps = 0.04e-3; % Absolute roughness 0.04 mm
 
@@ -44,8 +44,8 @@ dh_amp = 25;    % Amplitude of sinusoidal height increment
 
 % Elevation profile
 % H_prof = "Horizontal";
-% H_prof = "Fixed_tilt";
-H_prof = "Sinusoidal";
+H_prof = "Fixed tilt";
+% H_prof = "Sinusoidal";
 % H_prof = "Custom_prof";
 
 % Flow equation
@@ -55,12 +55,11 @@ Flow_eq = "PanB";
 % Generate multiple plots while varying one variable var (can be any
 % parameter set in the initial statements)
 % Var = {1 50 100 200 300 400 500}; % Values to be taken by H
-% Var = {130};                        % Value for H
+Var = {50 100 150 200 250 300};     % Value for H
 % Var = {30000 60000 90000 120000}; % Values for height increment period
-% Var = {0};
 % Var = {0 25 50 75 100}; % Values for height increment amplitude
 % Var = {"Horizontal","Fixed tilt","Sinusoidal","Custom prof"};
-Var = {"Horizontal","Fixed tilt","Custom prof"};
+% Var = {"Horizontal","Fixed tilt","Custom prof"};
 
 LStyle = {'b','r','k','b--','r--','k--','b-.'};
 
@@ -87,15 +86,18 @@ grid on
 % U_fig = figure('Color',[1 1 1]);
 % hold on
 % grid on
-psi_fig = figure('Color',[1 1 1]);
-hold on
-grid on
+% psi_fig = figure('Color',[1 1 1]);
+% hold on
+% grid on
 % h_fig = figure('Color',[1 1 1]);
 % hold on
 % grid on
 % Psi_fig = figure('Color',[1 1 1]);
 % hold on
 % grid on
+pct_Psi_fig = figure('Color',[1 1 1]);
+hold on
+grid on
 
 % 1 Figure with subplots
 sp = figure('Color',[1 1 1]);
@@ -124,10 +126,10 @@ cv = CP.PropsSI('Cvmass','P',P_a,'T',T_a,'Air');
 load('StF_Ab2.mat');
 
 for j=1:length(Var)
-    % H_2 = Var{j};
+    H_2 = Var{j};
     % T_sin = Var{j};
     % dh_amp = Var{j};
-    H_prof = Var{j};
+    % H_prof = Var{j};
 
     A = pi*D^2/4; % mm2
     L = 0:dL:L_m; % 70 km pipe with increments of 1 km
@@ -222,7 +224,7 @@ for j=1:length(Var)
                 if Flow_eq == "GFE"
                     % P from General Flow Equation
                     % Negligible height difference
-                    % P(i+1) = sqrt( P_1_kPa^2 - ( Q_a_day/(1.1494e-3*(T_a/P_a_kPa)*D_mm^2.5) )^2*G*T_f*(dL/1000)*Z_f*f(i) );
+                    P(i+1) = sqrt( P_1_kPa^2 - ( Q_a_day/(1.1494e-3*(T_a/P_a_kPa)*D_mm^2.5) )^2*G*T_f*(dL/1000)*Z_f*f(i) );
                 elseif Flow_eq == "PanB"
                     % P from Panhandle B equation
                     % Negligible height difference
@@ -323,6 +325,8 @@ for j=1:length(Var)
                         warning('Re outside the indicated region for the Panhandle B equation.')
                     end
                 end
+            else
+                warning("Unidentified height profile.")
 
             end
             
@@ -351,10 +355,9 @@ for j=1:length(Var)
     % xlabel('L [m]')
     % ylabel('P [Pa]')
     figure(P_fig)   % Pressure drop profile
-    plot(L/1000,P/1000) % kPa x km
     plot(L/1000,P/1000,LStyle{j}) % kPa x km
-    % xlabel('L [km]')
-    % ylabel('P [kPa]')   
+    xlabel('L [km]')
+    ylabel('P [kPa]')   
     % plot(L/1610,P*0.000145038 - 14.73) % psig x mi
     % xlabel('L [mi]')
     % ylabel('P [psig]')
@@ -365,10 +368,10 @@ for j=1:length(Var)
     % plot(L/1000,u,LStyle{j})
     % xlabel('L [km]')
     % ylabel('u [m/s]')
-    figure(psi_fig)   % Entropy profile
-    plot(L/1000,psi/1000,LStyle{j})
-    xlabel('L [km]')
-    ylabel('\Psi [kJ/kg]')
+    % figure(psi_fig)   % Entropy profile
+    % plot(L/1000,psi/1000,LStyle{j})
+    % xlabel('L [km]')
+    % ylabel('\Psi [kJ/kg]')
     % figure(h_fig) % Height profile
     % plot(L/1000, (1:length(L))*dh + dh_sin*sin(2*pi/T_sin*dL*(1:length(L))))
     % xlabel('L [km]')
@@ -377,6 +380,13 @@ for j=1:length(Var)
     % plot(L/1000,m_dot*psi/1000,LStyle{j})
     % xlabel('L [km]')
     % ylabel('\Psi [kW]')
+    % Percentage loss per km
+    figure(pct_Psi_fig)
+    Psi = m_dot*psi/1e9;
+    Psi_n = Psi./max(Psi);
+    plot(L./1000,Psi_n,LStyle{j})    
+    xlabel('L [km]')
+    ylabel('\Psi/\Psi_{max}')
 
     % Subplot structure
     figure(sp)
@@ -419,8 +429,8 @@ legend(string(Var))
 % figure(U_fig)
 % legend(string(Var))
 % 
-figure(psi_fig)
-legend(string(Var))
+% figure(psi_fig)
+% legend(string(Var))
 % 
 % figure(h_fig)
 % legend(string(Var))
@@ -433,10 +443,11 @@ legend(string(Var),'Location','northwest')
 % ylabel('H [m]')
 
 % Percentage loss per km
-figure('Color',[1 1 1])
-Psi = m_dot*psi/1e9;
-Psi_n = Psi./max(Psi);
-plot(L./1000,Psi_n)
-grid on
-xlabel('L [km]')
-ylabel('\Psi/\Psi_{max}')
+figure(pct_Psi_fig)
+legend(string(Var))
+% Psi = m_dot*psi/1e9;
+% Psi_n = Psi./max(Psi);
+% plot(L./1000,Psi_n)
+% grid on
+% xlabel('L [km]')
+% ylabel('\Psi/\Psi_{max}')
