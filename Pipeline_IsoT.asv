@@ -1,12 +1,11 @@
 % pressure over 70 km pipeline
 pyversion c:\Anaconda3\python.exe % Sets Python 3.11 as a interpreter
-
+CP = py.importlib.import_module('CoolProp.CoolProp');
 
 %% Steady-state analysis with constant T - X km pipe - Panhandle B flow equation
 clear
 clc
 % close all
-CP = py.importlib.import_module('CoolProp.CoolProp');
 %-------------------- Problem parameters ------------------------------%
 % Ambient conditions
 T_a = 15 + 273.15; % T = 15 oC - ~288 K
@@ -39,14 +38,14 @@ E = 0.75;   % Pipeline efficiency
 H_1 = 0;
 H_2 = 130;
 
-T_sin = 25000; % Period of sinusoidal height increment
-dh_amp = 25;    % Amplitude of sinusoidal height increment
+T_sin = 30000; % Period of sinusoidal height increment
+dh_sin = 50;    % Amplitude of sinusoidal height increment
 
 % Elevation profile
 % H_prof = "Horizontal";
 % H_prof = "Fixed_tilt";
-H_prof = "Sinusoidal";
-% H_prof = "Custom_prof";
+% H_prof = "Sinusoidal";
+H_prof = "Custom_prof";
 
 % Flow equation
 % Flow_eq = "GFE";
@@ -59,8 +58,7 @@ Flow_eq = "PanB";
 % Var = {30000 60000 90000 120000}; % Values for height increment period
 % Var = {0};
 % Var = {0 25 50 75 100}; % Values for height increment amplitude
-% Var = {"Horizontal","Fixed tilt","Sinusoidal","Custom prof"};
-Var = {"Horizontal","Fixed tilt","Custom prof"};
+Var = {}
 
 LStyle = {'b','r','k','b--','r--','k--','b-.'};
 
@@ -68,7 +66,7 @@ LStyle = {'b','r','k','b--','r--','k--','b-.'};
 % G = 0.6
 % T_a = (60 - 32)*5/9 + 273.15 % T = 15 oC - ~288 K
 % P_a = 14.73*6894.76 % P = 14.73 psia
-% rho_a = CP.PropsSI('D','P',P_a,'T',T_a,'Air');
+% rho_a = py.CoolProp.CoolProp.PropsSI('D','P',P_a,'T',T_a,'Air');
 % L_m = 161000                           % m
 % D = (16 - 2*0.250)*0.0254              % m
 % Q_a = (100*0.02825)*1000000/(24*3600)     % Sm3/s
@@ -87,15 +85,16 @@ grid on
 % U_fig = figure('Color',[1 1 1]);
 % hold on
 % grid on
-psi_fig = figure('Color',[1 1 1]);
-hold on
-grid on
+% psi_fig = figure('Color',[1 1 1]);
+% hold on
+% grid on
 % h_fig = figure('Color',[1 1 1]);
 % hold on
 % grid on
 % Psi_fig = figure('Color',[1 1 1]);
 % hold on
 % grid on
+% 
 
 % 1 Figure with subplots
 sp = figure('Color',[1 1 1]);
@@ -112,22 +111,21 @@ subplot(2,2,4)
 hold on
 grid on
 
-rho_a = CP.PropsSI('D','P',P_a,'T',T_a,'Air');
+rho_a = py.CoolProp.CoolProp.PropsSI('D','P',P_a,'T',T_a,'Air');
 T0 = T_a;
-h0 = CP.PropsSI('H','P',P_a,'T',T_a,'Air');
-s0 = CP.PropsSI('S','P',P_a,'T',T_a,'Air');
+h0 = py.CoolProp.CoolProp.PropsSI('H','P',P_a,'T',T_a,'Air');
+s0 = py.CoolProp.CoolProp.PropsSI('S','P',P_a,'T',T_a,'Air');
 
-cp = CP.PropsSI('C','P',P_a,'T',T_a,'Air');
-cv = CP.PropsSI('Cvmass','P',P_a,'T',T_a,'Air');
+cp = py.CoolProp.CoolProp.PropsSI('C','P',P_a,'T',T_a,'Air');
+cv = py.CoolProp.CoolProp.PropsSI('Cvmass','P',P_a,'T',T_a,'Air');
 % gam = cp/cv;
 
 load('StF_Ab2.mat');
 
 for j=1:length(Var)
-    % H_2 = Var{j};
+    H_2 = Var{j};
     % T_sin = Var{j};
-    % dh_amp = Var{j};
-    H_prof = Var{j};
+    % dh_sin = Var{j};
 
     A = pi*D^2/4; % mm2
     L = 0:dL:L_m; % 70 km pipe with increments of 1 km
@@ -166,11 +164,11 @@ for j=1:length(Var)
     
     for i=1:length(L)-1
         
-        rho(i) = CP.PropsSI('D','P',P(i),'T',T_f,'Air');
-        nu(i) = CP.PropsSI('V','P',P(i),'T',T_f,'Air');
-        h(i) = CP.PropsSI('H','P',P(i),'T',T_f,'Air');
-        s(i) = CP.PropsSI('S','P',P(i),'T',T_f,'Air');
-        Z(i) = CP.PropsSI('Z','P',P(i),'T',T_f,'Air');
+        rho(i) = py.CoolProp.CoolProp.PropsSI('D','P',P(i),'T',T_f,'Air');
+        nu(i) = py.CoolProp.CoolProp.PropsSI('V','P',P(i),'T',T_f,'Air');
+        h(i) = py.CoolProp.CoolProp.PropsSI('H','P',P(i),'T',T_f,'Air');
+        s(i) = py.CoolProp.CoolProp.PropsSI('S','P',P(i),'T',T_f,'Air');
+        Z(i) = py.CoolProp.CoolProp.PropsSI('Z','P',P(i),'T',T_f,'Air');
         U_erosional(i) = 1.22*100/sqrt(rho(i)); % The constant 100, can be any value from 100 to 250, 
 
         nu_Po(i) = 10*nu(i);
@@ -212,7 +210,7 @@ for j=1:length(Var)
         
         while (dP > 0.0001 & count < 10)
             P_f_kPa = 2/3*( P_1_kPa + P_2_kPa-(P_1_kPa*P_2_kPa)/(P_1_kPa+P_2_kPa) );
-            Z_f = CP.PropsSI('Z','P',P_f_kPa*1000,'T',T_f,'Air');
+            Z_f = py.CoolProp.CoolProp.PropsSI('Z','P',P_f_kPa*1000,'T',T_f,'Air');
             % Compressibility formula for natural gas
             % Z_f = 1/(1+
             % ((P_f*0.000145038-14.73)*344400*10^(1.785*G)/(T_f*1.8)^3.825));
@@ -243,7 +241,7 @@ for j=1:length(Var)
                     end
                 end
 
-            elseif (H_prof == "Fixed tilt")
+            elseif (H_prof == "Fixed_tilt")
                 
                 s_H = 0.0684*G*dh/(T_f*Z_f);
                 % L_e = dL*(exp(s_H)-1)/s_H;
@@ -271,7 +269,7 @@ for j=1:length(Var)
 
             elseif H_prof == "Sinusoidal"
                 
-                dh_sin = dh+dh_amp*sin( 2*pi/T_sin*L(i) );
+                dh_sin = dh+dh_sin*sin( 2*pi/T_sin*L(i) );
                 s_H = 0.0684*G*dh_sin/(T_f*Z_f); % Sinusoidal profile
                 % L_e = dL*(exp(s_H)-1)/s_H;
                 L_e = (dL/cos(atan(dh_sin/dL)))*(exp(s_H)-1)/s_H;
@@ -296,7 +294,7 @@ for j=1:length(Var)
                     end
                 end
 
-            elseif H_prof == "Custom prof"
+            elseif H_prof == "Custom_prof"
 
                 dh = dh_SfA(i); % Custom elevation profile
         
@@ -336,11 +334,11 @@ for j=1:length(Var)
     
     end
     
-    rho(end) = CP.PropsSI('D','P',P(end),'T',T_f,'Air');
-    h(end) = CP.PropsSI('H','P',P(end),'T',T_f,'Air');
-    s(end) = CP.PropsSI('S','P',P(end),'T',T_f,'Air');
-    nu(end) = CP.PropsSI('V','P',P(end),'T',T_f,'Air');
-    Z(end) = CP.PropsSI('Z','P',P(end),'T',T_f,'Air');
+    rho(end) = py.CoolProp.CoolProp.PropsSI('D','P',P(end),'T',T_f,'Air');
+    h(end) = py.CoolProp.CoolProp.PropsSI('H','P',P(end),'T',T_f,'Air');
+    s(end) = py.CoolProp.CoolProp.PropsSI('S','P',P(end),'T',T_f,'Air');
+    nu(end) = py.CoolProp.CoolProp.PropsSI('V','P',P(end),'T',T_f,'Air');
+    Z(end) = py.CoolProp.CoolProp.PropsSI('Z','P',P(end),'T',T_f,'Air');
     u(end) = 14.7349*( Q_a_day/D_mm^2 )*( P_a/T_a )*(Z(end)*T_f/P(end)); % Q_b has to be converted to m3/day and D to mm
     psi(end) = h(end)-h0 - T0*(s(end)-s0)+u(end)^2/2;
     
@@ -365,10 +363,10 @@ for j=1:length(Var)
     % plot(L/1000,u,LStyle{j})
     % xlabel('L [km]')
     % ylabel('u [m/s]')
-    figure(psi_fig)   % Entropy profile
-    plot(L/1000,psi/1000,LStyle{j})
-    xlabel('L [km]')
-    ylabel('\Psi [kJ/kg]')
+    % figure(psi_fig)   % Entropy profile
+    % plot(L/1000,psi/1000,LStyle{j})
+    % xlabel('L [km]')
+    % ylabel('\Psi [kJ/kg]')
     % figure(h_fig) % Height profile
     % plot(L/1000, (1:length(L))*dh + dh_sin*sin(2*pi/T_sin*dL*(1:length(L))))
     % xlabel('L [km]')
@@ -397,12 +395,11 @@ for j=1:length(Var)
     subplot(2,2,4)
     % Height profile
     if H_prof == "Horizontal"
-        plot(L/1000,zeros(length(L),1),LStyle{j})
-    elseif H_prof == "Fixed tilt"
+    elseif H_prof == "Fixed_tilt"
         plot(L/1000, (1:length(L))*dh,LStyle{j})
     elseif H_prof == "Sinusoidal"
-        plot(L/1000, (1:length(L))*dh + dh_amp*sin(2*pi/T_sin*dL*(1:length(L))),LStyle{j})
-    elseif H_prof == "Custom prof"
+        plot(L/1000, (1:length(L))*dh + dh_sin*sin(2*pi/T_sin*dL*(1:length(L))),LStyle{j})
+    elseif H_prof == "Custom_prof"
         plot(L/1000, H,LStyle{j})
     else
         plot(L/1000, (1:length(L))*dh,LStyle{j})
@@ -413,14 +410,14 @@ for j=1:length(Var)
 
 end
 
-figure(P_fig)
-legend(string(Var))
+% figure(P_fig)
+% legend(string(Var))
 % 
 % figure(U_fig)
 % legend(string(Var))
 % 
-figure(psi_fig)
-legend(string(Var))
+% figure(psi_fig)
+% legend(string(Var))
 % 
 % figure(h_fig)
 % legend(string(Var))
