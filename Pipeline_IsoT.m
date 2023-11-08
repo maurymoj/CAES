@@ -5,7 +5,7 @@ pyversion c:\Anaconda3\python.exe % Sets Python 3.11 as a interpreter
 %% Steady-state analysis with constant T - X km pipe - Panhandle B flow equation
 clear
 clc
-close all
+% close all
 CP = py.importlib.import_module('CoolProp.CoolProp');
 %-------------------- Problem parameters ------------------------------%
 % Ambient conditions
@@ -24,9 +24,13 @@ Q_a = 14*1000000/(24*3600); % Conversion from mcmd (millions of cubic meters
     % per day to cubic meters per second) - real demand estimation 70 mscm/day
     % St Fergus, 14 is the proportional relative to area of one of the 3, 900
     % mm diameter pipes
+% Q_a = 25*1000000/(24*3600); % Flow for 1200 mm pipe
+% Q_a = 3*1000000/(24*3600);  % Flow for 450 mm pipe
 
 % Pipe
 D = 0.9; % 900 mm
+% D = 1.2;
+% D = 0.45;
 dL = 1000;    % Distance increment
 L_m = 100000; % Total distance [m]
 
@@ -37,7 +41,7 @@ E = 0.75;   % Pipeline efficiency
     % "Handbook of natural gas transmission and processing"
 
 H_1 = 0;
-H_2 = 130;
+H_2 = 100;
 
 T_sin = 25000; % Period of sinusoidal height increment
 dh_amp = 25;    % Amplitude of sinusoidal height increment
@@ -54,15 +58,24 @@ Flow_eq = "PanB";
 
 % Generate multiple plots while varying one variable var (can be any
 % parameter set in the initial statements)
+% Pipe diameter mm
+Var = {0.450,0.900,1.200};
+% Var = {0.900,1.200};
+% Flow rate
+Var2 = {3*1000000/(24*3600),14*1000000/(24*3600),25*1000000/(24*3600)};
+% Elevation at H2
+% Var = {100};
 % Var = {1 50 100 200 300 400 500}; % Values to be taken by H
 % Var = {50 100 150 200 250 300};     % Value for H
-% Var = {30000 60000 90000 120000}; % Values for height increment period
+% Sinusoidal period - height increment
+% Var = {5000 10000 25000 50000};
+% Sinusoidal amplitude - height increment
 % Var = {0 25 50 75 100}; % Values for height increment amplitude
 % Elevation profile
 % Var = {"Horizontal","Fixed tilt","Sinusoidal","Custom prof"};
 % Var = {"Horizontal","Fixed tilt","Custom prof"};
 % Flow equation
-Var = {"GFE","PanB"};
+% Var = {"GFE","PanB"};
 
 LStyle = {'b','r','k','b--','r--','k--','b-.'};
 
@@ -95,9 +108,9 @@ grid on
 % h_fig = figure('Color',[1 1 1]);
 % hold on
 % grid on
-% Psi_fig = figure('Color',[1 1 1]);
-% hold on
-% grid on
+Psi_fig = figure('Color',[1 1 1]);
+hold on
+grid on
 pct_Psi_fig = figure('Color',[1 1 1]);
 hold on
 grid on
@@ -133,7 +146,9 @@ for j=1:length(Var)
     % T_sin = Var{j};
     % dh_amp = Var{j};
     % H_prof = Var{j};
-    Flow_eq = Var{j};
+    % Flow_eq = Var{j};
+    D = Var{j};
+    Q_a = Var2{j};
 
     A = pi*D^2/4; % mm2
     L = 0:dL:L_m; % 70 km pipe with increments of 1 km
@@ -382,17 +397,17 @@ for j=1:length(Var)
     % plot(L/1000, (1:length(L))*dh + dh_sin*sin(2*pi/T_sin*dL*(1:length(L))))
     % xlabel('L [km]')
     % ylabel('H [m]')
-    % figure(Psi_fig)
-    % plot(L/1000,m_dot*psi/1000,LStyle{j})
-    % xlabel('L [km]')
-    % ylabel('\Psi [kW]')
+    figure(Psi_fig)
+    plot(L/1000,m_dot*psi/1e9,LStyle{j})
+    xlabel('L [km]')
+    ylabel('\Psi [GW]')
     % Percentage loss per km
     figure(pct_Psi_fig)
     Psi = m_dot*psi/1e9;
-    Psi_n = Psi./max(Psi);
+    Psi_n = 100*Psi./max(Psi);
     plot(L./1000,Psi_n,LStyle{j})    
     xlabel('L [km]')
-    ylabel('\Psi/\Psi_{max}')
+    ylabel('\Psi/\Psi_{max} [%]')
 
     % Subplot structure
     figure(sp)
@@ -417,7 +432,7 @@ for j=1:length(Var)
     elseif H_prof == "Fixed tilt"
         plot(L/1000, (1:length(L))*dh,LStyle{j})
     elseif H_prof == "Sinusoidal"
-        plot(L/1000, (1:length(L))*dh + dh_amp*sin(2*pi/T_sin*dL*(1:length(L))),LStyle{j})
+        plot(L/1000, (0:length(L)-1)*dh + dh_amp*sin(2*pi/T_sin*L),LStyle{j})
     elseif H_prof == "Custom prof"
         plot(L/1000, H,LStyle{j})
     else
@@ -431,6 +446,7 @@ end
 
 figure(P_fig)
 legend(string(Var))
+applystyle2plot
 % 
 % figure(U_fig)
 % legend(string(Var))
@@ -448,9 +464,14 @@ legend(string(Var),'Location','northwest')
 % xlabel('L [km]')
 % ylabel('H [m]')
 
+figure(Psi_fig)
+legend(string(Var))
+applystyle2plot
+
 % Percentage loss per km
 figure(pct_Psi_fig)
 legend(string(Var))
+applystyle2plot
 % Psi = m_dot*psi/1e9;
 % Psi_n = Psi./max(Psi);
 % plot(L./1000,Psi_n)
