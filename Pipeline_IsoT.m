@@ -33,6 +33,7 @@ D = 0.9; % 900 mm
 % D = 0.45;
 dL = 1000;    % Distance increment
 L_m = 100000; % Total distance [m]
+% L_m = 395000; % Total distance [m]
 
 eps = 0.04e-3; % Absolute roughness 0.04 mm
 
@@ -47,8 +48,8 @@ T_sin = 25000; % Period of sinusoidal height increment
 dh_amp = 25;    % Amplitude of sinusoidal height increment
 
 % Elevation profile
-% H_prof = "Horizontal";
-H_prof = "Fixed tilt";
+H_prof = "Horizontal";
+% H_prof = "Fixed tilt";
 % H_prof = "Sinusoidal";
 % H_prof = "Custom_prof";
 
@@ -59,16 +60,16 @@ Flow_eq = "PanB";
 % Generate multiple plots while varying one variable var (can be any
 % parameter set in the initial statements)
 % Pipe diameter mm
-Var = {0.450,0.900,1.200};
+% Var = {0.450,0.900,1.200};
 % Var = {0.900,1.200};
 % Flow rate
-Var2 = {3*1000000/(24*3600),14*1000000/(24*3600),25*1000000/(24*3600)};
+% Var2 = {3*1000000/(24*3600),14*1000000/(24*3600),25*1000000/(24*3600)};
 % Elevation at H2
 % Var = {100};
 % Var = {1 50 100 200 300 400 500}; % Values to be taken by H
 % Var = {50 100 150 200 250 300};     % Value for H
 % Sinusoidal period - height increment
-% Var = {5000 10000 25000 50000};
+Var = {5000 10000 25000 50000};
 % Sinusoidal amplitude - height increment
 % Var = {0 25 50 75 100}; % Values for height increment amplitude
 % Elevation profile
@@ -143,12 +144,12 @@ load('StF_Ab2.mat');
 
 for j=1:length(Var)
     % H_2 = Var{j};
-    % T_sin = Var{j};
+    T_sin = Var{j};
     % dh_amp = Var{j};
     % H_prof = Var{j};
     % Flow_eq = Var{j};
-    D = Var{j};
-    Q_a = Var2{j};
+    % D = Var{j};
+    % Q_a = Var2{j};
 
     A = pi*D^2/4; % mm2
     L = 0:dL:L_m; % 70 km pipe with increments of 1 km

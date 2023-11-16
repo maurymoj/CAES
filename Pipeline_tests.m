@@ -352,8 +352,8 @@ Q_a = 14*1000000/(24*3600); % Conversion from mcmd (millions of cubic meters
 
 % Pipe
 D = 0.9; % 900 mm
-dL = 1000;    % Distance increment [m]
-L_m = 70000; % Total distance [m]
+dL = 10;    % Distance increment [m]
+L_m = 2000; % Total distance [m]
 % L_m = 240000; % Total distance [m]
 
 eps = 0.04e-3; % Absolute roughness 0.04 mm
@@ -396,9 +396,9 @@ LStyle = {'b','r','k','b--','r--','k--','b-.'};
 % h_fig = figure('Color',[1 1 1]);
 % hold on
 % grid on
-% T_fig = figure('Color',[1 1 1]);
-% hold on
-% grid on
+T_fig = figure('Color',[1 1 1]);
+hold on
+grid on
 
 % 1 Figure with subplots
 sp = figure('Color',[1 1 1]);
@@ -433,7 +433,7 @@ for j=1:length(Var)
     T_in = Var{j};
 
     A = pi*D^2/4; % mm2
-    L = 0:dL:L_m; % 70 km pipe with increments of 1 km
+    L = 0:dL:L_m; % L [m] pipe with increments of dL [m]
     H = interp1(x_SfA*1000,H_SfA,L,"linear","extrap");
     dh_SfA = diff(H);    
     
@@ -469,9 +469,10 @@ for j=1:length(Var)
     
     for i=1:length(L)-1
         dT = 10;
+        dP = 10;
         count_T = 0;
         T_old = max(0.98*T(i),T_s);
-        while (dT > 0.0001 & count_T < 1000) 
+        while ( (dT > 0.0001 || dP > 0.0001) && count_T < 1000) 
             
             if T_old == T_s
                 T_f = T_s;
@@ -503,13 +504,13 @@ for j=1:length(Var)
         
             Re(i) = 0.5134*( P_a_kPa/T_a )*( G*Q_a_day/(nu_Po(i)*D_mm) ); % P converted to kPa, Q to m3/day, nu to poise (1 Pa s = 10 poise), and D to mm
         
-            % Friction factor
+            % Darcy Friction factor
             % Iterations for the estimation of friction factor using Colebrook equation
             f_old = f_guess;
             df = 10;
             count=0;
             while (df > 0.0001 & count < 10) 
-                % f_n = (-2*log10(epsD/3.7 + 2.51/(Re*f^0.5)))^(-2); % Original Colebrook-White equation
+                % f_n = (-2*log10(epsD/3.7 + 2.51/(Re(i)*f(i)^0.5)))^(-2); % Original Colebrook-White equation
                 f_new = (-2*log10(epsD/3.7 + 2.825/(Re(i)*f_old^0.5)))^(-2); % Modified Colebrook-White equation - conservative (higher friction factors)
                 df = (f_new - f_old)/f_old;
                 f_old = f_new;
@@ -530,7 +531,7 @@ for j=1:length(Var)
                 % ((P_f*0.000145038-14.73)*344400*10^(1.785*G)/(T_f*1.8)^3.825));
                 % - Compressibility formula for natural gas
 
-                dh = dh_SfA(i); % Custom elevation profile
+                % dh = dh_SfA(i); % Custom elevation profile
 
                 % P from General Flow Equation
                 % Negligible height difference
@@ -566,7 +567,8 @@ for j=1:length(Var)
             Pr = py.CoolProp.CoolProp.PropsSI('Prandtl','P',P_f_kPa*1000,'T',T_f,'Air');
             k_fl = py.CoolProp.CoolProp.PropsSI('conductivity','P',P_f_kPa*1000,'T',T_f,'Air');
 
-            % Bhatti and Shah
+            % Bhatti and Shah, Handbook of Single Phase Convective Heat Transfer
+            % https://2022.help.altair.com/2022.1/flowsim/topics/internal/solver_technical_manual/general_functions_routines/gfr_htc_correlations_internal.htm/
             % Appropriate for rough pipes and Re > 10000, 0.5 < Pr < 10,
             % 0.002 < e/D < 0.05
             Re_e=Re(i)*epsD*sqrt(f(i)/8);
@@ -586,11 +588,17 @@ for j=1:length(Var)
             % elseif (Pr < 0.5) || (Pr > 2000)
             %     warning('Pr outside the Nu correlation appropriate region (0.5 < Pr < 2000)')
             % end
-            
+            % Nu = ( (f(i)/8)*(Re(i)-1000)*Pr )/( 1+12.7*(f(i)/8)^0.5*(Pr^(2/3)-1) );
+            % if (Re(i) < 3000) || (Re(i) > 5e6)
+            %     warning('Re outside the Nu correlation appropriate region (3000 < Re < 5e6)')
+            % elseif (Pr < 0.5) || (Pr > 2000)
+            %     warning('Pr outside the Nu correlation appropriate region (0.5 < Pr < 2000)')
+            % end
+
             % Adjusted Colburn Nu equation for cooling - "Themal fluid sciences - Cengel"
             % Appropriate for 0.6 < Pr < 160, Re > 10000
             % Nu = 0.023*Re(i)^0.8*Pr^0.4; % Adjusted Colburn equation for cooling - "Thermal fluid sciences - Cengel" not ideal for non-smooth pipes!!
-            % if (Re(i) < 10000)
+            % if (Re(i) < 10000)gas
             %     warning('Re outside the Nu correlation appropriate region (Re > 10000)')
             % elseif (Pr < 0.6) || (Pr > 160)
             %     warning('Pr outside the Nu correlation appropriate region (0.6 < Pr < 160)')
@@ -624,7 +632,7 @@ for j=1:length(Var)
     u(end) = 14.7349*( Q_a_day/D_mm^2 )*( P_a/T_a )*(Z(end)*T_f/P(end)); % Q_b has to be converted to m3/day and D to mm
     psi(end) = h(end)-h0 - T0*(s(end)-s0)+u(end)^2/2;
     
-    % Plots
+    % Single plots
     % figure('Color',[1 1 1])
     % plot(L,P)           % Pa x m 
     % xlabel('L [m]')
@@ -637,24 +645,20 @@ for j=1:length(Var)
     % xlabel('L [mi]')
     % ylabel('P [psig]')
     % ylim([1150 1450])
-    
     % figure('Color',[1 1 1])
     % figure(U_fig)   % Velocity profile
     % plot(L/1000,u,LStyle{j})
     % xlabel('L [km]')
     % ylabel('u [m/s]')
-    
     % figure(psi_fig) % Exergy profile
     % plot(L/1000,psi/1000,LStyle{j})
     % % plot(L/1000,phi,LStyle{j})
     % xlabel('L [km]')
     % ylabel('\Psi [kJ/kg]')
-
-    % figure(T_fig)   % Temperature profile
-    % plot(L/1000,T,LStyle{j})
-    % xlabel('L [km]')
-    % ylabel('T [K]')
-    % 
+    figure(T_fig)   % Temperature profile
+    plot(L/1000,T,LStyle{j})
+    xlabel('L [km]')
+    ylabel('T [K]')
     % figure(psi_comp_fig) % Exergy profile
     % plot(L/1000,(h-h0)./1000,LStyle{1})
     % plot(L/1000,(-T0*(s-s0))./1000,LStyle{2})
@@ -684,9 +688,9 @@ for j=1:length(Var)
     ylabel('\Psi [kJ/kg]')
     subplot(2,2,4)
     % Height profile
-    % plot(L/1000, (1:length(L))*dh,LStyle{j})
+    plot(L/1000, (1:length(L))*dh,LStyle{j})
     % plot(L/1000, (1:length(L))*dh + dh_sin*sin(2*pi/T_sin*dL*(1:length(L))),LStyle{j})
-    plot(L/1000, H,LStyle{j})
+    % plot(L/1000, H,LStyle{j})
     xlabel('L [km]')
     ylabel('H [m]')
 end
