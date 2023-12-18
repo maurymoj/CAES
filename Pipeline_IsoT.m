@@ -161,7 +161,6 @@ for j=1:length(Var)
 
     D_mm = 1000*D;% mm
     epsD = eps/D;
-    f_guess = (2*log10(1/epsD)+1.14)^(-2); % Initial friction f estimation using Nikuradse eq.
     
     m_dot = rho_a*Q_a;
 
@@ -184,6 +183,8 @@ for j=1:length(Var)
     T = T_f*ones(length(L),1);      % Assuming isothermal flow
     
     P(1) = P_in;
+    
+    f_guess = (2*log10(1/epsD)+1.14)^(-2); % Initial friction f estimation using Nikuradse eq.
     
     for i=1:length(L)-1
         

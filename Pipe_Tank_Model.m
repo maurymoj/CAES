@@ -40,6 +40,8 @@ E = 0.75;   % Pipeline efficiency
 H_1 = 0;
 H_2 = 1;
 
+Vol_tank = pi*D^2/4 * L_m; % Pipeline volume
+
 % Elevation profile
 H_prof = "Horizontal";
 % H_prof = "Fixed tilt";
@@ -49,6 +51,12 @@ H_prof = "Horizontal";
 % Flow equation
 % Flow_eq = "GFE";
 Flow_eq = "PanB";
+
+% Transient parameters
+dt = 10; % s
+T_total = 3600;
+% t = 0:dt:T_total;
+t = 0;
 
 % Generate multiple plots while varying one variable var (can be any
 % parameter set in the initial statements)
@@ -121,6 +129,87 @@ cv = CP.PropsSI('Cvmass','P',P_a,'T',T_a,'Air');
 
 load('StF_Ab2.mat');
 
+for k = 1:length(Var)
+    
+    A = pi*D^2/4; % Area, mm2
+    % L = 0:dL:L_m; % pipe length with increments of dL, m
+    L = [0;dL]; % pipe length with increments of dL, m
+
+    % Elevation profile from St. Fergus -> Aberdeen
+    H = interp1(x_SfA*1000,H_SfA,L,"linear","extrap");
+    dh_SfA = diff(H);
+    
+    dh = (H_2-H_1)/length(L);
+
+    D_mm = 1000*D;% mm
+    epsD = eps/D;
+
+     m_dot = rho_a*Q_a;
+
+    P_a_kPa = P_a/1000;
+    Q_a_day = Q_a*24*3600;    % Sm3/day
+    L_km = L./1000;           % km
+
+    f_guess = (2*log10(1/epsD)+1.14)^(-2); % Initial friction f estimation using Nikuradse eq.
+
+    rho = zeros(length(t),length(L));
+    nu= zeros(length(t),length(L));
+    nu_Po = zeros(length(t),length(L));
+    Z = zeros(length(t),length(L));
+    u = zeros(length(t),length(L));
+    Re = zeros(length(t),length(L));
+    f = zeros(length(t),length(L));
+    s = zeros(length(t),length(L));
+    h = zeros(length(t),length(L));
+    psi = zeros(length(t),length(L));
+    U_erosional = zeros(length(t),length(L));
+    P = zeros(length(t),length(L));
+
+    T = T_f*ones(length(t),length(L),1);      % Assuming isothermal flow
+    
+    P(:,1) = P_in; % Constant inlet pressure
+
+
+    for j = 1:length(t)
+        
+        for i = 1:length(L)
+            rho(j,i) = CP.PropsSI('D','P',P(j,i),'T',T_f,'Air');
+            nu(j,i) = CP.PropsSI('V','P',P(j,i),'T',T_f,'Air');
+            h(j,i) = CP.PropsSI('H','P',P(j,i),'T',T_f,'Air');
+            s(j,i) = CP.PropsSI('S','P',P(j,i),'T',T_f,'Air');
+            Z(j,i) = CP.PropsSI('Z','P',P(j,i),'T',T_f,'Air');
+            U_erosional(j,i) = 1.22*100/sqrt(rho(j,i)); % Erosional velocity - it is advised that the actual 
+                                                    % velocity be up to 50% of the erosional velocity.
+                                                    % The constant 100, can be any value from 100 to 250
+    
+            nu_Po(j,i) = 10*nu(j,i);    % Conversion of nu to Poise
+
+            % Velocity m/s
+            u(j,i) = 14.7349*( Q_a_day/D_mm^2 )*( P_a/T_a )*(Z(j,i)*T_f/P(j,i)); % Q_b has to be converted to m3/day and D to mm
+            if u(j,i) > 0.5*U_erosional(j,i)
+                warning('U greater than 50% of the erosional velocity')
+            end
+
+            % Exergy
+            % phi = h-h0 + T0*(s-s0)+u^2/2+gz
+            % Considering height difference
+            % psi(i) = h(i)-h0 + T0*(s(i)-s0)+u(i)^2/2+g*z(i)
+            
+            % Negligible height difference
+            psi(j,i) = h(j,i)-h0 - T0*(s(j,i)-s0)+u(j,i)^2/2;
+            
+            Re(i) = 0.5134*( P_a_kPa/T_a )*( G*Q_a_day/(nu_Po(i)*D_mm) ); % P in kPa, Q in m3/day, nu in poise (1 Pa s = 10 poise), and D in mm
+
+
+        end
+
+
+
+
+        
+    end
+
+end
 %%
 
 
@@ -145,7 +234,8 @@ for j=1:length(Var)
 
     D_mm = 1000*D;% mm
     epsD = eps/D;
-    f_guess = (2*log10(1/epsD)+1.14)^(-2); % Initial friction f estimation using Nikuradse eq.
+    
+    
     
     m_dot = rho_a*Q_a;
 
@@ -169,6 +259,8 @@ for j=1:length(Var)
     
     P(1) = P_in;
     
+    f_guess = (2*log10(1/epsD)+1.14)^(-2); % Initial friction f estimation using Nikuradse eq.
+
     for i=1:length(L)-1
         
         rho(i) = CP.PropsSI('D','P',P(i),'T',T_f,'Air');
