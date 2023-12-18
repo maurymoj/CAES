@@ -1,11 +1,11 @@
-% pressure over 70 km pipeline
 pyversion c:\Anaconda3\python.exe % Sets Python 3.11 as a interpreter
 
-%% Steady-state analysis with constant T - X km pipe - Panhandle B flow equation
+%%
 clear
 clc
 % close all
 CP = py.importlib.import_module('CoolProp.CoolProp');
+
 %-------------------- Problem parameters ------------------------------%
 % Ambient conditions
 T_a = 15 + 273.15; % T = 15 oC - ~288 K
@@ -15,8 +15,6 @@ G = 1;      % Specific gas gravity - for air G = 1
 P_in = 7e6; % 7 MPa
 T_1 = 5 + 273.15; % Common operational condition assumption Nasr and Connor "Natural Gas Engineering and Safety Challenges"
 T_f = T_1; % Isothermal assumption
-    % !!! High temperatures on the outlet of compressor stations,
-    % which can persist for up to 50 km. !!!
 
 % Flow rate
 Q_a = 14*1000000/(24*3600); % Conversion from mcmd (millions of cubic meters
@@ -32,7 +30,6 @@ D = 0.9; % 900 mm
 % D = 0.45;
 dL = 1000;    % Distance increment
 L_m = 400000; % Total distance [m]
-% L_m = 395000; % Total distance [m]
 
 eps = 0.04e-3; % Absolute roughness 0.04 mm
 
@@ -41,10 +38,7 @@ E = 0.75;   % Pipeline efficiency
     % "Handbook of natural gas transmission and processing"
 
 H_1 = 0;
-H_2 = 100;
-
-T_sin = 25000; % Period of sinusoidal height increment
-dh_amp = 25;    % Amplitude of sinusoidal height increment
+H_2 = 1;
 
 % Elevation profile
 H_prof = "Horizontal";
@@ -78,20 +72,6 @@ Var = {5000 10000 25000 50000};
 % Var = {"GFE","PanB"};
 
 LStyle = {'b','r','k','b--','r--','k--','b-.'};
-
-% % Sanity check with book equation comparisons
-% G = 0.6
-% T_a = (60 - 32)*5/9 + 273.15 % T = 15 oC - ~288 K
-% P_a = 14.73*6894.76 % P = 14.73 psia
-% rho_a = CP.PropsSI('D','P',P_a,'T',T_a,'Air');
-% L_m = 161000                           % m
-% D = (16 - 2*0.250)*0.0254              % m
-% Q_a = (100*0.02825)*1000000/(24*3600)     % Sm3/s
-% T_f = (80 - 32)*5/9 + 273.15
-% P_in = (1400 + 14.73)*6894.76
-% eps = 0.7e-3*25.4e-3
-% E = 0.95
-
 
 %----------------------------------------------------------------------%
 
@@ -140,6 +120,10 @@ cv = CP.PropsSI('Cvmass','P',P_a,'T',T_a,'Air');
 % gam = cp/cv;
 
 load('StF_Ab2.mat');
+
+%%
+
+
 
 for j=1:length(Var)
     % H_2 = Var{j};
