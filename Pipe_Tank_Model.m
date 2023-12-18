@@ -1,4 +1,4 @@
-pyversion c:\Anaconda3\python.exe % Sets Python 3.11 as a interpreter
+% pyversion c:\Anaconda3\python.exe % Sets Python 3.11 as a interpreter
 
 %%
 clear
@@ -15,14 +15,6 @@ G = 1;      % Specific gas gravity - for air G = 1
 P_in = 7e6; % 7 MPa
 T_1 = 5 + 273.15; % Common operational condition assumption Nasr and Connor "Natural Gas Engineering and Safety Challenges"
 T_f = T_1; % Isothermal assumption
-
-% Flow rate
-Q_a = 14*1000000/(24*3600); % Conversion from mcmd (millions of cubic meters
-    % per day to cubic meters per second) - real demand estimation 70 mscm/day
-    % St Fergus, 14 is the proportional relative to area of one of the 3, 900
-    % mm diameter pipes
-% Q_a = 25*1000000/(24*3600); % Flow for 1200 mm pipe
-% Q_a = 3*1000000/(24*3600);  % Flow for 450 mm pipe
 
 % Pipe
 D = 0.9; % 900 mm
@@ -168,7 +160,7 @@ for k = 1:length(Var)
     T = T_f*ones(length(t),length(L),1);      % Assuming isothermal flow
     
     P(:,1) = P_in; % Constant inlet pressure
-
+    P(:,2) = P_a;
 
     for j = 1:length(t)
         
@@ -184,6 +176,18 @@ for k = 1:length(Var)
     
             nu_Po(j,i) = 10*nu(j,i);    % Conversion of nu to Poise
 
+
+            
+            
+
+            Q_a_day = 1.1494e-3*(T_a/P_a)*( (P(j,1)^2 - P(j,2)^2)/(G*T_f*dL*Z(j,i)*f_guess) )^0.5*D_mm^2.5;
+            
+            Re(j,i) = 0.5134*( P_a_kPa/T_a )*( G*Q_a_day/(nu_Po(i)*D_mm) ); % P in kPa, Q in m3/day, nu in poise (1 Pa s = 10 poise), and D in mm
+
+
+
+
+
             % Velocity m/s
             u(j,i) = 14.7349*( Q_a_day/D_mm^2 )*( P_a/T_a )*(Z(j,i)*T_f/P(j,i)); % Q_b has to be converted to m3/day and D to mm
             if u(j,i) > 0.5*U_erosional(j,i)
@@ -198,7 +202,12 @@ for k = 1:length(Var)
             % Negligible height difference
             psi(j,i) = h(j,i)-h0 - T0*(s(j,i)-s0)+u(j,i)^2/2;
             
-            Re(i) = 0.5134*( P_a_kPa/T_a )*( G*Q_a_day/(nu_Po(i)*D_mm) ); % P in kPa, Q in m3/day, nu in poise (1 Pa s = 10 poise), and D in mm
+            
+
+
+
+
+
 
 
         end
@@ -274,6 +283,10 @@ for j=1:length(Var)
 
         nu_Po(i) = 10*nu(i);    % Conversion of nu to Poise
     
+
+
+
+
         % Velocity m/s
         u(i) = 14.7349*( Q_a_day/D_mm^2 )*( P_a/T_a )*(Z(i)*T_f/P(i)); % Q_b has to be converted to m3/day and D to mm
         if u(i) > 0.5*U_erosional(i)
@@ -296,7 +309,7 @@ for j=1:length(Var)
         df = 10;
         count=0;
         while (df > 0.0001 & count < 10) 
-            % f_n = (-2*log10(epsD/3.7 + 2.51/(Re*f^0.5)))^(-2); % Original Colebrook-White equation
+            f_n = (-2*log10(epsD/3.7 + 2.51/(Re*f^0.5)))^(-2); % Original Colebrook-White equation
             f_new = (-2*log10(epsD/3.7 + 2.825/(Re(i)*f_old^0.5)))^(-2); % Modified Colebrook-White equation - conservative (higher friction factors)
             df = (f_new - f_old)/f_old;
             f_old = f_new;
