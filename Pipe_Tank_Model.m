@@ -3,7 +3,7 @@
 %%
 clear
 clc
-% close all
+close all
 CP = py.importlib.import_module('CoolProp.CoolProp');
 
 %-------------------- Problem parameters ------------------------------%
@@ -58,11 +58,11 @@ t = 0;
 % Flow rate
 % Var2 = {3*1000000/(24*3600),14*1000000/(24*3600),25*1000000/(24*3600)};
 % Elevation at H2
-% Var = {100};
+Var = {100};
 % Var = {1 50 100 200 300 400 500}; % Values to be taken by H
 % Var = {50 100 150 200 250 300};     % Value for H
 % Sinusoidal period - height increment
-Var = {5000 10000 25000 50000};
+% Var = {5000 10000 25000 50000};
 % Sinusoidal amplitude - height increment
 % Var = {0 25 50 75 100}; % Values for height increment amplitude
 % Elevation profile
@@ -125,7 +125,8 @@ for k = 1:length(Var)
     
     A = pi*D^2/4; % Area, mm2
     % L = 0:dL:L_m; % pipe length with increments of dL, m
-    L = [0;dL]; % pipe length with increments of dL, m
+    % L = [0;dL]; % pipe length with increments of dL, m
+    L = 0;
 
     % Elevation profile from St. Fergus -> Aberdeen
     H = interp1(x_SfA*1000,H_SfA,L,"linear","extrap");
@@ -136,10 +137,10 @@ for k = 1:length(Var)
     D_mm = 1000*D;% mm
     epsD = eps/D;
 
-     m_dot = rho_a*Q_a;
+    % m_dot = rho_a*Q_a;
 
     P_a_kPa = P_a/1000;
-    Q_a_day = Q_a*24*3600;    % Sm3/day
+    % Q_a_day = Q_a*24*3600;    % Sm3/day
     L_km = L./1000;           % km
 
     f_guess = (2*log10(1/epsD)+1.14)^(-2); % Initial friction f estimation using Nikuradse eq.
@@ -176,16 +177,36 @@ for k = 1:length(Var)
     
             nu_Po(j,i) = 10*nu(j,i);    % Conversion of nu to Poise
 
-
-            
-            
-
             Q_a_day = 1.1494e-3*(T_a/P_a)*( (P(j,1)^2 - P(j,2)^2)/(G*T_f*dL*Z(j,i)*f_guess) )^0.5*D_mm^2.5;
+
+            Q_old = Q_a_day;
+            dQ = 10;
+            count_Q = 0;
+            
+            while (dQ > 0.0001 & count_Q < 1000)
+                Re(j,i) = 0.5134*( P_a_kPa/T_a )*( G*Q_a_day/(nu_Po(i)*D_mm) ); % P in kPa, Q in m3/day, nu in poise (1 Pa s = 10 poise), and D in mm
+            
+                % Friction factor
+                % Iterations for the estimation of friction factor using Colebrook equation
+                f_old = f_guess;
+                df = 10;
+                count_f=0;
+                while (df > 0.0001 & count_f < 10) 
+                    % f_n = (-2*log10(epsD/3.7 + 2.51/(Re*f^0.5)))^(-2); % Original Colebrook-White equation
+                    f_new = (-2*log10(epsD/3.7 + 2.825/(Re(j,i)*f_old^0.5)))^(-2); % Modified Colebrook-White equation - conservative (higher friction factors)
+                    df = (f_new - f_old)/f_old;
+                    f_old = f_new;
+                    count_f = count_f + 1; 
+                end
+                f(j,i) = f_old;
+
+                Q_a_day = 1.1494e-3*(T_a/P_a)*( (P(j,1)^2 - P(j,2)^2)/(G*T_f*dL*Z(j,i)*f(j,i)) )^0.5*D_mm^2.5;
+                dQ = abs((Q_a_day - Q_old)/Q_old);
+                Q_old = Q_a_day;
+                count_Q = count_Q + 1;
+            end
             
             Re(j,i) = 0.5134*( P_a_kPa/T_a )*( G*Q_a_day/(nu_Po(i)*D_mm) ); % P in kPa, Q in m3/day, nu in poise (1 Pa s = 10 poise), and D in mm
-
-
-
 
 
             % Velocity m/s
@@ -307,22 +328,22 @@ for j=1:length(Var)
         % Iterations for the estimation of friction factor using Colebrook equation
         f_old = f_guess;
         df = 10;
-        count=0;
-        while (df > 0.0001 & count < 10) 
+        count_f=0;
+        while (df > 0.0001 & count_f < 10) 
             f_n = (-2*log10(epsD/3.7 + 2.51/(Re*f^0.5)))^(-2); % Original Colebrook-White equation
             f_new = (-2*log10(epsD/3.7 + 2.825/(Re(i)*f_old^0.5)))^(-2); % Modified Colebrook-White equation - conservative (higher friction factors)
-            df = (f_new - f_old)/f_old;
+            df = abs((f_new - f_old)/f_old);
             f_old = f_new;
-            count = count + 1; 
+            count_f = count_f + 1; 
         end
         f(i) = f_old;
     
         P_1_kPa = P(i)/1000;
         P_2_kPa = 0.98*P_1_kPa; % Initial guess
         dP = 10;
-        count = 0;
+        count_f = 0;
         
-        while (dP > 0.0001 & count < 10)
+        while (dP > 0.0001 & count_f < 10)
             P_f_kPa = 2/3*( P_1_kPa + P_2_kPa-(P_1_kPa*P_2_kPa)/(P_1_kPa+P_2_kPa) );
             Z_f = CP.PropsSI('Z','P',P_f_kPa*1000,'T',T_f,'Air'); % compressibility for air
             % Compressibility formula for natural gas
@@ -442,9 +463,9 @@ for j=1:length(Var)
             
             % CHECK CONDITIONS OF EQUATIONS
 
-            dP = (P(i+1) - P_2_kPa)/P_2_kPa;
+            dP = abs((P(i+1) - P_2_kPa)/P_2_kPa);
             P_2_kPa = P(i+1);
-            count = count + 1;
+            count_f = count_f + 1;
         end
         P(i+1) = 1000*P(i+1); % conversion back to Pa
     
