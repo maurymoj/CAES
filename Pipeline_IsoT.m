@@ -185,7 +185,7 @@ for j=1:length(Var)
     P(1) = P_in;
     
     f_guess = (2*log10(1/epsD)+1.14)^(-2); % Initial friction f estimation using Nikuradse eq.
-    
+
     for i=1:length(L)-1
         
         rho(i) = CP.PropsSI('D','P',P(i),'T',T_f,'Air');
@@ -223,7 +223,7 @@ for j=1:length(Var)
         while (df > 0.0001 & count < 10) 
             % f_n = (-2*log10(epsD/3.7 + 2.51/(Re*f^0.5)))^(-2); % Original Colebrook-White equation
             f_new = (-2*log10(epsD/3.7 + 2.825/(Re(i)*f_old^0.5)))^(-2); % Modified Colebrook-White equation - conservative (higher friction factors)
-            df = (f_new - f_old)/f_old;
+            df = abs((f_new - f_old)/f_old);
             f_old = f_new;
             count = count + 1; 
         end
@@ -354,7 +354,7 @@ for j=1:length(Var)
             
             % CHECK CONDITIONS OF EQUATIONS
 
-            dP = (P(i+1) - P_2_kPa)/P_2_kPa;
+            dP = abs((P(i+1) - P_2_kPa)/P_2_kPa);
             P_2_kPa = P(i+1);
             count = count + 1;
         end
