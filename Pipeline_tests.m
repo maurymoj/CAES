@@ -512,7 +512,7 @@ for j=1:length(Var)
             while (df > 0.0001 & count < 10) 
                 % f_n = (-2*log10(epsD/3.7 + 2.51/(Re(i)*f(i)^0.5)))^(-2); % Original Colebrook-White equation
                 f_new = (-2*log10(epsD/3.7 + 2.825/(Re(i)*f_old^0.5)))^(-2); % Modified Colebrook-White equation - conservative (higher friction factors)
-                df = (f_new - f_old)/f_old;
+                df = abs((f_new - f_old)/f_old);
                 f_old = f_new;
                 count = count + 1; 
             end
@@ -555,7 +555,7 @@ for j=1:length(Var)
                     warning('Re outside the indicated region for the Panhandle B equation.')
                 end
 
-                dP = (P(i+1) - P_2_kPa)/P_2_kPa;
+                dP = abs((P(i+1) - P_2_kPa)/P_2_kPa);
                 P_2_kPa = P(i+1);
                 count = count + 1;
             end
@@ -612,7 +612,7 @@ for j=1:length(Var)
             C_p = py.CoolProp.CoolProp.PropsSI('C','P',P_f_kPa*1000,'T',T_f,'Air');
             a = pi*D*U/(m_dot*C_p);
             T(i+1) = T_s + (T(i) - T_s)*exp(-a*dL);
-            dT = (T(i+1) - T_old)/T_old;
+            dT = abs((T(i+1) - T_old)/T_old);
             T_old = max(T(i+1),T_s);
             count_T = count + 1; 
         end
