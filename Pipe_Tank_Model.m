@@ -35,8 +35,8 @@ H_2 = 1;
 Vol_tank = pi*D^2/4 * L_m; % Pipeline volume
 
 % Elevation profile
-H_prof = "Horizontal";
-% H_prof = "Fixed tilt";
+% H_prof = "Horizontal";
+H_prof = "Fixed tilt";
 % H_prof = "Sinusoidal";
 % H_prof = "Custom_prof";
 
@@ -119,7 +119,7 @@ cp = CP.PropsSI('C','P',P_a,'T',T_a,'Air');
 cv = CP.PropsSI('Cvmass','P',P_a,'T',T_a,'Air');
 % gam = cp/cv;
 
-load('StF_Ab2.mat');
+% load('StF_Ab2.mat');
 
 for k = 1:length(Var)
     
@@ -129,8 +129,8 @@ for k = 1:length(Var)
     L = 0;
 
     % Elevation profile from St. Fergus -> Aberdeen
-    H = interp1(x_SfA*1000,H_SfA,L,"linear","extrap");
-    dh_SfA = diff(H);
+     % H = interp1(x_SfA*1000,H_SfA,L,"linear","extrap");
+    % dh_SfA = diff(H);
     
     dh = (H_2-H_1)/length(L);
 
@@ -257,8 +257,8 @@ for j=1:length(Var)
     L = 0:dL:L_m; % 70 km pipe with increments of 1 km
 
     % Elevation profile from St. Fergus -> Aberdeen
-    H = interp1(x_SfA*1000,H_SfA,L,"linear","extrap");
-    dh_SfA = diff(H);
+    % H = interp1(x_SfA*1000,H_SfA,L,"linear","extrap");
+    % dh_SfA = diff(H);
     
     dh = (H_2-H_1)/length(L);
 

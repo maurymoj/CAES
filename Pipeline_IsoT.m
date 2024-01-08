@@ -41,7 +41,7 @@ E = 0.75;   % Pipeline efficiency
     % "Handbook of natural gas transmission and processing"
 
 H_1 = 0;
-H_2 = 100;
+H_2 = 1;
 
 T_sin = 25000; % Period of sinusoidal height increment
 dh_amp = 25;    % Amplitude of sinusoidal height increment
@@ -61,6 +61,7 @@ Flow_eq = "PanB";
 % Pipe diameter mm
 % Var = {0.450,0.900,1.200};
 % Var = {0.900,1.200};
+Var = {0.9};
 % Flow rate
 % Var2 = {3*1000000/(24*3600),14*1000000/(24*3600),25*1000000/(24*3600)};
 % Elevation at H2
@@ -68,7 +69,7 @@ Flow_eq = "PanB";
 % Var = {1 50 100 200 300 400 500}; % Values to be taken by H
 % Var = {50 100 150 200 250 300};     % Value for H
 % Sinusoidal period - height increment
-Var = {5000 10000 25000 50000};
+% Var = {5000 10000 25000 50000};
 % Sinusoidal amplitude - height increment
 % Var = {0 25 50 75 100}; % Values for height increment amplitude
 % Elevation profile
@@ -143,11 +144,11 @@ load('StF_Ab2.mat');
 
 for j=1:length(Var)
     % H_2 = Var{j};
-    T_sin = Var{j};
+    % T_sin = Var{j};
     % dh_amp = Var{j};
     % H_prof = Var{j};
     % Flow_eq = Var{j};
-    % D = Var{j};
+    D = Var{j};
     % Q_a = Var2{j};
 
     A = pi*D^2/4; % mm2
@@ -482,3 +483,13 @@ applystyle2plot
 % grid on
 % xlabel('L [km]')
 % ylabel('\Psi/\Psi_{max}')
+
+% Velocity analysis
+figure('color',[1 1 1])
+plot(L./1000, u)
+hold on
+plot(L./1000, U_erosional,'r')
+grid on
+xlabel('L [km]')
+ylabel('u [m/s]')
+legend('u','u_{erosional}')
