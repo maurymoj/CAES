@@ -31,8 +31,10 @@ D = 0.9; % 900 mm
 % D = 1.2;
 % D = 0.45;
 dL = 1000;    % Distance increment
-L_m = 100000; % Total distance [m]
+% L_m = 100000; % Total distance [m]
 % L_m = 395000; % Total distance [m]
+% L_m = 72145; % Total distance SfA [m]
+L_m = 73514; % Total distance SfA2 [m]
 
 eps = 0.04e-3; % Absolute roughness 0.04 mm
 
@@ -40,8 +42,11 @@ E = 0.75;   % Pipeline efficiency
     % Usually varies from 0.6 to 0.92 as a function of liquid presence and age
     % "Handbook of natural gas transmission and processing"
 
-H_1 = 0;
-H_2 = 100;
+% H_1 = 30.6726; % Values from St. Fergus to Aberdeen profile 1
+% H_2 = 137.917;
+
+H_1 = 8.1358; % Values from St. Fergus to Aberdeen profile 2
+H_2 = 104.6626;
 
 T_sin = 25000; % Period of sinusoidal height increment
 dh_amp = 25;    % Amplitude of sinusoidal height increment
@@ -54,12 +59,12 @@ H_prof = "Fixed tilt";
 
 % Flow equation
 % Flow_eq = "GFE";
-Flow_eq = "PanB";
+Flow_eq = "PanB"; % Overestimate of the pressure loss (~ 0.4% extra drop per 70 km)
 
 % Generate multiple plots while varying one variable var (can be any
 % parameter set in the initial statements)
 % Pipe diameter mm
-Var = {0.450,0.900,1.200}; Q = {3*1000000/(24*3600), 14*1000000/(24*3600), 25*1000000/(24*3600) };
+% Var = {0.450,0.900,1.200}; Q = {3*1000000/(24*3600), 14*1000000/(24*3600), 25*1000000/(24*3600) };
 % Var = {0.900,1.200};
 % Var = {0.9};
 % Flow rate
@@ -74,7 +79,7 @@ Var = {0.450,0.900,1.200}; Q = {3*1000000/(24*3600), 14*1000000/(24*3600), 25*10
 % Var = {0 25 50 75 100}; % Values for height increment amplitude
 % Elevation profile
 % Var = {"Horizontal","Fixed tilt","Sinusoidal","Custom prof"};
-% Var = {"Horizontal","Fixed tilt","Custom prof"};
+Var = {"Horizontal","Fixed tilt","Custom prof"};
 % Flow equation
 % Var = {"GFE","PanB"};
 
@@ -140,15 +145,17 @@ cp = CP.PropsSI('C','P',P_a,'T',T_a,'Air');
 cv = CP.PropsSI('Cvmass','P',P_a,'T',T_a,'Air');
 % gam = cp/cv;
 
+% load('StF_Ab.mat');
 load('StF_Ab2.mat');
+
 
 for j=1:length(Var)
     % H_2 = Var{j};
     % T_sin = Var{j};
     % dh_amp = Var{j};
-    % H_prof = Var{j};
+    H_prof = Var{j};
     % Flow_eq = Var{j};
-    D = Var{j}; Q_a = Q{j};
+    % D = Var{j}; Q_a = Q{j};
     % Q_a = Var2{j};
 
     A = pi*D^2/4; % mm2
@@ -447,6 +454,16 @@ for j=1:length(Var)
     xlabel('L [km]')
     ylabel('H [m]')
 
+    % Erosional Velocity analysis
+    % figure('color',[1 1 1])
+    % plot(L./1000, u)
+    % hold on
+    % plot(L./1000, U_erosional,'r')
+    % grid on
+    % xlabel('L [km]')
+    % ylabel('u [m/s]')
+    % legend('u','u_{erosional}')
+    % title(Var{j})
 end
 
 figure(P_fig)
@@ -484,12 +501,4 @@ applystyle2plot
 % xlabel('L [km]')
 % ylabel('\Psi/\Psi_{max}')
 
-% Velocity analysis
-figure('color',[1 1 1])
-plot(L./1000, u)
-hold on
-plot(L./1000, U_erosional,'r')
-grid on
-xlabel('L [km]')
-ylabel('u [m/s]')
-legend('u','u_{erosional}')
+
