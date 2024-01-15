@@ -36,6 +36,10 @@ L_m = 100000; % Total distance [m]
 % L_m = 72145; % Total distance SfA [m]
 % L_m = 73514; % Total distance SfA2 [m]
 
+
+T_turb = 250+273.15;
+
+
 eps = 0.04e-3; % Absolute roughness 0.04 mm
 
 E = 0.75;   % Pipeline efficiency
@@ -67,9 +71,9 @@ Flow_eq = "PanB"; % Overestimate of the pressure loss (~ 0.4% extra drop per 70 
 % Generate multiple plots while varying one variable var (can be any
 % parameter set in the initial statements)
 % Pipe diameter mm
-Var = {0.450,0.900,1.200}; Q = {3*1000000/(24*3600), 14*1000000/(24*3600), 25*1000000/(24*3600) };
+% Var = {0.450,0.900,1.200}; Q = {3*1000000/(24*3600), 14*1000000/(24*3600), 25*1000000/(24*3600) };
 % Var = {0.900,1.200};
-% Var = {0.9};
+Var = {0.9}; Q = {14*1000000/(24*3600)};
 % Flow rate
 % Var2 = {3*1000000/(24*3600),14*1000000/(24*3600),25*1000000/(24*3600)};
 % Elevation at H2
@@ -175,6 +179,10 @@ for j=1:length(Var)
     
     m_dot = rho_a*Q_a;
 
+
+    W_C = m_dot*cp*T_a*( (P_in/P_a)^(2/7) - 1);
+
+
     P_a_kPa = P_a/1000;
     Q_a_day = Q_a*24*3600;    % Sm3/day
     L_km = L./1000;           % km
@@ -192,6 +200,9 @@ for j=1:length(Var)
     U_erosional = zeros(length(L),1);
     P = zeros(length(L),1);
     T = T_f*ones(length(L),1);      % Assuming isothermal flow
+
+    W_T = zeros(length(L),1);
+    W_C2 = zeros(length(L),1);
     
     P(1) = P_in;
     
@@ -204,6 +215,10 @@ for j=1:length(Var)
         h(i) = CP.PropsSI('H','P',P(i),'T',T_f,'Air');
         s(i) = CP.PropsSI('S','P',P(i),'T',T_f,'Air');
         Z(i) = CP.PropsSI('Z','P',P(i),'T',T_f,'Air');
+
+        W_T(i) = m_dot*cp*T_turb*(1 - (P_a/P(i))^(2/7));
+        W_C2(i) = m_dot*cp*T_f*((P_in/P(i))^(2/7) - 1);
+
         U_erosional(i) = 1.22*100/sqrt(rho(i)); % Erosional velocity - it is advised that the actual 
                                                 % velocity be up to 50% of the erosional velocity.
                                                 % The constant 100, can be any value from 100 to 250
@@ -370,7 +385,10 @@ for j=1:length(Var)
             count = count + 1;
         end
         P(i+1) = 1000*P(i+1); % conversion back to Pa
-    
+        
+        
+        
+
     end
     
     rho(end) = CP.PropsSI('D','P',P(end),'T',T_f,'Air');
@@ -378,6 +396,10 @@ for j=1:length(Var)
     s(end) = CP.PropsSI('S','P',P(end),'T',T_f,'Air');
     nu(end) = CP.PropsSI('V','P',P(end),'T',T_f,'Air');
     Z(end) = CP.PropsSI('Z','P',P(end),'T',T_f,'Air');
+
+    W_T(end) = m_dot*cp*T_turb*(1 - (P_a/P(end))^(2/7));
+    W_C2(end) = m_dot*cp*T_f*((P_in/P(end))^(2/7) - 1);
+
     u(end) = 14.7349*( Q_a_day/D_mm^2 )*( P_a/T_a )*(Z(end)*T_f/P(end)); % Q_b has to be converted to m3/day and D to mm
     psi(end) = h(end)-h0 - T0*(s(end)-s0)+u(end)^2/2;
     U_erosional(end) = 1.22*100/sqrt(rho(end)); % Erosional velocity - it is advised that the actual 
@@ -504,4 +526,9 @@ applystyle2plot
 % xlabel('L [km]')
 % ylabel('\Psi/\Psi_{max}')
 
-
+figure('color',[1 1 1])
+plot(L/1000, W_T/1e9)
+grid on
+hold on
+plot(L/1000, W_C2/1e9)
+legend('W_T','W_{C,2}')

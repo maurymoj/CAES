@@ -58,6 +58,8 @@ t = 0;
 % Var = {0.900,1.200};
 % Flow rate
 % Var2 = {3*1000000/(24*3600),14*1000000/(24*3600),25*1000000/(24*3600)};
+% Inlet pressure
+% Var = {10000000}
 % Elevation at H2
 Var = {100};
 % Var = {1 50 100 200 300 400 500}; % Values to be taken by H
