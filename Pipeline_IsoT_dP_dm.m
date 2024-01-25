@@ -74,8 +74,8 @@ Var1 = {7e6};
 % Var = {0.900,1.200};
 % Var = {0.9};
 % Flow rate
-% Var2 = {10*1000000/(24*3600),15*1000000/(24*3600),20*1000000/(24*3600),25*1000000/(24*3600)};
-Var2 = {15*1000000/(24*3600)};
+Var2 = {10*1000000/(24*3600),15*1000000/(24*3600),20*1000000/(24*3600),25*1000000/(24*3600)};
+% Var2 = {15*1000000/(24*3600)};
 % Elevation at H2
 % Var = {100};
 % Var = {1 50 100 200 300 400 500}; % Values to be taken by H
@@ -109,24 +109,27 @@ LStyle = {'b','r','k','b--','r--','k--','b-.'};
 %----------------------------------------------------------------------%
 
 % Individual Figures
-% P_fig = figure('Color',[1 1 1]);
-% hold on
-% grid on
-% U_fig = figure('Color',[1 1 1]);
-% hold on
-% grid on
+P_fig = figure('Color',[1 1 1]);
+hold on
+grid on
+U_fig = figure('Color',[1 1 1]);
+hold on
+grid on
+s_fig = figure('Color',[1 1 1]);
+hold on
+grid on
 % psi_fig = figure('Color',[1 1 1]);
 % hold on
 % grid on
 % h_fig = figure('Color',[1 1 1]);
 % hold on
 % grid on
-% Psi_fig = figure('Color',[1 1 1]);
-% hold on
-% grid on
-% pct_Psi_fig = figure('Color',[1 1 1]);
-% hold on
-% grid on
+Psi_fig = figure('Color',[1 1 1]);
+hold on
+grid on
+pct_Psi_fig = figure('Color',[1 1 1]);
+hold on
+grid on
 
 % 1 Figure with subplots
 % sp = figure('Color',[1 1 1]);
@@ -409,8 +412,8 @@ for k=1:length(Var1)
         % plot(L,P)           % Pa x m 
         % xlabel('L [m]')
         % ylabel('P [Pa]')
-        % figure(P_fig)   % Pressure drop profile
-        figure('Color',[1 1 1])
+        figure(P_fig)   % Pressure drop profile
+        % figure('Color',[1 1 1])
         plot(L/1000,P/1000,LStyle{j}) % kPa x km
         xlabel('L [km]')
         ylabel('P [kPa]') 
@@ -421,12 +424,15 @@ for k=1:length(Var1)
         % % ylabel('P [psig]')
         % % ylim([1150 1450])
         % % figure('Color',[1 1 1])
-        % % figure(U_fig)   % Velocity profile
-        % % plot(L/1000,u)
-        % % plot(L/1000,u,LStyle{j})
-        % % xlabel('L [km]')
-        % % ylabel('u [m/s]')
-        % % figure(psi_fig)   % Entropy profile
+        % figure(U_fig)   % Velocity profile
+        % plot(L/1000,u,LStyle{j})
+        % xlabel('L [km]')
+        % ylabel('u [m/s]')
+        % figure(s_fig)   % Entropy profile
+        % plot(L/1000,s,LStyle{j})
+        % xlabel('L [km]')
+        % ylabel('s [kJ/kg K]')
+        % % figure(psi_fig)   % Specific exergy profile
         % figure('Color',[1 1 1])
         % plot(L/1000,psi/1000,LStyle{j})
         % xlabel('L [km]')
@@ -436,15 +442,15 @@ for k=1:length(Var1)
         % % plot(L/1000, (1:length(L))*dh + dh_sin*sin(2*pi/T_sin*dL*(1:length(L))))
         % % xlabel('L [km]')
         % % ylabel('H [m]')
-        % figure(Psi_fig)
-        figure('Color',[1 1 1])
+        figure(Psi_fig)
+        % figure('Color',[1 1 1])
         plot(L/1000,m_dot*psi/1e9,LStyle{j})
         xlabel('L [km]')
         ylabel('\Psi [GW]')
         title(titulo)
         % % Percentage loss per km
-        % figure(pct_Psi_fig)
-        figure('Color',[1 1 1])
+        figure(pct_Psi_fig)
+        % figure('Color',[1 1 1])
         Psi = m_dot*psi/1e9;
         Psi_n = 100*Psi./max(Psi);
         plot(L./1000,Psi_n,LStyle{j})    
@@ -531,5 +537,3 @@ end
 % grid on
 % xlabel('L [km]')
 % ylabel('\Psi/\Psi_{max}')
-
-

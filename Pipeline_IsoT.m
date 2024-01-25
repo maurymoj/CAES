@@ -12,7 +12,7 @@ T_a = 15 + 273.15; % T = 15 oC - ~288 K
 P_a = 101325 ; % P = 101.325 kPa
 G = 1;      % Specific gas gravity - for air G = 1
 
-P_in = 7e6; % 7 MPa
+P_in = 10e6; % 7 MPa
 T_1 = 5 + 273.15; % Common operational condition assumption Nasr and Connor "Natural Gas Engineering and Safety Challenges"
 T_f = T_1; % Isothermal assumption
     % !!! High temperatures on the outlet of compressor stations,
@@ -70,12 +70,16 @@ Flow_eq = "PanB"; % Overestimate of the pressure loss (~ 0.4% extra drop per 70 
 
 % Generate multiple plots while varying one variable var (can be any
 % parameter set in the initial statements)
+% Pipe pressure Pa
+% Var = {7e6, 8e6, 9e6, 10e6};
 % Pipe diameter mm
 % Var = {0.450,0.900,1.200}; Q = {3*1000000/(24*3600), 14*1000000/(24*3600), 25*1000000/(24*3600) };
+Var = {0.450,0.900,1.200}; Q = {1.9*3*1000000/(24*3600), 1.9*14*1000000/(24*3600), 1.9*25*1000000/(24*3600) };
 % Var = {0.900,1.200};
-Var = {0.9}; Q = {14*1000000/(24*3600)};
+% Var = {0.9}; Q = {15*1000000/(24*3600)};
 % Flow rate
 % Var2 = {3*1000000/(24*3600),14*1000000/(24*3600),25*1000000/(24*3600)};
+% Var = {3*1000000/(24*3600),14*1000000/(24*3600),25*1000000/(24*3600)};
 % Elevation at H2
 % Var = {100};
 % Var = {1 50 100 200 300 400 500}; % Values to be taken by H
@@ -157,13 +161,14 @@ load('StF_Ab2.mat');
 
 
 for j=1:length(Var)
+    % P_in = Var{j};
     % H_2 = Var{j};
     % T_sin = Var{j};
     % dh_amp = Var{j};
     % H_prof = Var{j};
     % Flow_eq = Var{j};
     D = Var{j}; Q_a = Q{j};
-    % Q_a = Var2{j};
+    % Q_a = Var{j};
 
     A = pi*D^2/4; % mm2
     L = 0:dL:L_m; % 70 km pipe with increments of 1 km
