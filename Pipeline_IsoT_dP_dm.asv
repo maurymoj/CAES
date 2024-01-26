@@ -67,8 +67,8 @@ Flow_eq = "PanB"; % Overestimate of the pressure loss (~ 0.4% extra drop per 70 
 % Generate multiple plots while varying one variable var (can be any
 % parameter set in the initial statements)
 % Pipe inlet pressure
-Var1 = {6e6, 7e6, 8e6, 9e6, 10e6};
-% Var1 = {7e6};
+% Var1 = {6e6, 7e6, 8e6, 9e6, 10e6};
+Var1 = {7e6};
 % Pipe diameter mm
 % Var2 = {0.450,0.900,1.200}; Q = {3*1000000/(24*3600), 14*1000000/(24*3600), 25*1000000/(24*3600) };
 % Var = {0.900,1.200};
@@ -109,27 +109,27 @@ LStyle = {'b','r','k','b--','r--','k--','b-.'};
 %----------------------------------------------------------------------%
 
 % Individual Figures
-% P_fig = figure('Color',[1 1 1]);
-% hold on
-% grid on
-% U_fig = figure('Color',[1 1 1]);
-% hold on
-% grid on
-% s_fig = figure('Color',[1 1 1]);
-% hold on
-% grid on
+P_fig = figure('Color',[1 1 1]);
+hold on
+grid on
+U_fig = figure('Color',[1 1 1]);
+hold on
+grid on
+s_fig = figure('Color',[1 1 1]);
+hold on
+grid on
 % psi_fig = figure('Color',[1 1 1]);
 % hold on
 % grid on
 % h_fig = figure('Color',[1 1 1]);
 % hold on
 % grid on
-% Psi_fig = figure('Color',[1 1 1]);
-% hold on
-% grid on
-% pct_Psi_fig = figure('Color',[1 1 1]);
-% hold on
-% grid on
+Psi_fig = figure('Color',[1 1 1]);
+hold on
+grid on
+pct_Psi_fig = figure('Color',[1 1 1]);
+hold on
+grid on
 
 % 1 Figure with subplots
 % sp = figure('Color',[1 1 1]);
@@ -464,14 +464,14 @@ for k=1:length(Var1)
         % ylabel('\Psi [GW]')
         % title(titulo)
         % Percentage loss per km
-        % figure(pct_Psi_fig)
+        figure(pct_Psi_fig)
         % figure('Color',[1 1 1])
-        % Psi = m_dot*psi/1e9;
-        % Psi_n = 100*Psi./max(Psi);
-        % plot(L./1000,Psi_n,LStyle{j})    
-        % xlabel('L [km]')
-        % ylabel('\Psi/\Psi_{max} [%]')
-        % title(titulo)
+        Psi = m_dot*psi/1e9;
+        Psi_n = 100*Psi./max(Psi);
+        plot(L./1000,Psi_n,LStyle{j})    
+        xlabel('L [km]')
+        ylabel('\Psi/\Psi_{max} [%]')
+        title(titulo)
         % 
         
         % % Subplot structure
@@ -487,18 +487,12 @@ for k=1:length(Var1)
         ylabel('u [m/s]')
         % Exergy profile
         subplot(2,2,3)
-        Psi = m_dot*psi/1e9;
-        plot(L/1000,Psi,LStyle{j})
+        plot(L/1000,m_dot*psi/1e9,LStyle{j})
         xlabel('L [km]')
         ylabel('\Psi [GW]')
         
         % Percentage loss per km
         subplot(2,2,4)
-        Psi_n = 100*Psi./max(Psi);
-        plot(L./1000,Psi_n,LStyle{j})    
-        xlabel('L [km]')
-        ylabel('\Psi/\Psi_{max} [%]')
-
         % Height profile
         % if H_prof == "Horizontal"
         %     plot(L/1000,zeros(length(L),1),LStyle{j})
@@ -526,9 +520,6 @@ for k=1:length(Var1)
         % legend('u','u_{erosional}')
         % title(Var{j})
     end
-    legend(string(Var2))
-    sgtitle(string(Var1{k}))
-
 end
 % figure(P_fig)
 % legend(string(Var))
