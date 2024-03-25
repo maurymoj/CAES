@@ -16,7 +16,7 @@ files.
      4            0.900              67 156               65
 
 Assumptions are:
-(1) The pies are mainained at constant temperature (15C) by the ground acting a heat
+(1) The pies are maintained at constant temperature (15C) by the ground acting a heat
 sink/source whenever necessary
 (2) Constant heat transfer coefficient between compressed gas and pipe,
 30W/m²K
