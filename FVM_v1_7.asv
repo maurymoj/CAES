@@ -100,7 +100,6 @@ T(:,:) = 298; % Isothermal pipeline assumption
 j=2;
 count(1) = 0;
 for j=2:n_t
-% for j=2
     % Initial guess for next time step is the same props as the previous t step
     P(:,j) = P(:,j-1);
     rho(:,j) = rho(:,j-1);
@@ -114,7 +113,7 @@ for j=2:n_t
     count(j) = 0;
     error_P = 10;
     
-    while count(j) < 100 && max(abs(error_P)) > 0.001
+    while count < 100 && max(abs(error_P)) > 0.001
         % Initial guess (properties at t+dt = properties at t)
         P(:,j) = P(:,j) + P_corr;
         rho(:,j) = rho(:,j) + rho_corr;
@@ -257,10 +256,10 @@ for j=2:n_t
         error_P = (P_corr./P(:,j));
         error_rho = (rho_corr./rho(:,j));
         error_v = (v_corr./v(:,j));
-        count(j) = count(j)+1;    
+        count = count+1;    
     end
     j
-    count(j)
+    count
     error_P = (P_corr./P(:,j))
     error_rho = (rho_corr./rho(:,j))
     error_v = (v_corr./v(:,j))
