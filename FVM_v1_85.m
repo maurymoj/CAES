@@ -23,22 +23,31 @@ A_h = pi*D^2/4;
 P_o = 101325;
 T_o = 273.15 + 15;
 
-% Inlet 
+% A - Left side - Inlet 
 P_in = 7000000;
 T_in = 273.15 + 15;
-m_dot = 150;
+m_in = 150;
 
 rho_in = CP.PropsSI('D','P',P_in,'T',T_in,'Air');
 cp_in = CP.PropsSI('C','P',P_in,'T',T_in,'Air');
-v_in = m_dot/(rho_in*A_h);
+v_in = m_in/(rho_in*A_h);
 
+
+% B - Right side
+% R_bound = 'Wall';
+R_bound = 'Outlet';
 % Outlet
-m_out = m_dot;
-% m_out = 0;
-v_out = 0;                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        
+if strcmp(R_bound,'Outlet')
+    m_out = m_in;
+elseif(strcmp(R_bound,'Wall'))
+    m_out = 0;
+    v_out = 0;
+elseif(strcmp(R_bound,'Inlet'))
+    
+end                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    
 
-dm = m_dot*dt;
-dE = m_dot*cp_in*T_in*dt;
+dm = m_in*dt;
+dE = m_in*cp_in*T_in*dt;
 
 g = 9.81;
 theta = 0;
@@ -61,8 +70,8 @@ T = zeros(n,n_t);
 rho = zeros(n,n_t);
 
 % Sanity check
-m = zeros(n_t,1);
-E = zeros(n_t,1);
+m = zeros(n_t,1); % Total mass in pipeline
+E = zeros(n_t,1); % Total energy in pipeline
 
 %------------------ SETTING INITIAL CONDITIONS ---------------------%
 % Initial conditions at nodes (i -> x, j -> t)
@@ -71,7 +80,6 @@ P(:,1) = P_o*ones(n,1);
 T(:,1) = T_o*ones(n,1);
 rho(:,1) = CP.PropsSI('D','P',P(1,1),'T',T(1,1),'Air');
 cp = CP.PropsSI('C','P',P(1,1),'T',T(1,1),'Air');
-% v_n = 0;
 
 % Inlet Boundary condition
 P_f(1,:) = P_in;
@@ -79,11 +87,10 @@ T_f(1,:) = T_in;
 rho_f(1,:) = rho_in;
 
 % Initial conditions at faces (i -> x, j -> t)
-% v(:,1) = 0; % V profile at t=0
 v(:,1) = v_in; % V profile at t=0
 
 v(1,:) = v_in; % Inlet flow rate (and velocity) is constant for all t>=0
-v(end,:) = 0; % V is 0 at the pipe end for all t>=0
+% v(end,:) = v_out; % V is 0 at the pipe end for all t>=0
 
 % Upwind scheme
 % velocity in faces to the nodes
@@ -102,22 +109,25 @@ P_f(end,1) = P(end,1); % ASSUMING v >= 0 for t=0!!!!
 T_f(end,1) = T(end,1); % ASSUMING v >= 0 for t=0!!!!
 rho_f(end,1) = rho(end,1); % ASSUMING v >= 0 for t=0!!!!
 
-% P_f(2:end,1) = P(:,1); % ASSUMING v >= 0 for t=0!!!!
-% T_f(2:end,1) = T(:,1); % ASSUMING v >= 0 for t=0!!!!
-% rho_f(2:end,1) = rho(:,1); % ASSUMING v >= 0 for t=0!!!!
+if strcmp(R_bound,'Outlet')
+    v(end,1) = rho_f(1,1)/rho_f(end,1)*v(1,1); % ENSURING CONSERVATION OF MASS
+elseif(strcmp(R_bound,'Wall'))
+    v(end,1) = 0;
+elseif(strcmp(R_bound,'Inlet'))
+    
+end 
+
+
 
 T(:,:) = T_o; % Isothermal pipeline assumption
 
 m(1) = sum(rho(:,1)*A_h*dx);
 E(1) = sum(rho(:,1)*A_h*dx*cp.*T(:,1));
-% ITERATION
 
 count = zeros(n_t,1);
 f_guess = (2*log10(1/epsD)+1.14)^(-2); % Friction factor based on Nikuradse
 
 for j=2:n_t
-% for j=2
-% j
     % Initial guess for next time step is the same props as the previous t step
     P(:,j) = P(:,j-1);
     rho(:,j) = rho(:,j-1);
@@ -131,22 +141,27 @@ for j=2:n_t
     v_star = v(:,j);
     count(j) = 0;
     error_P = 10;
-    
+
     while count(j) < 100 && max(abs(error_P)) > 0.001
 
-% count(j)
         alpha_P = 0.5;  % Pressure under-relaxation factor
         alpha_v = 0.5;  % velocity under-relaxation factor
         alpha_rho = 0.5;  % Density under-relaxation factor
 
         P(:,j) = P(:,j) + alpha_P*P_corr; % Pressure under-relaxation correction
         rho(:,j) = alpha_rho*(rho(:,j) + rho_corr) + (1-alpha_rho)*rho(:,j);
-        T(:,j) = T(:,j);
 
-        v(:,j) = alpha_v*(v_star(:) + v_corr) + (1-alpha_v)*v_star(:);
+        v(1:end-1,j) = alpha_v*(v_star(1:end-1) + v_corr(1:end-1)) + (1-alpha_v)*v_star(1:end-1);
+        
+        if strcmp(R_bound,'Outlet')
+            v(end,j) = rho(1,j)/rho(end,j)*v(1,j); % ENSURING CONSERVATION OF MASS
+        elseif(strcmp(R_bound,'Wall'))
+            v(end,j) = 0;
+        % elseif(strcmp(R_bound,'Inlet'))
+        end 
 
-
-        % Initial guess (properties at t+dt = properties at t)
+        % Initial guess (properties at t+dt = properties at t) - without
+        % under-relaxation
         % P(:,j) = P(:,j) + P_corr;
         % rho(:,j) = rho(:,j) + rho_corr;
         % T(:,j) = T(:,j);
@@ -159,15 +174,13 @@ for j=2:n_t
         % Properties in nodes to faces
         P_f(2:end-1,j) = (v(1:end-2,j) >= 0).*P(1:end-1,j) ...
             +            (v(1:end-2,j) <  0).*P(2:end,j);
-        T_f(2:end-1,j) = (v(1:end-2,j) >= 0).*T(1:end-1,j) ...
-            +            (v(1:end-2,j) <  0).*T(2:end,j);
         rho_f(2:end-1,j) = (v(1:end-2,j) >= 0).*rho(1:end-1,j) ...
             +            (v(1:end-2,j) <  0).*rho(2:end,j);
-        
+
         P_f(end,j) = P(end,j); % ASSUMING v >= 0 for t>0!!!!
-        T_f(end,j) = T(end,j); % ASSUMING v >= 0 for t>0!!!!
         rho_f(end,j) = rho(end,j); % ASSUMING v >= 0 for t>0!!!!
-    
+
+
         % Properties
         u_sonic = zeros(N,1);
         drho_dP = zeros(N,1);
@@ -177,39 +190,43 @@ for j=2:n_t
         drho_dP_n = zeros(n,1);
         cp = zeros(n,1);
 
-        for i = 1:n % PROPERTIES FROM P AND T
-            u_sonic(i) = CP.PropsSI('speed_of_sound','P',P_f(i,j),'T',T_f(i,j),'Air');
-            nu(i) = CP.PropsSI('viscosity','P',P_f(i,j),'T',T_f(i,j),'Air');
-            cp(i) = CP.PropsSI('C','P',P_f(i,j),'T',T_f(i,j),'Air');
-
-            drho_dP(i) = 1/(u_sonic(i)^2);
-
-            u_sonic_n(i) = CP.PropsSI('speed_of_sound','P',P(i,j),'T',T(i,j),'Air');
-            
-            drho_dP_n(i) = 1/(u_sonic_n(i)^2);
-        end
-
-        u_sonic(end) = CP.PropsSI('speed_of_sound','P',P_f(end,j),'T',T_f(end,j),'Air');
-        drho_dP(end) = 1/(u_sonic(end)^2);
-
-
-        % for i = 1:n  % PROPERTIES FROM P AND RHO
-        %     u_sonic(i) = CP.PropsSI('speed_of_sound','P',P_f(i,j),'D',rho_f(i,j),'Air');
-        %     nu = CP.PropsSI('viscosity','P',P_f(i,j),'D',rho_f(i,j),'Air');
+        % for i = 1:n % PROPERTIES FROM P AND T
+        % 
+        %     u_sonic(i) = CP.PropsSI('speed_of_sound','P',P_f(i,j),'T',T_f(i,j),'Air');
+        %     nu(i) = CP.PropsSI('viscosity','P',P_f(i,j),'T',T_f(i,j),'Air');
+        %     cp(i) = CP.PropsSI('C','P',P_f(i,j),'T',T_f(i,j),'Air');
         % 
         %     drho_dP(i) = 1/(u_sonic(i)^2);
         % 
-        %     u_sonic_n(i) = CP.PropsSI('speed_of_sound','P',P(i,j),'D',rho(i,j),'Air');
+        %     u_sonic_n(i) = CP.PropsSI('speed_of_sound','P',P(i,j),'T',T(i,j),'Air');
+        % 
         %     drho_dP_n(i) = 1/(u_sonic_n(i)^2);
         % end
         % 
-        % u_sonic(end) = CP.PropsSI('speed_of_sound','P',P_f(end,j),'D',rho_f(end,j),'Air');
+        % u_sonic(end) = CP.PropsSI('speed_of_sound','P',P_f(end,j),'T',T_f(end,j),'Air');
         % drho_dP(end) = 1/(u_sonic(end)^2);
 
 
+        for i = 1:n  % PROPERTIES FROM P AND RHO
+            T(i,j) = CP.PropsSI('T','P',P(i,j),'D',rho(i,j),'Air');
+            cp(i) = CP.PropsSI('C','P',P(i,j),'D',rho(i,j),'Air');
+            
+            u_sonic(i) = CP.PropsSI('speed_of_sound','P',P_f(i,j),'D',rho_f(i,j),'Air');
+            nu = CP.PropsSI('viscosity','P',P_f(i,j),'D',rho_f(i,j),'Air');
 
+            drho_dP(i) = 1/(u_sonic(i)^2);
 
+            u_sonic_n(i) = CP.PropsSI('speed_of_sound','P',P(i,j),'D',rho(i,j),'Air');
+            drho_dP_n(i) = 1/(u_sonic_n(i)^2);
+        end
 
+        u_sonic(end) = CP.PropsSI('speed_of_sound','P',P_f(end,j),'D',rho_f(end,j),'Air');
+        drho_dP(end) = 1/(u_sonic(end)^2);
+
+        T_f(2:end-1,j) = (v(1:end-2,j) >= 0).*T(1:end-1,j) ...
+            +            (v(1:end-2,j) <  0).*T(2:end,j);
+        T_f(end,j) = T(end,j); % ASSUMING v >= 0 for t>0!!!!
+    
         %---------- v* calculation - Momentum control volume ---------------------%
         
         % Friction factor based on Nikuradse - IMPLEMENT COLEBROOK EQUATION
@@ -262,9 +279,12 @@ for j=2:n_t
             - (a(1,2) - max(rho(1,j)*v_n(1,j)/dx,  0) );% a_B
         
         d(1) = -1/dx;
-        b(1) = (rho_f(2,j-1)*v(2,j-1)/dt)-rho_f(2,j)*g*sind(theta)+max(rho(1,j)*v_n(1,j)/dx,  0)*v_n(1,j);
+        b(1) = (rho_f(2,j-1)*v(2,j-1)/dt)...
+            - rho_f(2,j)*g*sind(theta)...
+            + max(rho(1,j)*v_n(1,j)/dx,  0)*v_n(1,j);
         
-        B(1) = d(1)*(P(2,j)-P(1,j)) + b(1);
+        B(1) = d(1)*(P(2,j)-P(1,j)) ...
+            + b(1);
         
         
         a(end,end-1) = -max(rho(n-1,j)*v_n(n-1,j)/dx, 0); % a_N-2 (index N-2, N-3)
@@ -272,7 +292,7 @@ for j=2:n_t
         a(end,end) = ...                                  % a_N-1 (index N-2, N-2)
             rho_f(N-1,j)/dt + f(N-1)*rho_f(N-1,j)*abs(v(N-1,j))/(2*D)...
             +(rho(n,j)*v_n(n,j) - rho(n-1,j)*v_n(n-1,j))/dx...
-            - (a(end,end-1) + max(-rho(n,j)*v_n(n,j)/dx,  0) );
+            - (a(end,end-1) - max(-rho(n,j)*v_n(n,j)/dx,  0) );
         
         d(end) = -1/dx;
         b(end) = (rho_f(N-1,j-1)*v(N-1,j-1)/dt)-rho_f(N-1,j)*g*sind(theta);
@@ -298,7 +318,7 @@ for j=2:n_t
         v_star = linsolve(a,B);
         v_star = [v(1,j);v_star;v(end,j)];
         % v(:,j) = [v(1,j);v_star;v(end,j)];
-        
+
         %--------------- Pressure correction P' calculations ---------------------%
         % The matrices/vectors in P' calculations have no shift, so index 1 means
         % control volume 1 and so on
@@ -314,16 +334,16 @@ for j=2:n_t
         
         
         % right node
-        A(n,n-1) = (rho_f(N-1,j)*d(end)/a(end,end))/dx + max(drho_dP(N-1)*v_star(N-1)/dx, 0);
+        A(n,n-1) = (rho_f(N-1,j)*d(end)/a(end,end))/dx - max(drho_dP(N-1)*v_star(N-1)/dx, 0);
         A(n,n) = drho_dP_n(n)/dt - drho_dP(N-1)*v_star(N-1)/dx - A(n,n-1); % v_star(end) = 0
         
         BB(n) = (rho(n,j-1)-rho(n,j))/dt + (rho_f(N-1,j)*v_star(N-1) - rho_f(N,j)*v_star(N))/dx;
         
         for i=2:n-1
         % Subtracted 1 from a and d as there is no row for the first face -
-        % boundary conditions
-            A(i,i-1) = (rho_f(i,2)*d(i-1)/a(i-1,i-1))/dx - max(drho_dP(i)*v_star(i)/dx,                     0);
-            A(i,i+1) = (rho_f(i+1,2)*d(i)/a(i,i))/dx - max(              0, -drho_dP(i+1)*v_star(i+1)/dx);
+        % boundary conditions for matrix/vector in momentum eq.
+            A(i,i-1) = (rho_f(i,j)*d(i-1)/a(i-1,i-1))/dx - max(drho_dP(i)*v_star(i)/dx,                     0);
+            A(i,i+1) = (rho_f(i+1,j)*d(i)/a(i,i))/dx - max(              0, -drho_dP(i+1)*v_star(i+1)/dx);
             A(i,i)   = drho_dP_n(i)/dt + (drho_dP(i+1)*v_star(i+1)/dx ...
                 - drho_dP(i)*v_star(i)/dx) - ( A(i,i-1) + A(i,i+1) );
             
@@ -331,32 +351,39 @@ for j=2:n_t
         end
         A;
         BB;
-        P_corr = linsolve(A,BB);        
+        P_corr = linsolve(A,BB);
 
         rho_corr = drho_dP_n.*P_corr;
-        
+
         a_i = diag(a);
         v_corr = zeros(N,1);
         % v_corr(1)         = d(1)./a_i(1).*P_corr(1);
         v_corr(1)         = 0;% Inlet boundary condition
         v_corr(2:end-1)   = d./a_i.*(P_corr(2:end)-P_corr(1:end-1));
+% !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
         v_corr(end)       = 0; % Wall boundary condition
+% !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+
+
         % v_corr(end)       =  % Velocity corrected based on mass balance (m_in =
         % m_out)
 
         error_P = (P_corr./P(:,j));
         error_rho = (rho_corr./rho(:,j));
         error_v = (v_corr./v(:,j));
-        count(j) = count(j)+1;    
+        count(j) = count(j)+1;  
+
     end
-    
+
     m(j) = sum(rho(:,j)*A_h*dx);
     E(j) = sum(rho(:,j)*A_h*dx.*cp.*T(:,j));
     [j count(j)]
-    % error_P
-    % error_rho
-    % error_v
 end
+
+
+
+
 
 mm = m(1) + dm*(0:n_t-1);
 EE = E(1) + dE*(0:n_t-1);
@@ -367,14 +394,17 @@ t = 0:dt:Dt;
 % Figures of mass and energy over time
 figure('color',[1 1 1]);plot(t,m)
 hold on; plot(t,mm(1:end))
+legend('m','\Delta m')
 figure('color',[1 1 1]);plot(t,E)
 hold on; plot(t,EE(1:end))
+legend('E','\Delta E')
 
 % differences between total mass/energy in and change in C.V. mass/energy
 figure('color',[1 1 1]);plot(t,mm' - m)
+title('Difference in mass')
 figure('color',[1 1 1]);plot(t,EE' - E)
-
-%%
+title('Difference in energy')
+%
 
 % Pressure field
 figure('color',[1 1 1])
@@ -404,7 +434,7 @@ plot(t, rho(3*floor(n/5),:))
 plot(t, rho(4*floor(n/5),:))
 plot(t, rho(5*floor(n/5),:))
 legend('2*n/5','3*n/5','4*n/5','n')
-title('Density x t')        
+title('Density x t')  
 
 % Pressure profile
 figure('color',[1 1 1])
@@ -417,15 +447,28 @@ plot(x, P(:,floor(n_t)))
 legend('n_t/5','2*n_t/5','3*n_t/5','4*n_t/5','n_t')
 title('Pressure profiles')
 
+% Temperature profile
+figure('color',[1 1 1])
+plot(x, T(:,2))
+hold all
+plot(x, T(:,floor(n_t/5)))
+plot(x, T(:,floor(2*n_t/5)))
+plot(x, T(:,floor(3*n_t/5)))
+plot(x, T(:,floor(4*n_t/5)))
+plot(x, T(:,floor(n_t)))
+legend('dt','n_t/5','2*n_t/5','3*n_t/5','4*n_t/5','n_t')
+title('Temperature profiles')
+
 % Velocity profile
 figure('color',[1 1 1])
-plot(x, v(1:end-1,floor(n_t/5)))
+plot(x, v(1:end-1,2))
 hold all
+plot(x, v(1:end-1,floor(n_t/5)))
 plot(x, v(1:end-1,floor(2*n_t/5)))
 plot(x, v(1:end-1,floor(3*n_t/5)))
 plot(x, v(1:end-1,floor(4*n_t/5)))
 plot(x, v(1:end-1,floor(n_t)))
-legend('n_t/5','2*n_t/5','3*n_t/5','4*n_t/5','n_t')
+legend('dt','n_t/5','2*n_t/5','3*n_t/5','4*n_t/5','n_t')
 title('Velocity profiles')
 
 % density profile

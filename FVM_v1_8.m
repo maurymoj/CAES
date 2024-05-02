@@ -141,10 +141,8 @@ for j=2:n_t
 
         P(:,j) = P(:,j) + alpha_P*P_corr; % Pressure under-relaxation correction
         rho(:,j) = alpha_rho*(rho(:,j) + rho_corr) + (1-alpha_rho)*rho(:,j);
-        T(:,j) = T(:,j);
 
-        v(:,j) = alpha_v*(v_star(:) + v_corr) + (1-alpha_v)*v_star(:);
-
+        v(:,j) = alpha_v*(v_star(:) + v_corr) + (1-alpha_v)*v_star(:);        
 
         % Initial guess (properties at t+dt = properties at t)
         % P(:,j) = P(:,j) + P_corr;
@@ -159,15 +157,13 @@ for j=2:n_t
         % Properties in nodes to faces
         P_f(2:end-1,j) = (v(1:end-2,j) >= 0).*P(1:end-1,j) ...
             +            (v(1:end-2,j) <  0).*P(2:end,j);
-        T_f(2:end-1,j) = (v(1:end-2,j) >= 0).*T(1:end-1,j) ...
-            +            (v(1:end-2,j) <  0).*T(2:end,j);
         rho_f(2:end-1,j) = (v(1:end-2,j) >= 0).*rho(1:end-1,j) ...
             +            (v(1:end-2,j) <  0).*rho(2:end,j);
-        
+
         P_f(end,j) = P(end,j); % ASSUMING v >= 0 for t>0!!!!
-        T_f(end,j) = T(end,j); % ASSUMING v >= 0 for t>0!!!!
         rho_f(end,j) = rho(end,j); % ASSUMING v >= 0 for t>0!!!!
-    
+
+
         % Properties
         u_sonic = zeros(N,1);
         drho_dP = zeros(N,1);
@@ -177,35 +173,41 @@ for j=2:n_t
         drho_dP_n = zeros(n,1);
         cp = zeros(n,1);
 
-        for i = 1:n % PROPERTIES FROM P AND T
-            u_sonic(i) = CP.PropsSI('speed_of_sound','P',P_f(i,j),'T',T_f(i,j),'Air');
-            nu(i) = CP.PropsSI('viscosity','P',P_f(i,j),'T',T_f(i,j),'Air');
-            cp(i) = CP.PropsSI('C','P',P_f(i,j),'T',T_f(i,j),'Air');
-
-            drho_dP(i) = 1/(u_sonic(i)^2);
-
-            u_sonic_n(i) = CP.PropsSI('speed_of_sound','P',P(i,j),'T',T(i,j),'Air');
-            
-            drho_dP_n(i) = 1/(u_sonic_n(i)^2);
-        end
-
-        u_sonic(end) = CP.PropsSI('speed_of_sound','P',P_f(end,j),'T',T_f(end,j),'Air');
-        drho_dP(end) = 1/(u_sonic(end)^2);
-
-
-        % for i = 1:n  % PROPERTIES FROM P AND RHO
-        %     u_sonic(i) = CP.PropsSI('speed_of_sound','P',P_f(i,j),'D',rho_f(i,j),'Air');
-        %     nu = CP.PropsSI('viscosity','P',P_f(i,j),'D',rho_f(i,j),'Air');
+        % for i = 1:n % PROPERTIES FROM P AND T
+        % 
+        %     u_sonic(i) = CP.PropsSI('speed_of_sound','P',P_f(i,j),'T',T_f(i,j),'Air');
+        %     nu(i) = CP.PropsSI('viscosity','P',P_f(i,j),'T',T_f(i,j),'Air');
+        %     cp(i) = CP.PropsSI('C','P',P_f(i,j),'T',T_f(i,j),'Air');
         % 
         %     drho_dP(i) = 1/(u_sonic(i)^2);
         % 
-        %     u_sonic_n(i) = CP.PropsSI('speed_of_sound','P',P(i,j),'D',rho(i,j),'Air');
+        %     u_sonic_n(i) = CP.PropsSI('speed_of_sound','P',P(i,j),'T',T(i,j),'Air');
+        % 
         %     drho_dP_n(i) = 1/(u_sonic_n(i)^2);
         % end
         % 
-        % u_sonic(end) = CP.PropsSI('speed_of_sound','P',P_f(end,j),'D',rho_f(end,j),'Air');
+        % u_sonic(end) = CP.PropsSI('speed_of_sound','P',P_f(end,j),'T',T_f(end,j),'Air');
         % drho_dP(end) = 1/(u_sonic(end)^2);
 
+
+        for i = 1:n  % PROPERTIES FROM P AND RHO
+            T(i,j) = CP.PropsSI('T','P',P(i,j),'D',rho(i,j),'Air');
+
+            u_sonic(i) = CP.PropsSI('speed_of_sound','P',P_f(i,j),'D',rho_f(i,j),'Air');
+            nu = CP.PropsSI('viscosity','P',P_f(i,j),'D',rho_f(i,j),'Air');
+
+            drho_dP(i) = 1/(u_sonic(i)^2);
+
+            u_sonic_n(i) = CP.PropsSI('speed_of_sound','P',P(i,j),'D',rho(i,j),'Air');
+            drho_dP_n(i) = 1/(u_sonic_n(i)^2);
+        end
+
+        u_sonic(end) = CP.PropsSI('speed_of_sound','P',P_f(end,j),'D',rho_f(end,j),'Air');
+        drho_dP(end) = 1/(u_sonic(end)^2);
+
+        T_f(2:end-1,j) = (v(1:end-2,j) >= 0).*T(1:end-1,j) ...
+            +            (v(1:end-2,j) <  0).*T(2:end,j);
+        T_f(end,j) = T(end,j); % ASSUMING v >= 0 for t>0!!!!
 
 
 
@@ -340,7 +342,12 @@ for j=2:n_t
         % v_corr(1)         = d(1)./a_i(1).*P_corr(1);
         v_corr(1)         = 0;% Inlet boundary condition
         v_corr(2:end-1)   = d./a_i.*(P_corr(2:end)-P_corr(1:end-1));
+% !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
         v_corr(end)       = 0; % Wall boundary condition
+% !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+
+
         % v_corr(end)       =  % Velocity corrected based on mass balance (m_in =
         % m_out)
 
@@ -367,13 +374,16 @@ t = 0:dt:Dt;
 % Figures of mass and energy over time
 figure('color',[1 1 1]);plot(t,m)
 hold on; plot(t,mm(1:end))
+legend('m','\Delta m')
 figure('color',[1 1 1]);plot(t,E)
 hold on; plot(t,EE(1:end))
+legend('E','\Delta E')
 
 % differences between total mass/energy in and change in C.V. mass/energy
 figure('color',[1 1 1]);plot(t,mm' - m)
+title('Difference in mass')
 figure('color',[1 1 1]);plot(t,EE' - E)
-
+title('Difference in energy')
 %%
 
 % Pressure field
@@ -404,7 +414,7 @@ plot(t, rho(3*floor(n/5),:))
 plot(t, rho(4*floor(n/5),:))
 plot(t, rho(5*floor(n/5),:))
 legend('2*n/5','3*n/5','4*n/5','n')
-title('Density x t')        
+title('Density x t')  
 
 % Pressure profile
 figure('color',[1 1 1])
@@ -417,15 +427,28 @@ plot(x, P(:,floor(n_t)))
 legend('n_t/5','2*n_t/5','3*n_t/5','4*n_t/5','n_t')
 title('Pressure profiles')
 
+% Temperature profile
+figure('color',[1 1 1])
+plot(x, T(:,2))
+hold all
+plot(x, T(:,floor(n_t/5)))
+plot(x, T(:,floor(2*n_t/5)))
+plot(x, T(:,floor(3*n_t/5)))
+plot(x, T(:,floor(4*n_t/5)))
+plot(x, T(:,floor(n_t)))
+legend('dt','n_t/5','2*n_t/5','3*n_t/5','4*n_t/5','n_t')
+title('Temperature profiles')
+
 % Velocity profile
 figure('color',[1 1 1])
-plot(x, v(1:end-1,floor(n_t/5)))
+plot(x, v(1:end-1,2))
 hold all
+plot(x, v(1:end-1,floor(n_t/5)))
 plot(x, v(1:end-1,floor(2*n_t/5)))
 plot(x, v(1:end-1,floor(3*n_t/5)))
 plot(x, v(1:end-1,floor(4*n_t/5)))
 plot(x, v(1:end-1,floor(n_t)))
-legend('n_t/5','2*n_t/5','3*n_t/5','4*n_t/5','n_t')
+legend('dt','n_t/5','2*n_t/5','3*n_t/5','4*n_t/5','n_t')
 title('Velocity profiles')
 
 % density profile
