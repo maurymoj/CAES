@@ -1,15 +1,15 @@
 clear 
 % close all
 clc
-
+tic
 CP = py.importlib.import_module('CoolProp.CoolProp');
 CP.PropsSI('D','P',101325,'T',298,'Air');
 
 %--------------------- SIMULATION PARAMETERS ------------------------%
 dx = 100;
-dt = 0.5;
+dt = 0.1;
 
-Dt = 50;
+Dt = 100;
 
 %----------------------- PROBLEM PARAMETERS -------------------------%
 % Pipeline parameters
@@ -19,12 +19,9 @@ eps = 0.04e-3; % Absolute roughness 0.04 mm
 epsD = eps/D;
 A_h = pi*D^2/4;
 
-% Initial conditions
-P_o = 101325;
-T_o = 273.15 + 15;
 
 % A - Left side - Inlet 
-P_in = 7000000;
+P_in = 7e6;
 T_in = 273.15 + 15;
 m_in = 150;
 
@@ -32,10 +29,9 @@ rho_in = CP.PropsSI('D','P',P_in,'T',T_in,'Air');
 cp_in = CP.PropsSI('C','P',P_in,'T',T_in,'Air');
 v_in = m_in/(rho_in*A_h);
 
-
-% B - Right side
-% R_bound = 'Wall';
-R_bound = 'Outlet';
+% B - Right side boundary condition
+R_bound = 'Wall';
+% R_bound = 'Outlet';
 % Outlet
 if strcmp(R_bound,'Outlet')
     m_out = m_in;
@@ -44,7 +40,16 @@ elseif(strcmp(R_bound,'Wall'))
     v_out = 0;
 elseif(strcmp(R_bound,'Inlet'))
     
-end                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    
+end                     
+
+% Initial conditions
+% P_o = 101325;
+P_o = 4e6;
+T_o = 273.15 + 15;
+v_o = 0;
+% v_o = v_in;
+
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               
 
 dm = m_in*dt;
 dE = m_in*cp_in*T_in*dt;
@@ -87,7 +92,7 @@ T_f(1,:) = T_in;
 rho_f(1,:) = rho_in;
 
 % Initial conditions at faces (i -> x, j -> t)
-v(:,1) = v_in; % V profile at t=0
+v(:,1) = v_o; % V profile at t=0
 
 v(1,:) = v_in; % Inlet flow rate (and velocity) is constant for all t>=0
 % v(end,:) = v_out; % V is 0 at the pipe end for all t>=0
@@ -122,7 +127,7 @@ end
 T(:,:) = T_o; % Isothermal pipeline assumption
 
 m(1) = sum(rho(:,1)*A_h*dx);
-E(1) = sum(rho(:,1)*A_h*dx*cp.*T(:,1));
+E(1) = sum(rho(:,1)*A_h*dx.*cp.*T(:,1));
 
 count = zeros(n_t,1);
 f_guess = (2*log10(1/epsD)+1.14)^(-2); % Friction factor based on Nikuradse
@@ -142,11 +147,15 @@ for j=2:n_t
     count(j) = 0;
     error_P = 10;
 
-    while count(j) < 100 && max(abs(error_P)) > 0.001
+    while count(j) < 100 && max(abs(error_P)) > 1e-4
 
-        alpha_P = 0.5;  % Pressure under-relaxation factor
-        alpha_v = 0.5;  % velocity under-relaxation factor
-        alpha_rho = 0.5;  % Density under-relaxation factor
+        % alpha_P = 0.5;  % Pressure under-relaxation factor
+        % alpha_v = 0.5;  % velocity under-relaxation factor
+        % alpha_rho = 0.5;  % Density under-relaxation factor
+
+        alpha_P = 1;  % Pressure under-relaxation factor
+        alpha_v = 1;  % velocity under-relaxation factor
+        alpha_rho = 1;  % Density under-relaxation factor
 
         P(:,j) = P(:,j) + alpha_P*P_corr; % Pressure under-relaxation correction
         rho(:,j) = alpha_rho*(rho(:,j) + rho_corr) + (1-alpha_rho)*rho(:,j);
@@ -210,7 +219,7 @@ for j=2:n_t
         for i = 1:n  % PROPERTIES FROM P AND RHO
             T(i,j) = CP.PropsSI('T','P',P(i,j),'D',rho(i,j),'Air');
             cp(i) = CP.PropsSI('C','P',P(i,j),'D',rho(i,j),'Air');
-            
+
             u_sonic(i) = CP.PropsSI('speed_of_sound','P',P_f(i,j),'D',rho_f(i,j),'Air');
             nu = CP.PropsSI('viscosity','P',P_f(i,j),'D',rho_f(i,j),'Air');
 
@@ -378,10 +387,11 @@ for j=2:n_t
 
     m(j) = sum(rho(:,j)*A_h*dx);
     E(j) = sum(rho(:,j)*A_h*dx.*cp.*T(:,j));
-    [j count(j)]
+    % [j count(j)]
+    % disp(strcat('t step: ',num2str(j),' n iterations: ',num2str(count(j))))
 end
 
-
+toc
 
 
 
@@ -389,62 +399,110 @@ mm = m(1) + dm*(0:n_t-1);
 EE = E(1) + dE*(0:n_t-1);
 
 x = 0:dx:L;
+x_f = [0;[dx/2:dx:L-dx/2]';L];
 t = 0:dt:Dt;
 
 % Figures of mass and energy over time
+figure('color',[1 1 1]);plot(m)
+hold on; plot(mm)
+legend('m','\Delta m')
+
+%
 figure('color',[1 1 1]);plot(t,m)
 hold on; plot(t,mm(1:end))
 legend('m','\Delta m')
 figure('color',[1 1 1]);plot(t,E)
 hold on; plot(t,EE(1:end))
-legend('E','\Delta E')
+legend('E','$E_o + \dot{m} \Delta E$','Interpreter','latex')
 
 % differences between total mass/energy in and change in C.V. mass/energy
-figure('color',[1 1 1]);plot(t,mm' - m)
-title('Difference in mass')
-figure('color',[1 1 1]);plot(t,EE' - E)
-title('Difference in energy')
+% figure('color',[1 1 1]);plot(t,mm' - m)
+% title('Difference in mass')
+% figure('color',[1 1 1]);plot(t,EE' - E)
+% title('Difference in energy')
+% % Relative differences between total mass/energy in and change in C.V. mass/energy
+% figure('color',[1 1 1]);plot(t,(mm' - m)./m)
+% title('Difference in mass')
+% figure('color',[1 1 1]);plot(t,(EE' - E)./E)
+% title('Difference in energy')
 %
-
+%%
 % Pressure field
 figure('color',[1 1 1])
-plot(t, P(2*floor(n/5),:))
+plot(t, P(2,:))
 hold all
-plot(t, P(3*floor(n/5),:))
-plot(t, P(4*floor(n/5),:))
-plot(t, P(5*floor(n/5),:))
-legend('2*n/5','3*n/5','4*n/5','n')
+plot(t, P(2*floor(n/5)+1,:))
+plot(t, P(3*floor(n/5)+1,:))
+plot(t, P(4*floor(n/5)+1,:))
+plot(t, P(n,:))
+xs = [x(2),x(2*floor(n/5)+1),x(3*floor(n/5)+1),x(4*floor(n/5)+1),x(n)]'
+xs_leg = [num2str(xs),['m','m','m','m','m']'];
+legend(xs_leg)
+% legend('2*n/5','3*n/5','4*n/5','n')
 title('Pressure x t')
+
+% Pressure (faces) field
+figure('color',[1 1 1])
+plot(t, P_f(2,:))
+hold all
+plot(t, P_f(2*floor(n/5)+1,:))
+plot(t, P_f(3*floor(n/5)+1,:))
+plot(t, P_f(4*floor(n/5)+1,:))
+plot(t, P_f(n,:))
+xs = [x(2),x(2*floor(n/5)+1),x(3*floor(n/5)+1),x(4*floor(n/5)+1),x(n)]'
+xs_leg = [num2str(xs),['m','m','m','m','m']'];
+legend(xs_leg)
+% legend('2*n/5','3*n/5','4*n/5','n')
+title('Pressure (faces) x t')
 
 % Velocity field
 figure('color',[1 1 1])
-plot(t, v(2*floor(n/5),:))
+plot(t, v(2,:))
 hold all
+plot(t, v(2*floor(n/5),:))
 plot(t, v(3*floor(n/5),:))
 plot(t, v(4*floor(n/5),:))
 plot(t, v(5*floor(n/5),:))
-legend('2*n/5','3*n/5','4*n/5','n')
+legend(xs_leg)
+% legend('2*n/5','3*n/5','4*n/5','n')
 title('Velocity x t')
 
-% density field
+% density (nodes) field
 figure('color',[1 1 1])
-plot(t, rho(2*floor(n/5),:))
+plot(t, rho(2,:))
 hold all
+plot(t, rho(2*floor(n/5),:))
 plot(t, rho(3*floor(n/5),:))
 plot(t, rho(4*floor(n/5),:))
 plot(t, rho(5*floor(n/5),:))
-legend('2*n/5','3*n/5','4*n/5','n')
+legend(xs_leg)
+% legend('2*n/5','3*n/5','4*n/5','n')
 title('Density x t')  
+
+% density (faces) field
+figure('color',[1 1 1])
+plot(t, rho_f(2,:))
+hold all
+plot(t, rho_f(2*floor(n/5),:))
+plot(t, rho_f(3*floor(n/5),:))
+plot(t, rho_f(4*floor(n/5),:))
+plot(t, rho_f(5*floor(n/5),:))
+legend(xs_leg)
+% legend('2*n/5','3*n/5','4*n/5','n')
+title('Density (faces) x t')  
 
 % Pressure profile
 figure('color',[1 1 1])
-plot(x, P(:,floor(n_t/5)))
+plot(x, P(:,2))
 hold all
+plot(x, P(:,floor(n_t/5)))
 plot(x, P(:,floor(2*n_t/5)))
 plot(x, P(:,floor(3*n_t/5)))
 plot(x, P(:,floor(4*n_t/5)))
 plot(x, P(:,floor(n_t)))
-legend('n_t/5','2*n_t/5','3*n_t/5','4*n_t/5','n_t')
+ts = [t(2),t(floor(n_t/5)),t(floor(2*n_t/5)),t(floor(3*n_t/5)),t(floor(4*n_t/5)),t(n_t)]';
+ts_leg = [num2str(ts),['s','s','s','s','s','s']'];
+legend(ts_leg)
 title('Pressure profiles')
 
 % Temperature profile
@@ -456,7 +514,8 @@ plot(x, T(:,floor(2*n_t/5)))
 plot(x, T(:,floor(3*n_t/5)))
 plot(x, T(:,floor(4*n_t/5)))
 plot(x, T(:,floor(n_t)))
-legend('dt','n_t/5','2*n_t/5','3*n_t/5','4*n_t/5','n_t')
+legend(ts_leg)
+% legend('dt','n_t/5','2*n_t/5','3*n_t/5','4*n_t/5','n_t')
 title('Temperature profiles')
 
 % Velocity profile
@@ -468,16 +527,73 @@ plot(x, v(1:end-1,floor(2*n_t/5)))
 plot(x, v(1:end-1,floor(3*n_t/5)))
 plot(x, v(1:end-1,floor(4*n_t/5)))
 plot(x, v(1:end-1,floor(n_t)))
-legend('dt','n_t/5','2*n_t/5','3*n_t/5','4*n_t/5','n_t')
+legend(ts_leg)
+% legend('dt','n_t/5','2*n_t/5','3*n_t/5','4*n_t/5','n_t')
 title('Velocity profiles')
 
 % density profile
 figure('color',[1 1 1])
-plot(x, rho(:,floor(n_t/5)))
+plot(x, rho(:,2))
 hold all
+plot(x, rho(:,floor(n_t/5)))
 plot(x, rho(:,floor(2*n_t/5)))
 plot(x, rho(:,floor(3*n_t/5)))
 plot(x, rho(:,floor(4*n_t/5)))
 plot(x, rho(:,floor(n_t)))
-legend('n_t/5','2*n_t/5','3*n_t/5','4*n_t/5','n_t')
+legend(ts_leg)
+% legend('dt','n_t/5','2*n_t/5','3*n_t/5','4*n_t/5','n_t')
 title('Density profiles')
+
+% Pressure profile (faces)
+figure('color',[1 1 1])
+plot(x_f, P_f(:,2))
+hold all
+plot(x_f, P_f(:,floor(n_t/5)))
+plot(x_f, P_f(:,floor(2*n_t/5)))
+plot(x_f, P_f(:,floor(3*n_t/5)))
+plot(x_f, P_f(:,floor(4*n_t/5)))
+plot(x_f, P_f(:,floor(n_t)))
+ts = [t(2),t(floor(n_t/5)),t(floor(2*n_t/5)),t(floor(3*n_t/5)),t(floor(4*n_t/5)),t(n_t)]';
+ts_leg = [num2str(ts),['s','s','s','s','s','s']'];
+legend(ts_leg)
+title('Pressure profiles (faces)')
+
+% Temperature profile
+figure('color',[1 1 1])
+plot(x_f, T_f(:,2))
+hold all
+plot(x_f, T_f(:,floor(n_t/5)))
+plot(x_f, T_f(:,floor(2*n_t/5)))
+plot(x_f, T_f(:,floor(3*n_t/5)))
+plot(x_f, T_f(:,floor(4*n_t/5)))
+plot(x_f, T_f(:,floor(n_t)))
+legend(ts_leg)
+% legend('dt','n_t/5','2*n_t/5','3*n_t/5','4*n_t/5','n_t')
+title('Temperature profiles (faces)')
+
+% density profile
+figure('color',[1 1 1])
+plot(x_f, rho_f(:,2))
+hold all
+plot(x_f, rho_f(:,floor(n_t/5)))
+plot(x_f, rho_f(:,floor(2*n_t/5)))
+plot(x_f, rho_f(:,floor(3*n_t/5)))
+plot(x_f, rho_f(:,floor(4*n_t/5)))
+plot(x_f, rho_f(:,floor(n_t)))
+legend(ts_leg)
+% legend('dt','n_t/5','2*n_t/5','3*n_t/5','4*n_t/5','n_t')
+title('Density profiles (faces)')
+
+% Velocity profile
+figure('color',[1 1 1])
+plot(x_f, v(:,2))
+hold all
+plot(x_f, v(:,floor(n_t/5)))
+plot(x_f, v(:,floor(2*n_t/5)))
+plot(x_f, v(:,floor(3*n_t/5)))
+plot(x_f, v(:,floor(4*n_t/5)))
+plot(x_f, v(:,floor(n_t)))
+legend(ts_leg)
+% legend('dt','n_t/5','2*n_t/5','3*n_t/5','4*n_t/5','n_t')
+title('Velocity profiles (faces)')
+
