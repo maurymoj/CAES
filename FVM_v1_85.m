@@ -5,16 +5,13 @@ tic
 CP = py.importlib.import_module('CoolProp.CoolProp');
 CP.PropsSI('D','P',101325,'T',298,'Air');
 
-%--------------------- SIMULATION PARAMETERS ------------------------%
-dx = 100;
-dt = 0.1;
-
-Dt = 100;
-
 %----------------------- PROBLEM PARAMETERS -------------------------%
 % Pipeline parameters
-L = 5000;
-D = 0.75;
+L = 70000;
+D = 0.9;
+% L = 213333;
+% L = 300;
+% D = 24;
 eps = 0.04e-3; % Absolute roughness 0.04 mm
 epsD = eps/D;
 A_h = pi*D^2/4;
@@ -23,7 +20,7 @@ A_h = pi*D^2/4;
 % A - Left side - Inlet 
 P_in = 7e6;
 T_in = 273.15 + 15;
-m_in = 150;
+m_in = 100;
 
 rho_in = CP.PropsSI('D','P',P_in,'T',T_in,'Air');
 cp_in = CP.PropsSI('C','P',P_in,'T',T_in,'Air');
@@ -44,7 +41,7 @@ end
 
 % Initial conditions
 % P_o = 101325;
-P_o = 4e6;
+P_o = 5e6;
 T_o = 273.15 + 15;
 v_o = 0;
 % v_o = v_in;
@@ -56,6 +53,25 @@ dE = m_in*cp_in*T_in*dt;
 
 g = 9.81;
 theta = 0;
+
+%--------------------- SIMULATION PARAMETERS ------------------------%
+dx = 70000/50;
+dt = 0.1;
+
+Dt = 3600;
+
+tol = 1e-6;
+
+% Tuning
+
+% Under-relaxation (1 means no under-relaxation
+alpha_P = 0.5;  % Pressure under-relaxation factor
+alpha_v = 0.5;  % velocity under-relaxation factor
+alpha_rho = 0.5;  % Density under-relaxation factor
+
+% alpha_P = 1;  % Pressure under-relaxation factor
+% alpha_v = 1;  % velocity under-relaxation factor
+% alpha_rho = 1;  % Density under-relaxation factor
 
 %---------------------- ARRAYS INITIALIZATION ----------------------%
 n = L/dx+1;       % number of nodes
@@ -147,15 +163,7 @@ for j=2:n_t
     count(j) = 0;
     error_P = 10;
 
-    while count(j) < 100 && max(abs(error_P)) > 1e-4
-
-        % alpha_P = 0.5;  % Pressure under-relaxation factor
-        % alpha_v = 0.5;  % velocity under-relaxation factor
-        % alpha_rho = 0.5;  % Density under-relaxation factor
-
-        alpha_P = 1;  % Pressure under-relaxation factor
-        alpha_v = 1;  % velocity under-relaxation factor
-        alpha_rho = 1;  % Density under-relaxation factor
+    while count(j) < 100 && max(abs(error_P)) > tol
 
         P(:,j) = P(:,j) + alpha_P*P_corr; % Pressure under-relaxation correction
         rho(:,j) = alpha_rho*(rho(:,j) + rho_corr) + (1-alpha_rho)*rho(:,j);
@@ -388,7 +396,7 @@ for j=2:n_t
     m(j) = sum(rho(:,j)*A_h*dx);
     E(j) = sum(rho(:,j)*A_h*dx.*cp.*T(:,j));
     % [j count(j)]
-    % disp(strcat('t step: ',num2str(j),' n iterations: ',num2str(count(j))))
+    disp(strcat('t step: ',num2str(j),' n iterations: ',num2str(count(j))))
 end
 
 toc
@@ -403,10 +411,10 @@ x_f = [0;[dx/2:dx:L-dx/2]';L];
 t = 0:dt:Dt;
 
 % Figures of mass and energy over time
-figure('color',[1 1 1]);plot(m)
-hold on; plot(mm)
-legend('m','\Delta m')
-
+% figure('color',[1 1 1]);plot(m)
+% hold on; plot(mm)
+% legend('m','\Delta m')
+% 
 %
 figure('color',[1 1 1]);plot(t,m)
 hold on; plot(t,mm(1:end))
@@ -415,16 +423,58 @@ figure('color',[1 1 1]);plot(t,E)
 hold on; plot(t,EE(1:end))
 legend('E','$E_o + \dot{m} \Delta E$','Interpreter','latex')
 
+
+% Pressure profile
+figure('color',[1 1 1])
+plot(x, P(:,2))
+hold all
+plot(x, P(:,floor(n_t/5)))
+plot(x, P(:,floor(2*n_t/5)))
+plot(x, P(:,floor(3*n_t/5)))
+plot(x, P(:,floor(4*n_t/5)))
+plot(x, P(:,floor(n_t)))
+ts = [t(2),t(floor(n_t/5)),t(floor(2*n_t/5)),t(floor(3*n_t/5)),t(floor(4*n_t/5)),t(n_t)]';
+ts_leg = [num2str(ts),['s','s','s','s','s','s']'];
+legend(ts_leg)
+title('Pressure profiles')
+
+% Velocity profile
+figure('color',[1 1 1])
+plot(x, v(1:end-1,2))
+hold all
+plot(x, v(1:end-1,floor(n_t/5)))
+plot(x, v(1:end-1,floor(2*n_t/5)))
+plot(x, v(1:end-1,floor(3*n_t/5)))
+plot(x, v(1:end-1,floor(4*n_t/5)))
+plot(x, v(1:end-1,floor(n_t)))
+legend(ts_leg)
+% legend('dt','n_t/5','2*n_t/5','3*n_t/5','4*n_t/5','n_t')
+title('Velocity profiles')
+
+% density profile
+figure('color',[1 1 1])
+plot(x, rho(:,2))
+hold all
+plot(x, rho(:,floor(n_t/5)))
+plot(x, rho(:,floor(2*n_t/5)))
+plot(x, rho(:,floor(3*n_t/5)))
+plot(x, rho(:,floor(4*n_t/5)))
+plot(x, rho(:,floor(n_t)))
+legend(ts_leg)
+% legend('dt','n_t/5','2*n_t/5','3*n_t/5','4*n_t/5','n_t')
+title('Density profiles')
+
+
 % differences between total mass/energy in and change in C.V. mass/energy
 % figure('color',[1 1 1]);plot(t,mm' - m)
 % title('Difference in mass')
 % figure('color',[1 1 1]);plot(t,EE' - E)
 % title('Difference in energy')
 % % Relative differences between total mass/energy in and change in C.V. mass/energy
-% figure('color',[1 1 1]);plot(t,(mm' - m)./m)
-% title('Difference in mass')
-% figure('color',[1 1 1]);plot(t,(EE' - E)./E)
-% title('Difference in energy')
+figure('color',[1 1 1]);plot(t,(mm' - m)./m)
+title('Difference in mass')
+figure('color',[1 1 1]);plot(t,(EE' - E)./E)
+title('Difference in energy')
 %
 %%
 % Pressure field
