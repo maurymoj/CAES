@@ -2,8 +2,8 @@
 clear F
 loops = 60;
 
-P_min = 4000000;
-P_max = 14000000;
+P_min = 5000000;
+P_max = 5500000;
 
 sim = 'CAESP';
 time = datetime("now")
@@ -15,8 +15,8 @@ open(vid)
 F(loops) = struct('cdata',[],'colormap',[])
 figure('Color',[1 1 1])
 
-for i=1:100
-    plot(x,P(:,i*10));
+for i=1:300
+    plot(x,P(:,i*1));
     ti = strcat('t = ',num2str(i*1),' s');
     title(ti);
     ylim([P_min P_max])

@@ -20,7 +20,7 @@ T_f = T_1; % Isothermal assumption
 
 % Flow rate
 Q_a = 14*1000000/(24*3600); % Conversion from mcmd (millions of cubic meters
-    % per day to cubic meters per second) - real demand estimation 70 mscm/day
+    % per day to standard cubic meters per second) - real demand estimation 70 mscm/day
     % St Fergus, 14 is the proportional relative to area of one of the 3, 900
     % mm diameter pipes
 % Q_a = 25*1000000/(24*3600); % Flow for 1200 mm pipe
