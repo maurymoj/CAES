@@ -7,7 +7,7 @@ CP.PropsSI('D','P',101325,'T',298,'Air');
 
 %----------------------- PROBLEM PARAMETERS -------------------------%
 % Pipeline parameters
-L = 70000;
+L = 10000;
 D = 0.9;
 % L = 213333;
 % L = 300;
@@ -46,19 +46,19 @@ T_o = 273.15 + 15;
 v_o = 0;
 % v_o = v_in;
 
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               
-
-dm = m_in*dt;
-dE = m_in*cp_in*T_in*dt;
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              
 
 g = 9.81;
 theta = 0;
 
 %--------------------- SIMULATION PARAMETERS ------------------------%
-dx = 70000/50;
-dt = 0.1;
+sim = 'CAESP';
+% sim = 'CAESC';
+dx = L/50;
+dt = 1;
 
-Dt = 3600;
+Dt = 100;
+% Dt = 3600;
 
 tol = 1e-6;
 
@@ -138,9 +138,10 @@ elseif(strcmp(R_bound,'Inlet'))
     
 end 
 
-
-
 T(:,:) = T_o; % Isothermal pipeline assumption
+
+dm = m_in*dt;
+dE = m_in*cp_in*T_in*dt;
 
 m(1) = sum(rho(:,1)*A_h*dx);
 E(1) = sum(rho(:,1)*A_h*dx.*cp.*T(:,1));
@@ -647,3 +648,5 @@ legend(ts_leg)
 % legend('dt','n_t/5','2*n_t/5','3*n_t/5','4*n_t/5','n_t')
 title('Velocity profiles (faces)')
 
+name = strcat(sim,'_P',P_in,'_L',L,'_Dt',Dt);
+save(name)

@@ -2,18 +2,24 @@
 clear F
 loops = 60;
 
-vid = VideoWriter("Pt.avi");
+P_min = 4000000;
+P_max = 14000000;
+
+sim = 'CAESP';
+time = datetime("now")
+vid_titl = strcat(sim,'_',string(year(time)),'_',string(month(time)),'_',string(day(time)),'_',string(hour(time)),'h.avi')
+vid = VideoWriter(vid_titl);
 vid.FrameRate = 10;
 open(vid)
 
 F(loops) = struct('cdata',[],'colormap',[])
 figure('Color',[1 1 1])
 
-for i=1:360
-    plot(x,P(:,i*100));
-    ti = strcat('t = ',num2str(i*10),' s');
+for i=1:100
+    plot(x,P(:,i*10));
+    ti = strcat('t = ',num2str(i*1),' s');
     title(ti);
-    ylim([5000000 5400000])
+    ylim([P_min P_max])
     grid on
     drawnow
     F(i) = getframe(gcf);
