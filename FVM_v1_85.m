@@ -57,7 +57,7 @@ sim = 'CAESP';
 dx = L/50;
 dt = 1;
 
-Dt = 100;
+Dt = 300;
 % Dt = 3600;
 
 tol = 1e-6;
@@ -230,11 +230,13 @@ for j=2:n_t
             cp(i) = CP.PropsSI('C','P',P(i,j),'D',rho(i,j),'Air');
 
             u_sonic(i) = CP.PropsSI('speed_of_sound','P',P_f(i,j),'D',rho_f(i,j),'Air');
+            % u_sonic(i) = 10; % test of slower speed of sound
             nu = CP.PropsSI('viscosity','P',P_f(i,j),'D',rho_f(i,j),'Air');
 
             drho_dP(i) = 1/(u_sonic(i)^2);
 
             u_sonic_n(i) = CP.PropsSI('speed_of_sound','P',P(i,j),'D',rho(i,j),'Air');
+            % u_sonic_n(i) = 10; 
             drho_dP_n(i) = 1/(u_sonic_n(i)^2);
         end
 
@@ -648,5 +650,5 @@ legend(ts_leg)
 % legend('dt','n_t/5','2*n_t/5','3*n_t/5','4*n_t/5','n_t')
 title('Velocity profiles (faces)')
 
-name = strcat(sim,'_P',P_in,'_L',L,'_Dt',Dt);
+name = strcat(sim,'_P',P_in/1000,'kPa_L',L/1000,'km_Dt',Dt);
 save(name)
