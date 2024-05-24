@@ -8,33 +8,36 @@ CP.PropsSI('D','P',101325,'T',298,'Air');
 %----------------------- PROBLEM PARAMETERS -------------------------%
 % Pipeline parameters
 % Kiuchi
-L = 5000;
-D = 0.5;
-% L = 30000;
+% L = 5000;
+% D = 0.5;
+% L = 70000;
 % D = 0.9;
 % L = 213333;
 % L = 300;
 % D = 24;
+L = 35;
+D = 40;
 eps = 0.04e-3; % Absolute roughness 0.04 mm
 epsD = eps/D;
 A_h = pi*D^2/4;
 
 % Ambient conditions
 P_a = 101325;
-T_a = 298.15;
+T_a = 273.15 + 25;
 rho_a = CP.PropsSI('D','P',P_a,'T',T_a,'Air');
 
 % A - Left side - Inlet 
-P_in = 5e6;
+P_in = 7e6;
 T_in = 273.15 + 60;
 Q_st_in = 3e5; % standard cubic meters per hour
-Q_a = Q_st_in/3600;
+% Q_a = Q_st_in/3600;
 
 rho_in = CP.PropsSI('D','P',P_in,'T',T_in,'Air');
 cp_in = CP.PropsSI('C','P',P_in,'T',T_in,'Air');
 
-m_in = rho_a*Q_a;
+% m_in = rho_a*Q_a;
 % m_in = 100;
+m_in = 108; % Huntorf
 
 v_in = m_in/(rho_in*A_h);
 
@@ -55,30 +58,34 @@ end
 
 % Initial conditions
 % P_o = 101325;
-P_o = 5e6;
-T_o = 273.15 + 15;
+% P_o = 5e6;
+P_o = 4.3e6; % Huntorf
+T_o = 273.15 + 25;
 v_o = 0;
 % v_o = v_in;
-
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              
 
 g = 9.81;
 theta = 0;
 
 %--------------------- SIMULATION PARAMETERS ------------------------%
-sim = 'CAESP';
-% sim = 'CAESC';
-dx = L/50;
-dt = 1;
+% simType = 'CAESPipe';
+simType = 'CAESCav';
+% dx = L/(50-1); % CAESPipe
+% dt = 1;
+dx = L/(10-1); % CAESCav
+dt = 0.001;
 
-Dt = 100;
+
+Dt = 4*3600;
 % Dt = 3600;
+% Dt = 60;
 
-tol = 1e-6;
+% tol = 1e-6; % CAESPipe
+tol = 1e-8; % CAEScav
 
 % Tuning
 
-% Under-relaxation (1 means no under-relaxation
+% Under-relaxation (1 means no under-relaxation)
 alpha_P = 0.5;  % Pressure under-relaxation factor
 alpha_v = 0.5;  % velocity under-relaxation factor
 alpha_rho = 0.5;  % Density under-relaxation factor
@@ -88,21 +95,23 @@ alpha_rho = 0.5;  % Density under-relaxation factor
 % alpha_rho = 1;  % Density under-relaxation factor
 
 %---------------------- ARRAYS INITIALIZATION ----------------------%
-n = L/dx+1;       % number of nodes
-N = n + 1;      % number of faces
+t = 0:dt:Dt;
+
+n_n = L/dx;       % number of nodes
+N_f = n_n + 1;      % number of faces
 n_t = Dt/dt+1;  % n of time steps
 
 % Face initialization
-v = zeros(N,n_t);
-P_f = zeros(N,n_t);
-T_f = zeros(N,n_t);
-rho_f = zeros(N,n_t);
+v = zeros(N_f,n_t);
+P_f = zeros(N_f,n_t);
+T_f = zeros(N_f,n_t);
+rho_f = zeros(N_f,n_t);
 
 % Node initialization
-v_n = zeros(n,n_t);
-P = zeros(n,n_t);
-T = zeros(n,n_t);
-rho = zeros(n,n_t);
+v_n = zeros(n_n,n_t);
+P = zeros(n_n,n_t);
+T = zeros(n_n,n_t);
+rho = zeros(n_n,n_t);
 
 % Sanity check
 m = zeros(n_t,1); % Total mass in pipeline
@@ -111,8 +120,8 @@ E = zeros(n_t,1); % Total energy in pipeline
 %------------------ SETTING INITIAL CONDITIONS ---------------------%
 % Initial conditions at nodes (i -> x, j -> t)
 % Thermodynamic properties over all solution space
-P(:,1) = P_o*ones(n,1);
-T(:,1) = T_o*ones(n,1);
+P(:,1) = P_o*ones(n_n,1);
+T(:,1) = T_o*ones(n_n,1);
 rho(:,1) = CP.PropsSI('D','P',P(1,1),'T',T(1,1),'Air');
 cp = CP.PropsSI('C','P',P(1,1),'T',T(1,1),'Air');
 
@@ -124,7 +133,9 @@ rho_f(1,:) = rho_in;
 % Initial conditions at faces (i -> x, j -> t)
 v(:,1) = v_o; % V profile at t=0
 
-v(1,:) = v_in; % Inlet flow rate (and velocity) is constant for all t>=0
+% V_in = (t<Dt/3)'.*v_in;
+V_in = v_in;
+v(1,:) = V_in; % Inlet flow rate (and velocity) is constant for all t>=0
 % v(end,:) = v_out; % V is 0 at the pipe end for all t>=0
 
 % Upwind scheme
@@ -154,9 +165,6 @@ end
 
 T(:,:) = T_o; % Isothermal pipeline assumption
 
-dm = m_in*dt;
-dE = m_in*cp_in*T_in*dt;
-
 m(1) = sum(rho(:,1)*A_h*dx);
 E(1) = sum(rho(:,1)*A_h*dx.*cp.*T(:,1));
 
@@ -168,11 +176,11 @@ for j=2:n_t
     P(:,j) = P(:,j-1);
     rho(:,j) = rho(:,j-1);
     T(:,j) = T(:,j-1);
-    v(:,j) = v(:,j-1);
+    v(2:end-1,j) = v(2:end-1,j-1);
     
-    P_corr = zeros(n,1);
-    rho_corr = zeros(n,1);
-    v_corr = zeros(N,1);
+    P_corr = zeros(n_n,1);
+    rho_corr = zeros(n_n,1);
+    v_corr = zeros(N_f,1);
     
     v_star = v(:,j);
     count(j) = 0;
@@ -214,13 +222,13 @@ for j=2:n_t
 
 
         % Properties
-        u_sonic = zeros(N,1);
-        drho_dP = zeros(N,1);
-        nu = zeros(N,1);
+        u_sonic = zeros(N_f,1);
+        drho_dP = zeros(N_f,1);
+        nu = zeros(N_f,1);
 
-        u_sonic_n = zeros(n,1);
-        drho_dP_n = zeros(n,1);
-        cp = zeros(n,1);
+        u_sonic_n = zeros(n_n,1);
+        drho_dP_n = zeros(n_n,1);
+        cp = zeros(n_n,1);
 
         % for i = 1:n % PROPERTIES FROM P AND T
         % 
@@ -239,7 +247,7 @@ for j=2:n_t
         % drho_dP(end) = 1/(u_sonic(end)^2);
 
 
-        for i = 1:n  % PROPERTIES FROM P AND RHO
+        for i = 1:n_n  % PROPERTIES FROM P AND RHO
             T(i,j) = CP.PropsSI('T','P',P(i,j),'D',rho(i,j),'Air');
             cp(i) = CP.PropsSI('C','P',P(i,j),'D',rho(i,j),'Air');
 
@@ -262,7 +270,7 @@ for j=2:n_t
         %---------- v* calculation - Momentum control volume ---------------------%
         
         % Friction factor based on Nikuradse - IMPLEMENT COLEBROOK EQUATION
-        f = (2*log10(1/epsD)+1.14)^(-2)*ones(n,1);
+        f = (2*log10(1/epsD)+1.14)^(-2)*ones(n_n,1);
         
         % Re = rho_f(:,j).*v(:,j)*D./nu(:);
         % f = zeros(n,1);
@@ -297,10 +305,10 @@ for j=2:n_t
 
         % Matrix/vector initialization (only need to solve for the inner faces -
         % boundary faces are dealt with the boundary conditions)
-        a = zeros(N-2);
-        b = zeros(N-2,1);
-        d = zeros(N-2,1);
-        B = zeros(N-2,1);
+        a = zeros(N_f-2);
+        b = zeros(N_f-2,1);
+        d = zeros(N_f-2,1);
+        B = zeros(N_f-2,1);
         
         % For momentum equations the first line refers to face B and the last line to
         % face E, as we know velocities at faces A and F from the boundary
@@ -319,19 +327,19 @@ for j=2:n_t
             + b(1);
         
         
-        a(end,end-1) = -max(rho(n-1,j)*v_n(n-1,j)/dx, 0); % a_N-2 (index N-2, N-3)
+        a(end,end-1) = -max(rho(n_n-1,j)*v_n(n_n-1,j)/dx, 0); % a_N-2 (index N-2, N-3)
         % WHAT TO DO REGARDING TO THE a INDICES ??
         a(end,end) = ...                                  % a_N-1 (index N-2, N-2)
-            rho_f(N-1,j)/dt + f(N-1)*rho_f(N-1,j)*abs(v(N-1,j))/(2*D)...
-            +(rho(n,j)*v_n(n,j) - rho(n-1,j)*v_n(n-1,j))/dx...
-            - (a(end,end-1) - max(-rho(n,j)*v_n(n,j)/dx,  0) );
+            rho_f(N_f-1,j)/dt + f(N_f-1)*rho_f(N_f-1,j)*abs(v(N_f-1,j))/(2*D)...
+            +(rho(n_n,j)*v_n(n_n,j) - rho(n_n-1,j)*v_n(n_n-1,j))/dx...
+            - (a(end,end-1) - max(-rho(n_n,j)*v_n(n_n,j)/dx,  0) );
         
         d(end) = -1/dx;
-        b(end) = (rho_f(N-1,j-1)*v(N-1,j-1)/dt)-rho_f(N-1,j)*g*sind(theta);
+        b(end) = (rho_f(N_f-1,j-1)*v(N_f-1,j-1)/dt)-rho_f(N_f-1,j)*g*sind(theta);
         
-        B(end) = d(end)*(P(n,j)-P(n-1,j)) + b(end);
+        B(end) = d(end)*(P(n_n,j)-P(n_n-1,j)) + b(end);
         
-        for i=2:N-3
+        for i=2:N_f-3
         % The indices of the node and face properties have to be added by 1, since
         % the 1st line was ommited (as we have it solved from the boundary
         % condition 
@@ -354,8 +362,8 @@ for j=2:n_t
         %--------------- Pressure correction P' calculations ---------------------%
         % The matrices/vectors in P' calculations have no shift, so index 1 means
         % control volume 1 and so on
-        A = zeros(n);
-        BB = zeros(n,1);
+        A = zeros(n_n);
+        BB = zeros(n_n,1);
         
         % left node
         % Coefficients of a and d are displaced by 1 (1 = B, 2 = C and so on) 
@@ -366,12 +374,12 @@ for j=2:n_t
         
         
         % right node
-        A(n,n-1) = (rho_f(N-1,j)*d(end)/a(end,end))/dx - max(drho_dP(N-1)*v_star(N-1)/dx, 0);
-        A(n,n) = drho_dP_n(n)/dt - drho_dP(N-1)*v_star(N-1)/dx - A(n,n-1); % v_star(end) = 0
+        A(n_n,n_n-1) = (rho_f(N_f-1,j)*d(end)/a(end,end))/dx - max(drho_dP(N_f-1)*v_star(N_f-1)/dx, 0);
+        A(n_n,n_n) = drho_dP_n(n_n)/dt - drho_dP(N_f-1)*v_star(N_f-1)/dx - A(n_n,n_n-1); % v_star(end) = 0
         
-        BB(n) = (rho(n,j-1)-rho(n,j))/dt + (rho_f(N-1,j)*v_star(N-1) - rho_f(N,j)*v_star(N))/dx;
+        BB(n_n) = (rho(n_n,j-1)-rho(n_n,j))/dt + (rho_f(N_f-1,j)*v_star(N_f-1) - rho_f(N_f,j)*v_star(N_f))/dx;
         
-        for i=2:n-1
+        for i=2:n_n-1
         % Subtracted 1 from a and d as there is no row for the first face -
         % boundary conditions for matrix/vector in momentum eq.
             A(i,i-1) = (rho_f(i,j)*d(i-1)/a(i-1,i-1))/dx - max(drho_dP(i)*v_star(i)/dx,                     0);
@@ -388,7 +396,7 @@ for j=2:n_t
         rho_corr = drho_dP_n.*P_corr;
 
         a_i = diag(a);
-        v_corr = zeros(N,1);
+        v_corr = zeros(N_f,1);
         % v_corr(1)         = d(1)./a_i(1).*P_corr(1);
         v_corr(1)         = 0;% Inlet boundary condition
         v_corr(2:end-1)   = d./a_i.*(P_corr(2:end)-P_corr(1:end-1));
@@ -407,30 +415,37 @@ for j=2:n_t
         count(j) = count(j)+1;  
 
     end
+    
+    if P(2,j) >= P_in
+        v(1,j+1:end) = 0;
+    end
 
     m(j) = sum(rho(:,j)*A_h*dx);
     E(j) = sum(rho(:,j)*A_h*dx.*cp.*T(:,j));
     % [j count(j)]
-    disp(strcat('t step: ',num2str(j),' n iterations: ',num2str(count(j))))
+    disp(strcat('t= ',num2str((j-1)*dt),'s, n iterations: ',num2str(count(j))))
 end
 
 toc
 
+dm = rho_in*V_in*A_h*dt;
+dE = rho_in*V_in*A_h*cp_in*T_in*dt;
 
+% mm = m(1) + [0; cumsum(dm(1:end-1))];
+% EE = E(1) + [0; cumsum(dE(1:end-1))];
+mm = m(1) + dm.*(0:n_t-1)';
+EE = E(1) + dE.*(0:n_t-1)';
 
-mm = m(1) + dm*(0:n_t-1);
-EE = E(1) + dE*(0:n_t-1);
 
 x = 0:dx:L;
-x_f = [0;[dx/2:dx:L-dx/2]';L];
-t = 0:dt:Dt;
+x_f = [0:dx:L]';
+x_n = [dx/2:dx:L]';
 
 % Figures of mass and energy over time
 % figure('color',[1 1 1]);plot(m)
 % hold on; plot(mm)
 % legend('m','\Delta m')
-% 
-%
+
 figure('color',[1 1 1]);plot(t,m)
 hold on; plot(t,mm(1:end))
 legend('m','\Delta m')
@@ -438,69 +453,69 @@ figure('color',[1 1 1]);plot(t,E)
 hold on; plot(t,EE(1:end))
 legend('E','$E_o + \dot{m} \Delta E$','Interpreter','latex')
 
-
-% Pressure profile
-figure('color',[1 1 1])
-plot(x, P(:,2))
-hold all
-plot(x, P(:,floor(n_t/5)))
-plot(x, P(:,floor(2*n_t/5)))
-plot(x, P(:,floor(3*n_t/5)))
-plot(x, P(:,floor(4*n_t/5)))
-plot(x, P(:,floor(n_t)))
-ts = [t(2),t(floor(n_t/5)),t(floor(2*n_t/5)),t(floor(3*n_t/5)),t(floor(4*n_t/5)),t(n_t)]';
-ts_leg = [num2str(ts),['s','s','s','s','s','s']'];
-legend(ts_leg)
-title('Pressure profiles')
-
-% Velocity profile
-figure('color',[1 1 1])
-plot(x, v(1:end-1,2))
-hold all
-plot(x, v(1:end-1,floor(n_t/5)))
-plot(x, v(1:end-1,floor(2*n_t/5)))
-plot(x, v(1:end-1,floor(3*n_t/5)))
-plot(x, v(1:end-1,floor(4*n_t/5)))
-plot(x, v(1:end-1,floor(n_t)))
-legend(ts_leg)
-% legend('dt','n_t/5','2*n_t/5','3*n_t/5','4*n_t/5','n_t')
-title('Velocity profiles')
-
-% density profile
-figure('color',[1 1 1])
-plot(x, rho(:,2))
-hold all
-plot(x, rho(:,floor(n_t/5)))
-plot(x, rho(:,floor(2*n_t/5)))
-plot(x, rho(:,floor(3*n_t/5)))
-plot(x, rho(:,floor(4*n_t/5)))
-plot(x, rho(:,floor(n_t)))
-legend(ts_leg)
-% legend('dt','n_t/5','2*n_t/5','3*n_t/5','4*n_t/5','n_t')
-title('Density profiles')
-
-
 % differences between total mass/energy in and change in C.V. mass/energy
 % figure('color',[1 1 1]);plot(t,mm' - m)
 % title('Difference in mass')
 % figure('color',[1 1 1]);plot(t,EE' - E)
 % title('Difference in energy')
 % % Relative differences between total mass/energy in and change in C.V. mass/energy
-figure('color',[1 1 1]);plot(t,(mm' - m)./m)
+figure('color',[1 1 1]);plot(t,(mm - m)./m)
 title('Difference in mass')
-figure('color',[1 1 1]);plot(t,(EE' - E)./E)
+figure('color',[1 1 1]);plot(t,(EE - E)./E)
 title('Difference in energy')
-%
+
+%%
+% Pressure profile
+figure('color',[1 1 1])
+plot(x_n, P(:,2)./1e6)
+hold all
+plot(x_n, P(:,floor(n_t/5))./1e6)
+plot(x_n, P(:,floor(2*n_t/5))./1e6)
+plot(x_n, P(:,floor(3*n_t/5))./1e6)
+plot(x_n, P(:,floor(4*n_t/5))./1e6)
+plot(x_n, P(:,floor(n_t))./1e6)
+ts = [t(2),t(floor(n_t/5)),t(floor(2*n_t/5)),t(floor(3*n_t/5)),t(floor(4*n_t/5)),t(n_t)]';
+ts_leg = [num2str(ts),['s','s','s','s','s','s']'];
+legend(ts_leg)
+title('Pressure profiles [MPa]')
+
+% Velocity profile
+figure('color',[1 1 1])
+plot(x_f, v(:,2))
+hold all
+plot(x_f, v(:,floor(n_t/5)))
+plot(x_f, v(:,floor(2*n_t/5)))
+plot(x_f, v(:,floor(3*n_t/5)))
+plot(x_f, v(:,floor(4*n_t/5)))
+plot(x_f, v(:,floor(n_t)))
+legend(ts_leg)
+% legend('dt','n_t/5','2*n_t/5','3*n_t/5','4*n_t/5','n_t')
+title('Velocity profiles')
+
+% density profile
+figure('color',[1 1 1])
+plot(x_n, rho(:,2))
+hold all
+plot(x_n, rho(:,floor(n_t/5)))
+plot(x_n, rho(:,floor(2*n_t/5)))
+plot(x_n, rho(:,floor(3*n_t/5)))
+plot(x_n, rho(:,floor(4*n_t/5)))
+plot(x_n, rho(:,floor(n_t)))
+legend(ts_leg)
+% legend('dt','n_t/5','2*n_t/5','3*n_t/5','4*n_t/5','n_t')
+title('Density profiles')
+
+
 %%
 % Pressure field
 figure('color',[1 1 1])
 plot(t, P(2,:))
 hold all
-plot(t, P(2*floor(n/5)+1,:))
-plot(t, P(3*floor(n/5)+1,:))
-plot(t, P(4*floor(n/5)+1,:))
-plot(t, P(n,:))
-xs = [x(2),x(2*floor(n/5)+1),x(3*floor(n/5)+1),x(4*floor(n/5)+1),x(n)]'
+plot(t, P(2*floor(n_n/5)+1,:))
+plot(t, P(3*floor(n_n/5)+1,:))
+plot(t, P(4*floor(n_n/5)+1,:))
+plot(t, P(n_n,:))
+xs = [x_n(2),x_n(2*floor(n_n/5)+1),x_n(3*floor(n_n/5)+1),x_n(4*floor(n_n/5)+1),x_n(n_n)]'
 xs_leg = [num2str(xs),['m','m','m','m','m']'];
 legend(xs_leg)
 % legend('2*n/5','3*n/5','4*n/5','n')
@@ -510,11 +525,11 @@ title('Pressure x t')
 figure('color',[1 1 1])
 plot(t, P_f(2,:))
 hold all
-plot(t, P_f(2*floor(n/5)+1,:))
-plot(t, P_f(3*floor(n/5)+1,:))
-plot(t, P_f(4*floor(n/5)+1,:))
-plot(t, P_f(n,:))
-xs = [x(2),x(2*floor(n/5)+1),x(3*floor(n/5)+1),x(4*floor(n/5)+1),x(n)]'
+plot(t, P_f(2*floor(n_n/5)+1,:))
+plot(t, P_f(3*floor(n_n/5)+1,:))
+plot(t, P_f(4*floor(n_n/5)+1,:))
+plot(t, P_f(n_n,:))
+xs = [x_n(2),x_n(2*floor(n_n/5)+1),x_n(3*floor(n_n/5)+1),x_n(4*floor(n_n/5)+1),x_n(n_n)]'
 xs_leg = [num2str(xs),['m','m','m','m','m']'];
 legend(xs_leg)
 % legend('2*n/5','3*n/5','4*n/5','n')
@@ -524,10 +539,10 @@ title('Pressure (faces) x t')
 figure('color',[1 1 1])
 plot(t, v(2,:))
 hold all
-plot(t, v(2*floor(n/5),:))
-plot(t, v(3*floor(n/5),:))
-plot(t, v(4*floor(n/5),:))
-plot(t, v(5*floor(n/5),:))
+plot(t, v(2*floor(n_n/5),:))
+plot(t, v(3*floor(n_n/5),:))
+plot(t, v(4*floor(n_n/5),:))
+plot(t, v(5*floor(n_n/5),:))
 legend(xs_leg)
 % legend('2*n/5','3*n/5','4*n/5','n')
 title('Velocity x t')
@@ -536,10 +551,10 @@ title('Velocity x t')
 figure('color',[1 1 1])
 plot(t, rho(2,:))
 hold all
-plot(t, rho(2*floor(n/5),:))
-plot(t, rho(3*floor(n/5),:))
-plot(t, rho(4*floor(n/5),:))
-plot(t, rho(5*floor(n/5),:))
+plot(t, rho(2*floor(n_n/5),:))
+plot(t, rho(3*floor(n_n/5),:))
+plot(t, rho(4*floor(n_n/5),:))
+plot(t, rho(5*floor(n_n/5),:))
 legend(xs_leg)
 % legend('2*n/5','3*n/5','4*n/5','n')
 title('Density x t')  
@@ -548,23 +563,23 @@ title('Density x t')
 figure('color',[1 1 1])
 plot(t, rho_f(2,:))
 hold all
-plot(t, rho_f(2*floor(n/5),:))
-plot(t, rho_f(3*floor(n/5),:))
-plot(t, rho_f(4*floor(n/5),:))
-plot(t, rho_f(5*floor(n/5),:))
+plot(t, rho_f(2*floor(n_n/5),:))
+plot(t, rho_f(3*floor(n_n/5),:))
+plot(t, rho_f(4*floor(n_n/5),:))
+plot(t, rho_f(5*floor(n_n/5),:))
 legend(xs_leg)
 % legend('2*n/5','3*n/5','4*n/5','n')
 title('Density (faces) x t')  
 
 % Pressure profile
 figure('color',[1 1 1])
-plot(x, P(:,2))
+plot(x_n, P(:,2))
 hold all
-plot(x, P(:,floor(n_t/5)))
-plot(x, P(:,floor(2*n_t/5)))
-plot(x, P(:,floor(3*n_t/5)))
-plot(x, P(:,floor(4*n_t/5)))
-plot(x, P(:,floor(n_t)))
+plot(x_n, P(:,floor(n_t/5)))
+plot(x_n, P(:,floor(2*n_t/5)))
+plot(x_n, P(:,floor(3*n_t/5)))
+plot(x_n, P(:,floor(4*n_t/5)))
+plot(x_n, P(:,floor(n_t)))
 ts = [t(2),t(floor(n_t/5)),t(floor(2*n_t/5)),t(floor(3*n_t/5)),t(floor(4*n_t/5)),t(n_t)]';
 ts_leg = [num2str(ts),['s','s','s','s','s','s']'];
 legend(ts_leg)
@@ -572,39 +587,39 @@ title('Pressure profiles')
 
 % Temperature profile
 figure('color',[1 1 1])
-plot(x, T(:,2))
+plot(x_n, T(:,2))
 hold all
-plot(x, T(:,floor(n_t/5)))
-plot(x, T(:,floor(2*n_t/5)))
-plot(x, T(:,floor(3*n_t/5)))
-plot(x, T(:,floor(4*n_t/5)))
-plot(x, T(:,floor(n_t)))
+plot(x_n, T(:,floor(n_t/5)))
+plot(x_n, T(:,floor(2*n_t/5)))
+plot(x_n, T(:,floor(3*n_t/5)))
+plot(x_n, T(:,floor(4*n_t/5)))
+plot(x_n, T(:,floor(n_t)))
 legend(ts_leg)
 % legend('dt','n_t/5','2*n_t/5','3*n_t/5','4*n_t/5','n_t')
 title('Temperature profiles')
 
 % Velocity profile
 figure('color',[1 1 1])
-plot(x, v(1:end-1,2))
+plot(x_f, v(:,2))
 hold all
-plot(x, v(1:end-1,floor(n_t/5)))
-plot(x, v(1:end-1,floor(2*n_t/5)))
-plot(x, v(1:end-1,floor(3*n_t/5)))
-plot(x, v(1:end-1,floor(4*n_t/5)))
-plot(x, v(1:end-1,floor(n_t)))
+plot(x_f, v(:,floor(n_t/5)))
+plot(x_f, v(:,floor(2*n_t/5)))
+plot(x_f, v(:,floor(3*n_t/5)))
+plot(x_f, v(:,floor(4*n_t/5)))
+plot(x_f, v(:,floor(n_t)))
 legend(ts_leg)
 % legend('dt','n_t/5','2*n_t/5','3*n_t/5','4*n_t/5','n_t')
 title('Velocity profiles')
 
 % density profile
 figure('color',[1 1 1])
-plot(x, rho(:,2))
+plot(x_n, rho(:,2))
 hold all
-plot(x, rho(:,floor(n_t/5)))
-plot(x, rho(:,floor(2*n_t/5)))
-plot(x, rho(:,floor(3*n_t/5)))
-plot(x, rho(:,floor(4*n_t/5)))
-plot(x, rho(:,floor(n_t)))
+plot(x_n, rho(:,floor(n_t/5)))
+plot(x_n, rho(:,floor(2*n_t/5)))
+plot(x_n, rho(:,floor(3*n_t/5)))
+plot(x_n, rho(:,floor(4*n_t/5)))
+plot(x_n, rho(:,floor(n_t)))
 legend(ts_leg)
 % legend('dt','n_t/5','2*n_t/5','3*n_t/5','4*n_t/5','n_t')
 title('Density profiles')
@@ -662,5 +677,12 @@ legend(ts_leg)
 % legend('dt','n_t/5','2*n_t/5','3*n_t/5','4*n_t/5','n_t')
 title('Velocity profiles (faces)')
 
-name = strcat(sim,'_P',P_in,'_L',L,'_Dt',Dt);
+if strcmp(simType,'CAESCav')
+    name = strcat(simType,'_P',num2str(P_in/1e6),'MPa_L',num2str(L),'m_Dt',num2str(floor(Dt/3600)),'h');
+elseif strcmp(simType,'CAESPipe')
+    name = strcat(simType,'_P',num2str(P_in/1e6),'MPa_L',num2str(L/1000),'km_Dt',num2str(floor(Dt/3600)),'h');
+else
+    disp('Unidentified simulation')
+end
+
 save(name)
