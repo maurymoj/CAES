@@ -15,13 +15,14 @@ G = 1;      % Specific gas gravity - for air G = 1
 P_in = 7e6; % 7 MPa
 T_1 = 5 + 273.15; % Common operational condition assumption Nasr and Connor "Natural Gas Engineering and Safety Challenges"
 T_f = T_1; % Isothermal assumption
+P_tank_t0 = 3e6; % Initial pressure at the tank
 
 % Pipe
 D = 0.9; % 900 mm
 % D = 1.2;
 % D = 0.45;
-dL = 1000;    % Distance increment
-L_m = 400000; % Total distance [m]
+dL = 1000;   % Entry pipe length
+L_m = 70000; % Total pipe length[m]
 
 eps = 0.04e-3; % Absolute roughness 0.04 mm
 
@@ -41,11 +42,11 @@ H_prof = "Fixed tilt";
 % H_prof = "Custom_prof";
 
 % Flow equation
-% Flow_eq = "GFE";
-Flow_eq = "PanB";
+Flow_eq = "GFE";
+% Flow_eq = "PanB";
 
 % Transient parameters
-dt = 10; % s
+dt = 10; % time increment, [s]
 T_total = 3600;
 % t = 0:dt:T_total;
 t = 0;
@@ -57,6 +58,8 @@ t = 0;
 % Var = {0.900,1.200};
 % Flow rate
 % Var2 = {3*1000000/(24*3600),14*1000000/(24*3600),25*1000000/(24*3600)};
+% Inlet pressure
+% Var = {10000000}
 % Elevation at H2
 Var = {100};
 % Var = {1 50 100 200 300 400 500}; % Values to be taken by H
@@ -119,25 +122,97 @@ cp = CP.PropsSI('C','P',P_a,'T',T_a,'Air');
 cv = CP.PropsSI('Cvmass','P',P_a,'T',T_a,'Air');
 % gam = cp/cv;
 
-% load('StF_Ab2.mat');
 
 for k = 1:length(Var)
     
     A = pi*D^2/4; % Area, mm2
-    % L = 0:dL:L_m; % pipe length with increments of dL, m
-    % L = [0;dL]; % pipe length with increments of dL, m
-    L = 0;
-
-    % Elevation profile from St. Fergus -> Aberdeen
-     % H = interp1(x_SfA*1000,H_SfA,L,"linear","extrap");
-    % dh_SfA = diff(H);
     
-    dh = (H_2-H_1)/length(L);
+    L = dL;
 
+    dh = (H_2-H_1)/length(L);
+    
     D_mm = 1000*D;% mm
     epsD = eps/D;
 
-    % m_dot = rho_a*Q_a;
+    P_a_kPa = P_a/1000;
+    % Q_a_day = Q_a*24*3600;    % Sm3/day
+    L_km = L./1000;           % km
+
+    % Initial friction factor f estimation using Nikuradse eq.
+    f_guess = (2*log10(1/epsD)+1.14)^(-2);
+
+
+
+
+    % Parameter initialization
+    P1 = P_in*ones(length(t),1);
+    T1 = T_1*ones(length(t),1);
+    
+    P2 = zeros(length(t),1);
+    T2 = zeros(length(t),1);
+    P_t = zeros(length(t),1);
+    T_t = zeros(length(t),1);
+    
+    rho1 = CP.PropsSI('D','P',P1,'T',T1,'Air');
+    nu1 = CP.PropsSI('V','P',P1,'T',T1,'Air');
+    h1 = CP.PropsSI('H','P',P1,'T',T1,'Air');
+    s1 = CP.PropsSI('S','P',P1,'T',T1,'Air');
+    Z1 = CP.PropsSI('Z','P',P1,'T',T1,'Air');
+    U_erosional_1 = 1.22*100/sqrt(rho1); % Erosional velocity - it is advised that the actual 
+                                                % velocity be up to 50% of the erosional velocity.
+                                                % The constant 100, can be any value from 100 to 250
+
+    P2(1) = P_tank_t0;
+    T2(1) = T_1;
+
+    P_t(1) = P_tank_t0;
+    T_t(1) = T_1;
+
+    for j = 1:length(t)
+        rho1 = CP.PropsSI('D','P',P1,'T',T_f,'Air');
+
+
+
+        rho(j) = CP.PropsSI('D','P',P(j),'T',T_f,'Air');
+        nu(j) = CP.PropsSI('V','P',P(j),'T',T_f,'Air');
+        h(j) = CP.PropsSI('H','P',P(j),'T',T_f,'Air');
+        s(j) = CP.PropsSI('S','P',P(j),'T',T_f,'Air');
+        Z(j) = CP.PropsSI('Z','P',P(j),'T',T_f,'Air');
+        U_erosional(j) = 1.22*100/sqrt(rho(j)); % Erosional velocity - it is advised that the actual 
+                                                % velocity be up to 50% of the erosional velocity.
+                                                % The constant 100, can be any value from 100 to 250
+
+        nu_Po(j) = 10*nu(j);    % Conversion of nu to Poise
+        
+        % Estimation of standard volumetric flow rate
+        Q_a_day = 1.1494e-3*(T_a/P_a)*( (P(j,1)^2 - P(j,2)^2)/(G*T_f*dL*Z(j,i)*f_guess) )^0.5*D_mm^2.5;
+
+        Q_old = Q_a_day;
+        dQ = 10;
+        count_Q = 0;
+    
+        
+    
+        
+    end
+
+
+
+
+end
+
+
+
+%%
+
+
+for k = 1:length(Var)
+    
+    % Elevation profile from St. Fergus -> Aberdeen
+    % H = interp1(x_SfA*1000,H_SfA,L,"linear","extrap");
+    % dh_SfA = diff(H);
+    
+        % m_dot = rho_a*Q_a;
 
     P_a_kPa = P_a/1000;
     % Q_a_day = Q_a*24*3600;    % Sm3/day
@@ -161,7 +236,7 @@ for k = 1:length(Var)
     T = T_f*ones(length(t),length(L),1);      % Assuming isothermal flow
     
     P(:,1) = P_in; % Constant inlet pressure
-    P(:,2) = P_a;
+    P(:,2) = P_tank_t0;
 
     for j = 1:length(t)
         
@@ -176,7 +251,8 @@ for k = 1:length(Var)
                                                     % The constant 100, can be any value from 100 to 250
     
             nu_Po(j,i) = 10*nu(j,i);    % Conversion of nu to Poise
-
+            
+            % Estimation of standard volumetric flow rate
             Q_a_day = 1.1494e-3*(T_a/P_a)*( (P(j,1)^2 - P(j,2)^2)/(G*T_f*dL*Z(j,i)*f_guess) )^0.5*D_mm^2.5;
 
             Q_old = Q_a_day;
@@ -215,6 +291,7 @@ for k = 1:length(Var)
                 warning('U greater than 50% of the erosional velocity')
             end
 
+            m_dot(j)
             % Exergy
             % phi = h-h0 + T0*(s-s0)+u^2/2+gz
             % Considering height difference

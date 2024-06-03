@@ -12,7 +12,7 @@ T_a = 15 + 273.15; % T = 15 oC - ~288 K
 P_a = 101325 ; % P = 101.325 kPa
 G = 1;      % Specific gas gravity - for air G = 1
 
-P_in = 7e6; % 7 MPa
+P_in = 10e6; % 7 MPa
 T_1 = 5 + 273.15; % Common operational condition assumption Nasr and Connor "Natural Gas Engineering and Safety Challenges"
 T_f = T_1; % Isothermal assumption
     % !!! High temperatures on the outlet of compressor stations,
@@ -20,7 +20,7 @@ T_f = T_1; % Isothermal assumption
 
 % Flow rate
 Q_a = 14*1000000/(24*3600); % Conversion from mcmd (millions of cubic meters
-    % per day to cubic meters per second) - real demand estimation 70 mscm/day
+    % per day to standard cubic meters per second) - real demand estimation 70 mscm/day
     % St Fergus, 14 is the proportional relative to area of one of the 3, 900
     % mm diameter pipes
 % Q_a = 25*1000000/(24*3600); % Flow for 1200 mm pipe
@@ -31,8 +31,14 @@ D = 0.9; % 900 mm
 % D = 1.2;
 % D = 0.45;
 dL = 1000;    % Distance increment
-L_m = 400000; % Total distance [m]
+L_m = 100000; % Total distance [m]
 % L_m = 395000; % Total distance [m]
+% L_m = 72145; % Total distance SfA [m]
+% L_m = 73514; % Total distance SfA2 [m]
+
+
+T_turb = 250+273.15;
+
 
 eps = 0.04e-3; % Absolute roughness 0.04 mm
 
@@ -41,29 +47,39 @@ E = 0.75;   % Pipeline efficiency
     % "Handbook of natural gas transmission and processing"
 
 H_1 = 0;
-H_2 = 1;
+H_2 = 100;
+
+% H_1 = 30.6726; % Values from St. Fergus to Aberdeen profile 1
+% H_2 = 137.917;
+
+% H_1 = 8.1358; % Values from St. Fergus to Aberdeen profile 2
+% H_2 = 104.6626;
 
 T_sin = 25000; % Period of sinusoidal height increment
 dh_amp = 25;    % Amplitude of sinusoidal height increment
 
 % Elevation profile
-H_prof = "Horizontal";
-% H_prof = "Fixed tilt";
+% H_prof = "Horizontal";
+H_prof = "Fixed tilt";
 % H_prof = "Sinusoidal";
 % H_prof = "Custom_prof";
 
 % Flow equation
 % Flow_eq = "GFE";
-Flow_eq = "PanB";
+Flow_eq = "PanB"; % Overestimate of the pressure loss (~ 0.4% extra drop per 70 km)
 
 % Generate multiple plots while varying one variable var (can be any
 % parameter set in the initial statements)
+% Pipe pressure Pa
+% Var = {7e6, 8e6, 9e6, 10e6};
 % Pipe diameter mm
-% Var = {0.450,0.900,1.200};
+% Var = {0.450,0.900,1.200}; Q = {3*1000000/(24*3600), 14*1000000/(24*3600), 25*1000000/(24*3600) };
+Var = {0.450,0.900,1.200}; Q = {1.9*3*1000000/(24*3600), 1.9*14*1000000/(24*3600), 1.9*25*1000000/(24*3600) };
 % Var = {0.900,1.200};
-Var = {0.9};
+% Var = {0.9}; Q = {15*1000000/(24*3600)};
 % Flow rate
 % Var2 = {3*1000000/(24*3600),14*1000000/(24*3600),25*1000000/(24*3600)};
+% Var = {3*1000000/(24*3600),14*1000000/(24*3600),25*1000000/(24*3600)};
 % Elevation at H2
 % Var = {100};
 % Var = {1 50 100 200 300 400 500}; % Values to be taken by H
@@ -140,16 +156,19 @@ cp = CP.PropsSI('C','P',P_a,'T',T_a,'Air');
 cv = CP.PropsSI('Cvmass','P',P_a,'T',T_a,'Air');
 % gam = cp/cv;
 
+% load('StF_Ab.mat');
 load('StF_Ab2.mat');
 
+
 for j=1:length(Var)
+    % P_in = Var{j};
     % H_2 = Var{j};
     % T_sin = Var{j};
     % dh_amp = Var{j};
     % H_prof = Var{j};
     % Flow_eq = Var{j};
-    D = Var{j};
-    % Q_a = Var2{j};
+    D = Var{j}; Q_a = Q{j};
+    % Q_a = Var{j};
 
     A = pi*D^2/4; % mm2
     L = 0:dL:L_m; % 70 km pipe with increments of 1 km
@@ -164,6 +183,10 @@ for j=1:length(Var)
     epsD = eps/D;
     
     m_dot = rho_a*Q_a;
+
+
+    W_C = m_dot*cp*T_a*( (P_in/P_a)^(2/7) - 1);
+
 
     P_a_kPa = P_a/1000;
     Q_a_day = Q_a*24*3600;    % Sm3/day
@@ -182,6 +205,9 @@ for j=1:length(Var)
     U_erosional = zeros(length(L),1);
     P = zeros(length(L),1);
     T = T_f*ones(length(L),1);      % Assuming isothermal flow
+
+    W_T = zeros(length(L),1);
+    W_C2 = zeros(length(L),1);
     
     P(1) = P_in;
     
@@ -194,6 +220,10 @@ for j=1:length(Var)
         h(i) = CP.PropsSI('H','P',P(i),'T',T_f,'Air');
         s(i) = CP.PropsSI('S','P',P(i),'T',T_f,'Air');
         Z(i) = CP.PropsSI('Z','P',P(i),'T',T_f,'Air');
+
+        W_T(i) = m_dot*cp*T_turb*(1 - (P_a/P(i))^(2/7));
+        W_C2(i) = m_dot*cp*T_f*((P_in/P(i))^(2/7) - 1);
+
         U_erosional(i) = 1.22*100/sqrt(rho(i)); % Erosional velocity - it is advised that the actual 
                                                 % velocity be up to 50% of the erosional velocity.
                                                 % The constant 100, can be any value from 100 to 250
@@ -360,7 +390,10 @@ for j=1:length(Var)
             count = count + 1;
         end
         P(i+1) = 1000*P(i+1); % conversion back to Pa
-    
+        
+        
+        
+
     end
     
     rho(end) = CP.PropsSI('D','P',P(end),'T',T_f,'Air');
@@ -368,6 +401,10 @@ for j=1:length(Var)
     s(end) = CP.PropsSI('S','P',P(end),'T',T_f,'Air');
     nu(end) = CP.PropsSI('V','P',P(end),'T',T_f,'Air');
     Z(end) = CP.PropsSI('Z','P',P(end),'T',T_f,'Air');
+
+    W_T(end) = m_dot*cp*T_turb*(1 - (P_a/P(end))^(2/7));
+    W_C2(end) = m_dot*cp*T_f*((P_in/P(end))^(2/7) - 1);
+
     u(end) = 14.7349*( Q_a_day/D_mm^2 )*( P_a/T_a )*(Z(end)*T_f/P(end)); % Q_b has to be converted to m3/day and D to mm
     psi(end) = h(end)-h0 - T0*(s(end)-s0)+u(end)^2/2;
     U_erosional(end) = 1.22*100/sqrt(rho(end)); % Erosional velocity - it is advised that the actual 
@@ -447,6 +484,16 @@ for j=1:length(Var)
     xlabel('L [km]')
     ylabel('H [m]')
 
+    % Erosional Velocity analysis
+    % figure('color',[1 1 1])
+    % plot(L./1000, u)
+    % hold on
+    % plot(L./1000, U_erosional,'r')
+    % grid on
+    % xlabel('L [km]')
+    % ylabel('u [m/s]')
+    % legend('u','u_{erosional}')
+    % title(Var{j})
 end
 
 figure(P_fig)
@@ -484,12 +531,9 @@ applystyle2plot
 % xlabel('L [km]')
 % ylabel('\Psi/\Psi_{max}')
 
-% Velocity analysis
 figure('color',[1 1 1])
-plot(L./1000, u)
-hold on
-plot(L./1000, U_erosional,'r')
+plot(L/1000, W_T/1e9)
 grid on
-xlabel('L [km]')
-ylabel('u [m/s]')
-legend('u','u_{erosional}')
+hold on
+plot(L/1000, W_C2/1e9)
+legend('W_T','W_{C,2}')
