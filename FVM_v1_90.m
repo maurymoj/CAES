@@ -3,7 +3,6 @@ clear
 clc
 tic
 CP = py.importlib.import_module('CoolProp.CoolProp');
-CP.PropsSI('D','P',101325,'T',298,'Air');
 
 %----------------------- PROBLEM PARAMETERS -------------------------%
 % Pipeline parameters
@@ -72,16 +71,15 @@ theta = 0;
 simType = 'CAESCav';
 % dx = L/(50-1); % CAESPipe
 % dt = 1;
-dx = L/(10-1); % CAESCav
-dt = 0.001;
-
+dx = L/(5-1); % CAESCav
+dt = 0.01;
 
 Dt = 4*3600;
 % Dt = 3600;
-% Dt = 60;
+% Dt = 10;
 
 % tol = 1e-6; % CAESPipe
-tol = 1e-8; % CAEScav
+tol = 1e-7; % CAEScav
 
 % Tuning
 
@@ -416,30 +414,45 @@ for j=2:n_t
 
     end
     
-    if P(2,j) >= P_in
+    if P(1,j) >= P_in
         v(1,j+1:end) = 0;
+        t_shut_off = (j-1)*dt;
     end
 
     m(j) = sum(rho(:,j)*A_h*dx);
     E(j) = sum(rho(:,j)*A_h*dx.*cp.*T(:,j));
     % [j count(j)]
-    disp(strcat('t= ',num2str((j-1)*dt),'s, n iterations: ',num2str(count(j))))
+    if rem((j-1)*dt,1) == 0
+        disp(strcat('t= ',num2str((j-1)*dt),'s, n iterations: ',num2str(count(j))))
+    end
 end
 
 toc
 
-dm = rho_in*V_in*A_h*dt;
-dE = rho_in*V_in*A_h*cp_in*T_in*dt;
-
+% Sanity checks
+% dm = rho_in*V_in*A_h*dt;
+% dE = rho_in*V_in*A_h*cp_in*T_in*dt;
 % mm = m(1) + [0; cumsum(dm(1:end-1))];
 % EE = E(1) + [0; cumsum(dE(1:end-1))];
-mm = m(1) + dm.*(0:n_t-1)';
-EE = E(1) + dE.*(0:n_t-1)';
+% mm = m(1) + dm.*(v~=0).*(0:n_t-1)';
+% EE = E(1) + dE.*(0:n_t-1)';
+
+% As a function of inlet velocity (CONSTANT INLET CONDITIONS)
+dm = rho_in*v(1,:)'*A_h*dt;
+mm = m(1) + cumsum(dmm);
+dE = rho_in*v(1,:)'*A_h*cp_in*T_in*dt;
+EE = E(1) + cumsum(dE);
 
 
 x = 0:dx:L;
 x_f = [0:dx:L]';
 x_n = [dx/2:dx:L]';
+
+% Exergy
+X = P*(A_h*L).*(P_a./P - 1 + log(P./P_a))./(1e6*3600); % Pipeline Exergy [MWh]
+X_min = P_o*(A_h*L).*(P_a./P_o - 1 + log(P_o./P_a))/(1e6*3600); % Exergy when discharged [MWh]
+
+X_net = X - X_min; % Exergy between current state and discharged state (assuming whole pipeline at P_min)
 
 % Figures of mass and energy over time
 % figure('color',[1 1 1]);plot(m)
@@ -509,12 +522,12 @@ title('Density profiles')
 %%
 % Pressure field
 figure('color',[1 1 1])
-plot(t, P(2,:))
+plot(t, P(2,:)./1e6)
 hold all
-plot(t, P(2*floor(n_n/5)+1,:))
-plot(t, P(3*floor(n_n/5)+1,:))
-plot(t, P(4*floor(n_n/5)+1,:))
-plot(t, P(n_n,:))
+plot(t, P(2*floor(n_n/5)+1,:)./1e6)
+plot(t, P(3*floor(n_n/5)+1,:)./1e6)
+plot(t, P(4*floor(n_n/5)+1,:)./1e6)
+plot(t, P(n_n,:)./1e6)
 xs = [x_n(2),x_n(2*floor(n_n/5)+1),x_n(3*floor(n_n/5)+1),x_n(4*floor(n_n/5)+1),x_n(n_n)]'
 xs_leg = [num2str(xs),['m','m','m','m','m']'];
 legend(xs_leg)
@@ -523,12 +536,12 @@ title('Pressure x t')
 
 % Pressure (faces) field
 figure('color',[1 1 1])
-plot(t, P_f(2,:))
+plot(t, P_f(2,:)./1e6)
 hold all
-plot(t, P_f(2*floor(n_n/5)+1,:))
-plot(t, P_f(3*floor(n_n/5)+1,:))
-plot(t, P_f(4*floor(n_n/5)+1,:))
-plot(t, P_f(n_n,:))
+plot(t, P_f(2*floor(n_n/5)+1,:)./1e6)
+plot(t, P_f(3*floor(n_n/5)+1,:)./1e6)
+plot(t, P_f(4*floor(n_n/5)+1,:)./1e6)
+plot(t, P_f(n_n,:)./1e6)
 xs = [x_n(2),x_n(2*floor(n_n/5)+1),x_n(3*floor(n_n/5)+1),x_n(4*floor(n_n/5)+1),x_n(n_n)]'
 xs_leg = [num2str(xs),['m','m','m','m','m']'];
 legend(xs_leg)
@@ -573,13 +586,13 @@ title('Density (faces) x t')
 
 % Pressure profile
 figure('color',[1 1 1])
-plot(x_n, P(:,2))
+plot(x_n, P(:,2)./1e6)
 hold all
-plot(x_n, P(:,floor(n_t/5)))
-plot(x_n, P(:,floor(2*n_t/5)))
-plot(x_n, P(:,floor(3*n_t/5)))
-plot(x_n, P(:,floor(4*n_t/5)))
-plot(x_n, P(:,floor(n_t)))
+plot(x_n, P(:,floor(n_t/5))./1e6)
+plot(x_n, P(:,floor(2*n_t/5))./1e6)
+plot(x_n, P(:,floor(3*n_t/5))./1e6)
+plot(x_n, P(:,floor(4*n_t/5))./1e6)
+plot(x_n, P(:,floor(n_t))./1e6)
 ts = [t(2),t(floor(n_t/5)),t(floor(2*n_t/5)),t(floor(3*n_t/5)),t(floor(4*n_t/5)),t(n_t)]';
 ts_leg = [num2str(ts),['s','s','s','s','s','s']'];
 legend(ts_leg)
@@ -626,13 +639,13 @@ title('Density profiles')
 
 % Pressure profile (faces)
 figure('color',[1 1 1])
-plot(x_f, P_f(:,2))
+plot(x_f, P_f(:,2)./1e6)
 hold all
-plot(x_f, P_f(:,floor(n_t/5)))
-plot(x_f, P_f(:,floor(2*n_t/5)))
-plot(x_f, P_f(:,floor(3*n_t/5)))
-plot(x_f, P_f(:,floor(4*n_t/5)))
-plot(x_f, P_f(:,floor(n_t)))
+plot(x_f, P_f(:,floor(n_t/5))./1e6)
+plot(x_f, P_f(:,floor(2*n_t/5))./1e6)
+plot(x_f, P_f(:,floor(3*n_t/5))./1e6)
+plot(x_f, P_f(:,floor(4*n_t/5))./1e6)
+plot(x_f, P_f(:,floor(n_t))./1e6)
 ts = [t(2),t(floor(n_t/5)),t(floor(2*n_t/5)),t(floor(3*n_t/5)),t(floor(4*n_t/5)),t(n_t)]';
 ts_leg = [num2str(ts),['s','s','s','s','s','s']'];
 legend(ts_leg)
