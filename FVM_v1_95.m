@@ -7,88 +7,107 @@ CP = py.importlib.import_module('CoolProp.CoolProp');
 %----------------------- PROBLEM PARAMETERS -------------------------%
 % Pipeline parameters
 % Kiuchi
-% L = 5000;
-% D = 0.5;
+L = 5000;
+D = 0.5;
 % L = 70000;
 % D = 0.9;
 % L = 213333;
 % L = 300;
 % D = 24;
-L = 35;
-D = 40;
+% L = 35;
+% D = 40;
 eps = 0.04e-3; % Absolute roughness 0.04 mm
 epsD = eps/D;
 A_h = pi*D^2/4;
 
 % Ambient conditions
-P_a = 101325;
-T_a = 273.15 + 25;
-rho_a = CP.PropsSI('D','P',P_a,'T',T_a,'Air');
-h_0 = CP.PropsSI('H','P',P_a,'T',T_a,'Air');
-s_0 = CP.PropsSI('S','P',P_a,'T',T_a,'Air');
+P_amb = 101325;
+T_amb = 273.15 + 25;
+
 
 % A - Left side - Inlet 
-P_in = 7e6;
-T_in = 273.15 + 60;
+
 Q_st_in = 3e5; % standard cubic meters per hour
 % Q_a = Q_st_in/3600;
 
-rho_in = CP.PropsSI('D','P',P_in,'T',T_in,'Air');
-cp_in = CP.PropsSI('C','P',P_in,'T',T_in,'Air');
-h_in = CP.PropsSI('H','P',P_in,'T',T_in,'Air');
-s_in = CP.PropsSI('S','P',P_in,'T',T_in,'Air');
-
 % m_in = rho_a*Q_a;
 % m_in = 100;
-m_in = 108; % Huntorf
+% L_bound = 'Outlet';
+% L_bound = 'Wall';
+% L_bound = 'Inlet';
+L_bound = 'P_const';
+if strcmp(L_bound,'Inlet')
+    m_A = 108; % Huntorf
+    % v_A = ?
+    P_A = 7e6;
+    T_A = 273.15 + 60;
 
-v_in = m_in/(rho_in*A_h);
+elseif strcmp(L_bound,'Wall')
+    m_A = 0;
+    v_A = 0;
+elseif strcmp(L_bound,'Outlet')
+    % m_A = m_R;
+elseif strcmp(L_bound,'P_const')
+    P_A = 4e6; % 4 MPa
+end   
 
 % B - Right side boundary condition
-R_bound = 'Wall';
 % R_bound = 'Outlet';
+R_bound = 'Wall';
+% R_bound = 'Inlet';
+% R_bound = 'P_const';
 % Outlet
 if strcmp(R_bound,'Outlet')
-    m_out = m_in;
+    % m_out = m_A;
 elseif(strcmp(R_bound,'Wall'))
-    m_out = 0;
-    v_out = 0;
+    m_B = 0;
+    v_B = 0;
 elseif(strcmp(R_bound,'Inlet'))
-    
+    m_B = 108; % Huntorf
+    v_B = m_B/(rho_B*A_h);
+elseif strcmp(R_bound,'P_const')
+    P_B = 4e6; 
+    % P_B = 4.13e6; % 4.13 MPa = Huntorf https://www.sciencedirect.com/science/article/pii/S0196890420302004#s0010
 end                     
 
 % Initial conditions
-% P_o = 101325;
-% P_o = 5e6;
-P_o = 4.3e6; % Huntorf
-T_o = 273.15 + 25;
-v_o = 0;
-% v_o = v_in;
+% P_0 = 101325;
+% P_0 = 5e6;
+P_0 = 4.3e6; % Huntorf
+T_0 = 273.15 + 25;
+v_0 = 0;
+% v_0 = v_in;
 
 g = 9.81;
 theta = 0;
 
 %--------------------- SIMULATION PARAMETERS ------------------------%
-% simType = 'CAESPipe';
-simType = 'CAESCav';
-% dx = L/(50-1); % CAESPipe
-% dt = 1;
-dx = L/(5-1); % CAESCav
-dt = 0.01;
+simType = 'CAESPipe';
+% simType = 'CAESCav';
+
+if strcmp(simType,'CAESPipe')
+    dx = L/(50-1); % CAESPipe
+    dt = 1;
+    tol = 1e-6; % CAESPipe
+elseif strcmp(simType,'CAESCav')
+    dx = L/(5-1); % CAESCav
+    dt = 0.01;
+    tol = 1e-7; % CAEScav
+else
+    warning('Cant identify simulation type.')
+end
 
 Dt = 4*3600;
 % Dt = 3600;
 % Dt = 10;
 
-% tol = 1e-6; % CAESPipe
-tol = 1e-7; % CAEScav
-
 % Tuning
 
 % Under-relaxation (1 means no under-relaxation)
-alpha_P = 0.5;  % Pressure under-relaxation factor
-alpha_v = 0.5;  % velocity under-relaxation factor
-alpha_rho = 0.5;  % Density under-relaxation factor
+alpha = 0.5;
+alpha_P = alpha ;  % Pressure under-relaxation factor
+alpha_v = alpha ;  % velocity under-relaxation factor
+alpha_rho = alpha ;  % Density under-relaxation factor
 
 % alpha_P = 1;  % Pressure under-relaxation factor
 % alpha_v = 1;  % velocity under-relaxation factor
@@ -118,27 +137,110 @@ m = zeros(n_t,1); % Total mass in pipeline
 E = zeros(n_t,1); % Total energy in pipeline
 
 %------------------ SETTING INITIAL CONDITIONS ---------------------%
+% Basic calculations
+rho_amb = CP.PropsSI('D','P',P_amb,'T',T_amb,'Air');
+P_o = P_amb;
+T_o = T_amb;
+h_o = CP.PropsSI('H','P',P_o,'T',T_o,'Air');
+s_o = CP.PropsSI('S','P',P_o,'T',T_o,'Air');
+
 % Initial conditions at nodes (i -> x, j -> t)
 % Thermodynamic properties over all solution space
-P(:,1) = P_o*ones(n_n,1);
-T(:,1) = T_o*ones(n_n,1);
+P(:,1) = P_0*ones(n_n,1);
+T(:,1) = T_0*ones(n_n,1);
 rho(:,1) = CP.PropsSI('D','P',P(1,1),'T',T(1,1),'Air');
-cp = CP.PropsSI('C','P',P(1,1),'T',T(1,1),'Air');
-
-% Inlet Boundary condition
-P_f(1,:) = P_in;
-T_f(1,:) = T_in;
-rho_f(1,:) = rho_in;
+cp = CP.PropsSI('C','P',P(1,1),'T',T(1,1),'Air'); % Constant Cp (?)
 
 % Initial conditions at faces (i -> x, j -> t)
-v(:,1) = v_o; % V profile at t=0
+v(:,1) = v_0; % V profile at t=0
 
-% V_in = (t<Dt/3)'.*v_in;
-V_in = v_in;
-v(1,:) = V_in; % Inlet flow rate (and velocity) is constant for all t>=0
-% v(end,:) = v_out; % V is 0 at the pipe end for all t>=0
+% Boundary conditions (Inlet and Wall)
 
-% Upwind scheme
+% L boundary conditions
+if strcmp(L_bound,'Inlet')
+    % At node
+    rho_A = CP.PropsSI('D','P',P_A,'T',T_A,'Air');
+    cp_A = CP.PropsSI('C','P',P_A,'T',T_A,'Air');
+    h_A = CP.PropsSI('H','P',P_A,'T',T_A,'Air');
+    s_A = CP.PropsSI('S','P',P_A,'T',T_A,'Air');
+
+    v_A = m_A/(rho_A*A_h);
+
+    P(1,:) = P_A;
+    T(1,:) = T_A;
+    rho(1,:) = rho_A;
+
+    P_f(1,:) = P_A;
+    T_f(1,:) = T_A;
+    rho_f(1,:) = rho_A;
+    % At face
+    v(1,:) = v_A;
+
+
+elseif strcmp(L_bound,'Wall')
+    v(1,:) = 0;
+
+elseif strcmp(L_bound,'P_const') 
+    % Assumptions:
+    % - Outflow
+    % - Zero gradient for all properties
+    % - Constant cross-sectional area
+    P(1,1) = P_A;
+    T(1,1) = T(2,1);
+    rho(1,1) = rho(2,1);
+
+    v(1,1) = v(2,1);    
+
+    P_f(1,1) = P(1,1);
+    T_f(1,1) = T(1,1);
+    rho_f(1,1) = rho(1,1);
+end
+
+
+% R boundary conditions
+if strcmp(R_bound,'Inlet')
+    rho_B = CP.PropsSI('D','P',P_B,'T',T_B,'Air');
+    cp_B = CP.PropsSI('C','P',P_B,'T',T_B,'Air');
+    h_B = CP.PropsSI('H','P',P_B,'T',T_B,'Air');
+    s_B = CP.PropsSI('S','P',P_B,'T',T_B,'Air');
+
+    v_B = m_B/(rho_B*A_h);
+
+    P(end,:) = P_B;
+    T(end,:) = T_B;
+    rho(end,:) = rho_B;
+
+    P_f(end,:) = P_B;
+    T_f(end,:) = T_B;
+    rho_f(end,:) = rho_B;
+    % At face
+    v(end,:) = v_B;
+
+elseif(strcmp(R_bound,'Wall'))
+    v(end,:) = 0;
+
+elseif(strcmp(R_bound,'P_const'))    
+    % Assumptions:
+    % - Outflow
+    % - Zero gradient for all properties
+    % - Constant cross-sectional area
+    P(end,1) = P_B;
+    T(end,1) = T(end-1,1);
+    rho(end,1) = rho(end-1,1);
+
+    v(end,1) = v(end-1,1);
+
+    P_f(end,1) = P(end,1);
+    T_f(end,1) = T(end,1);
+    rho_f(end,1) = rho(end,1);    
+end
+
+
+
+
+
+
+% UPWIND SCHEME
 % velocity in faces to the nodes
 v_n(:,1) = (v(1:end-1,1) >= 0).*v((1:end-1),1) ...
     +      (v(1:end-1,1) <  0).*v((2:end),1);
@@ -155,21 +257,83 @@ P_f(end,1) = P(end,1); % ASSUMING v >= 0 for t=0!!!!
 T_f(end,1) = T(end,1); % ASSUMING v >= 0 for t=0!!!!
 rho_f(end,1) = rho(end,1); % ASSUMING v >= 0 for t=0!!!!
 
-if strcmp(R_bound,'Outlet')
-    v(end,1) = rho_f(1,1)/rho_f(end,1)*v(1,1); % ENSURING CONSERVATION OF MASS
-elseif(strcmp(R_bound,'Wall'))
-    v(end,1) = 0;
-elseif(strcmp(R_bound,'Inlet'))
+
+
+
+% Boundary conditions (Outlet and Constant pressure - depend on the other )
+
+% L boundary conditions
+if strcmp(L_bound,'Outlet') 
+    % Assumptions:
+    % - Zero gradient for all properties except u-velocity
+    % - Velocity at neighbouting node is corrected to ensure conservation of
+    % mass with the inlet
+    % - Constant cross-sectional area
+    P(1,1) = P(2,1);
+    T(1,1) = T(2,1);
+    rho(1,1) = rho(2,1);
+
     
+    v_n(1,1) = (rho(end,1)*v_n(end,1))/rho(1,1); % Velocity correction
+
+    % Upwind scheme
+    v(1,1) = v_n(1,1);
+    
+    P_f(1,1) = P(1,1);
+    T_f(1,1) = T(1,1);
+    rho_f(1,1) = rho(1,1);
+    
+    % m_A = m_R;
+end  
+
+% R boundary conditions
+if strcmp(R_bound,'Outlet')
+    % Assumptions:
+    % - Zero gradient for all properties except u-velocity
+    % - Velocity at neighbouting node is corrected to ensure conservation of
+    % mass with the inlet
+    % - Constant cross-sectional area
+    P(end,1) = P(end-1,1);
+    T(end,1) = T(end-1,1);
+    rho(end,1) = rho(end-1,1);
+
+    v_n(end,1) = (rho(1,1)./rho(end,1)).*v_n(1,1); % Velocity correction
+
+    % v(end,1) = rho_f(1,1)/rho_f(end,1)*v(1,1); % ENSURING CONSERVATION OF MASS
+    % Upwind scheme
+    v(end,1) = v_n(end,1);
+    
+    P_f(end,1) = P(end,1);
+    T_f(end,1) = T(end,1);
+    rho_f(end,1) = rho(end,1);
 end 
 
-T(:,:) = T_o; % Isothermal pipeline assumption
+
+
+
+
+
+
+
+
+
+
+
+
+
+%%
+T(:,:) = T_0; % Isothermal pipeline assumption
 
 m(1) = sum(rho(:,1)*A_h*dx);
 E(1) = sum(rho(:,1)*A_h*dx.*cp.*T(:,1));
 
 count = zeros(n_t,1);
 f_guess = (2*log10(1/epsD)+1.14)^(-2); % Friction factor based on Nikuradse
+
+
+
+
+
 
 for j=2:n_t
     % Initial guess for next time step is the same props as the previous t step
@@ -416,7 +580,7 @@ for j=2:n_t
 
     end
     
-    if P(1,j) >= P_in
+    if P(1,j) >= P_A
         v(1,j+1:end) = 0;
         t_shut_off = (j-1)*dt;
     end
@@ -440,19 +604,19 @@ toc
 % EE = E(1) + dE.*(0:n_t-1)';
 
 % As a function of inlet velocity (CONSTANT INLET CONDITIONS)
-dm = rho_in*v(1,:)'*A_h*dt;
+dm = rho_A*v(1,:)'*A_h*dt;
 mm = m(1) + cumsum(dmm);
-dE = rho_in*v(1,:)'*A_h*cp_in*T_in*dt;
+dE = rho_A*v(1,:)'*A_h*cp_A*T_A*dt;
 EE = E(1) + cumsum(dE);
-dX = rho_in*v(1,:)'*A_h*(h_in - h_0 - T_0*(s_in - s_0))*dt; % Flow exergy - kinetic and potential term contributions assumed negligible
+dX = rho_A*v(1,:)'*A_h*(h_A - h_o - T_o*(s_A - s_o))*dt; % Flow exergy - kinetic and potential term contributions assumed negligible
 
 x = 0:dx:L;
 x_f = [0:dx:L]';
 x_n = [dx/2:dx:L]';
 
 % Exergy
-X = P*(A_h*L).*(P_a./P - 1 + log(P./P_a))./(1e6*3600); % Pipeline Exergy [MWh]
-X_min = P_o*(A_h*L).*(P_a./P_o - 1 + log(P_o./P_a))/(1e6*3600); % Exergy when discharged [MWh]
+X = P*(A_h*L).*(P_amb./P - 1 + log(P./P_amb))./(1e6*3600); % Pipeline Exergy [MWh]
+X_min = P_0*(A_h*L).*(P_amb./P_0 - 1 + log(P_0./P_amb))/(1e6*3600); % Exergy when discharged [MWh]
 
 X_net = X - X_min; % Exergy between current state and discharged state (assuming whole pipeline at P_min)
 X_in = sum(dX);
@@ -694,9 +858,9 @@ legend(ts_leg)
 title('Velocity profiles (faces)')
 
 if strcmp(simType,'CAESCav')
-    name = strcat(simType,'_P',num2str(P_in/1e6),'MPa_L',num2str(L),'m_Dt',num2str(floor(Dt/3600)),'h');
+    name = strcat(simType,'_P',num2str(P_A/1e6),'MPa_L',num2str(L),'m_Dt',num2str(floor(Dt/3600)),'h');
 elseif strcmp(simType,'CAESPipe')
-    name = strcat(simType,'_P',num2str(P_in/1e6),'MPa_L',num2str(L/1000),'km_Dt',num2str(floor(Dt/3600)),'h');
+    name = strcat(simType,'_P',num2str(P_A/1e6),'MPa_L',num2str(L/1000),'km_Dt',num2str(floor(Dt/3600)),'h');
 else
     disp('Unidentified simulation')
 end
