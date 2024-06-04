@@ -30,7 +30,7 @@ s_a = CP.PropsSI('S','P',P_a,'T',T_a,'Air');
 % A - Left side - Inlet 
 P_in = 7e6;
 T_in = 273.15 + 60;
-Q_st_in = 3e5; % standard cubic meters per hour
+% Q_st_in = 3e5; % standard cubic meters per hour
 % Q_a = Q_st_in/3600;
 
 rho_in = CP.PropsSI('D','P',P_in,'T',T_in,'Air');
@@ -58,7 +58,7 @@ elseif(strcmp(L_bound,'Wall'))
 elseif(strcmp(L_bound,'Inlet'))
 
 elseif(strcmp(L_bound,'Const_P'))
-    
+    P_out = 4e6; % 4 MPa
 end  
 
 % B - Right side boundary condition
@@ -73,7 +73,7 @@ elseif(strcmp(R_bound,'Wall'))
 elseif(strcmp(R_bound,'Inlet'))
 
 elseif(strcmp(L_bound,'Const_P'))
-
+    P_out = 4e6;
 end                     
 
 % Initial conditions
@@ -90,28 +90,29 @@ theta = 0;
 %--------------------- SIMULATION PARAMETERS ------------------------%
 % simType = 'CAESPipe';
 simType = 'CAESCav';
-% dx = L/(50-1); % CAESPipe
-% dt = 1;
-dx = L/(5-1); % CAESCav
-dt = 0.01;
+
+if strcmp(simType,'CAESPipe')
+    dx = L/(50-1); % CAESPipe
+    dt = 1;
+    tol = 1e-6; % CAESPipe
+elseif strcmp(simType,'CAESCav')
+    dx = L/(5-1); % CAESCav
+    dt = 0.01;
+    tol = 1e-7; % CAEScav
+else
+    warning('Cant identify simulation type.')
+end
 
 Dt = 4*3600;
 % Dt = 3600;
 % Dt = 10;
 
-% tol = 1e-6; % CAESPipe
-tol = 1e-7; % CAEScav
-
 % Tuning
-
+alpha = 0.5;
 % Under-relaxation (1 means no under-relaxation)
-alpha_P = 0.5;  % Pressure under-relaxation factor
-alpha_v = 0.5;  % velocity under-relaxation factor
-alpha_rho = 0.5;  % Density under-relaxation factor
-
-% alpha_P = 1;  % Pressure under-relaxation factor
-% alpha_v = 1;  % velocity under-relaxation factor
-% alpha_rho = 1;  % Density under-relaxation factor
+alpha_P = alpha;  % Pressure under-relaxation factor
+alpha_v = alpha;  % velocity under-relaxation factor
+alpha_rho = alpha;  % Density under-relaxation factor
 
 %---------------------- ARRAYS INITIALIZATION ----------------------%
 t = 0:dt:Dt;
@@ -465,7 +466,7 @@ dm = rho_in*v(1,:)'*A_h*dt;
 mm = m(1) + cumsum(dmm);
 dE = rho_in*v(1,:)'*A_h*cp_in*T_in*dt;
 EE = E(1) + cumsum(dE);
-
+dX = rho_in*v(1,:)'*A_h*(h_in - h_0 - T_0*(s_in - s_0))*dt; % Flow exergy - kinetic and potential term contributions assumed negligible
 
 x = 0:dx:L;
 x_f = [0:dx:L]';
@@ -476,7 +477,7 @@ X_min = P_o*(A_h*L).*(P_a./P_o - 1 + log(P_o./P_a))/(1e6*3600);
 
 X_net = X - X_min;
 
-X_in = 
+X_in = sum(dX);
 
 % Figures of mass and energy over time
 % figure('color',[1 1 1]);plot(m)
