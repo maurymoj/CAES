@@ -68,7 +68,7 @@ elseif(strcmp(R_bound,'Wall'))
     m_B = 0;
     v_B = 0;
 elseif(strcmp(R_bound,'Inlet'))
-    m_B = 108; % Huntorf
+    m_B = -108; % Huntorf  % Remember the sign to indicate the direction of flow (+ right , - left)
     v_B = m_B/(rho_B*A_h);
 elseif strcmp(R_bound,'P_const')
     P_B = 4e6; 
@@ -180,7 +180,7 @@ elseif strcmp(L_bound,'P_const')
     % - Outflow
     % - Zero gradient for all properties
     % - Constant cross-sectional area
-    P(1,1) = P_A;
+    P(1,:) = P_A;
     T(1,1) = T(2,1);
     rho(1,1) = rho(2,1);
 
@@ -219,7 +219,7 @@ elseif(strcmp(R_bound,'P_const'))
     % - Outflow
     % - Zero gradient for all properties
     % - Constant cross-sectional area
-    P(end,1) = P_B;
+    P(end,:) = P_B;
     T(end,1) = T(end-1,1);
     rho(end,1) = rho(end-1,1);
 
@@ -227,7 +227,7 @@ elseif(strcmp(R_bound,'P_const'))
 
     P_f(end,1) = P(end,1);
     T_f(end,1) = T(end,1);
-    rho_f(end,1) = rho(end,1);    
+    rho_f(end,1) = rho(end,1); 
 end
 
 
@@ -336,17 +336,46 @@ for j=2:n_t
 
     while count(j) < 100 && max(abs(error_P)) > tol
 
-        P(:,j) = P(:,j) + alpha_P*P_corr; % Pressure under-relaxation correction
+        % Under-relaxed corrections
+        P(:,j) = P(:,j) + alpha_P*P_corr;
         rho(:,j) = alpha_rho*(rho(:,j) + rho_corr) + (1-alpha_rho)*rho(:,j);
 
         v(1:end-1,j) = alpha_v*(v_star(1:end-1) + v_corr(1:end-1)) + (1-alpha_v)*v_star(1:end-1);
         
-        if strcmp(R_bound,'Outlet')
-            v(end,j) = rho(1,j)/rho(end,j)*v(1,j); % ENSURING CONSERVATION OF MASS
+        if strcmp(L_bound,'Inlet')
+        elseif strcmp(L_bound,'Wall')
+            % v(1,j) = 0;
+        elseif strcmp(L_bound,'P_const')
+            T(1,j) = T(2,j);
+            rho(1,j) = rho(2,j);
+
+            v(1,j) = v(2,j);
+        
+            P_f(1,j) = P(1,j);
+            T_f(1,j) = T(1,j);
+            rho_f(1,j) = rho(1,j);
+        end
+
+        if strcmp(R_bound,'Inlet')
         elseif(strcmp(R_bound,'Wall'))
-            v(end,j) = 0;
-        % elseif(strcmp(R_bound,'Inlet'))
+            % v(end,j) = 0;
+        elseif strcmp(R_bound,'P_const')
+            % P(end,:) = P_B;
+            T(end,j) = T(end-1,j);
+            rho(end,j) = rho(end-1,j);
+        
+            v(end,j) = v(end-1,j);
+        
+            P_f(end,j) = P(end,j);
+            T_f(end,j) = T(end,j);
+            rho_f(end,j) = rho(end,j);   
         end 
+
+        if strcmp(R_bound,'Outlet')
+            v(end,j) = rho(1,j)*v(1,j)/rho(end,j); % ENSURING CONSERVATION OF MASS
+        elseif strcmp(L_bound,'Outlet')
+            v(1,j) = rho(end,j)*v(end,j)/rho(1,j); 
+        end
 
         % Initial guess (properties at t+dt = properties at t) - without
         % under-relaxation
