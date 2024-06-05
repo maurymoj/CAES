@@ -16,6 +16,12 @@ D = 0.5;
 % D = 24;
 % L = 35;
 % D = 40;
+
+% Dt = 4*3600; % Total simulation time
+% Dt = 3600;
+% Dt = 10;
+Dt = 600;
+
 eps = 0.04e-3; % Absolute roughness 0.04 mm
 epsD = eps/D;
 A_h = pi*D^2/4;
@@ -27,16 +33,16 @@ T_amb = 273.15 + 25;
 
 % A - Left side - Inlet 
 
-Q_st_in = 3e5; % standard cubic meters per hour
-% Q_a = Q_st_in/3600;
 
-% m_in = rho_a*Q_a;
-% m_in = 100;
 % L_bound = 'Outlet';
 % L_bound = 'Wall';
 % L_bound = 'Inlet';
 L_bound = 'P_const';
 if strcmp(L_bound,'Inlet')
+    % Q_st_in = 3e5; % standard cubic meters per hour
+    % Q_a = Q_st_in/3600;
+    % m_in = rho_a*Q_a;
+    % m_in = 100;
     m_A = 108; % Huntorf
     % v_A = ?
     P_A = 7e6;
@@ -53,10 +59,9 @@ end
 
 % B - Right side boundary condition
 % R_bound = 'Outlet';
-R_bound = 'Wall';
 % R_bound = 'Inlet';
 % R_bound = 'P_const';
-% Outlet
+R_bound = 'Wall';
 if strcmp(R_bound,'Outlet')
     % m_out = m_A;
 elseif(strcmp(R_bound,'Wall'))
@@ -97,10 +102,6 @@ else
     warning('Cant identify simulation type.')
 end
 
-Dt = 4*3600;
-% Dt = 3600;
-% Dt = 10;
-
 % Tuning
 
 % Under-relaxation (1 means no under-relaxation)
@@ -108,11 +109,6 @@ alpha = 0.5;
 alpha_P = alpha ;  % Pressure under-relaxation factor
 alpha_v = alpha ;  % velocity under-relaxation factor
 alpha_rho = alpha ;  % Density under-relaxation factor
-
-% alpha_P = 1;  % Pressure under-relaxation factor
-% alpha_v = 1;  % velocity under-relaxation factor
-% alpha_rho = 1;  % Density under-relaxation factor
-
 %---------------------- ARRAYS INITIALIZATION ----------------------%
 t = 0:dt:Dt;
 
@@ -176,7 +172,6 @@ if strcmp(L_bound,'Inlet')
     % At face
     v(1,:) = v_A;
 
-
 elseif strcmp(L_bound,'Wall')
     v(1,:) = 0;
 
@@ -189,7 +184,7 @@ elseif strcmp(L_bound,'P_const')
     T(1,1) = T(2,1);
     rho(1,1) = rho(2,1);
 
-    v(1,1) = v(2,1);    
+    v(1,1) = v(2,1);
 
     P_f(1,1) = P(1,1);
     T_f(1,1) = T(1,1);
@@ -260,7 +255,7 @@ rho_f(end,1) = rho(end,1); % ASSUMING v >= 0 for t=0!!!!
 
 
 
-% Boundary conditions (Outlet and Constant pressure - depend on the other )
+% Boundary conditions (Outlet - depend on the other side of the pipeline)
 
 % L boundary conditions
 if strcmp(L_bound,'Outlet') 
@@ -273,7 +268,6 @@ if strcmp(L_bound,'Outlet')
     T(1,1) = T(2,1);
     rho(1,1) = rho(2,1);
 
-    
     v_n(1,1) = (rho(end,1)*v_n(end,1))/rho(1,1); % Velocity correction
 
     % Upwind scheme
@@ -297,9 +291,8 @@ if strcmp(R_bound,'Outlet')
     T(end,1) = T(end-1,1);
     rho(end,1) = rho(end-1,1);
 
-    v_n(end,1) = (rho(1,1)./rho(end,1)).*v_n(1,1); % Velocity correction
+    v_n(end,1) = (rho(1,1)*v_n(1,1))/rho(end,1); % Velocity correction
 
-    % v(end,1) = rho_f(1,1)/rho_f(end,1)*v(1,1); % ENSURING CONSERVATION OF MASS
     % Upwind scheme
     v(end,1) = v_n(end,1);
     
@@ -313,16 +306,7 @@ end
 
 
 
-
-
-
-
-
-
-
-
-%%
-T(:,:) = T_0; % Isothermal pipeline assumption
+% T(:,:) = T_0; % Isothermal pipeline assumption
 
 m(1) = sum(rho(:,1)*A_h*dx);
 E(1) = sum(rho(:,1)*A_h*dx.*cp.*T(:,1));
