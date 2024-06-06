@@ -24,22 +24,23 @@ open(vid)
 F(loops) = struct('cdata',[],'colormap',[]);
 figure('Color',[1 1 1])
 % dt_f = 0.1; % time between frames
-dt_f = 36;
+dt_f = 1;
 dec = dt_f/dt;
 t_dec = zeros(1,floor((length(t)-1)/dec+1));
 % decimation = 1000;
 for i=1:length(t_dec)
     t_dec(i) = t(1+dec*(i-1));
     % single plot
-    plot(x_n,P(:,1+dec*(i-1))./1e6);
-    xlabel('x [km]')
-    ylabel('P [MPa]')
+    % plot(x_n,P(:,1+dec*(i-1))./1e6);
+    % xlabel('x [km]')
+    % ylabel('P [MPa]')
     % ylim([P_min-0.1 P_max+0.1])
     % ylim([P_min max(P(:,1+dec*(i-1)))./1e6+0.001])
-    ylim([min(P(:,1+dec*(i-1)))/1e6-0.001 max(P(:,1+dec*(i-1)))/1e6+0.001])
+    % ylim([min(P(:,1+dec*(i-1)))/1e6-0.001 max(P(:,1+dec*(i-1)))/1e6+0.001])
 
     % plot(x_f,P_f(:,1+dec*(i-1))./1e6);
     % plot(x_f,v(:,1+dec*(i-1)));
+
     % plot(x_f,rho_f(:,1+dec*(i-1)));
 
     % double plot
@@ -49,9 +50,9 @@ for i=1:length(t_dec)
     % xlabel('x [km]')
     % ylabel('P [MPa]')
     % yyaxis right
-    % plot(x_f,v(:,1+dec*(i-1)));
-    % ylim([v_min v_max])
-    % ylabel('v [m/s]')
+    plot(x_f,v(:,1+dec*(i-1)));
+    ylim([v_min v_max])
+    ylabel('v [m/s]')
 
     ti = strcat('t = ',num2str(t_dec(i)),' s');
     title(ti);

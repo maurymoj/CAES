@@ -1,6 +1,7 @@
 clear 
 % close all
 clc
+profile on
 tic
 CP = py.importlib.import_module('CoolProp.CoolProp');
 
@@ -19,16 +20,16 @@ D = 0.5;
 
 % Initial conditions
 % P_0 = 101325;
-% P_0 = 7e6;
-P_0 = 4.3e6; % Huntorf
+P_0 = 7e6;
+% P_0 = 4.3e6; % Huntorf
 T_0 = 273.15 + 25;
 v_0 = 0;
 % v_0 = v_in;
 
 % Dt = 4*3600; % Total simulation time
 % Dt = 3600;
-% Dt = 10;
-Dt = 600;
+Dt = 10;
+% Dt = 300;
 
 eps = 0.04e-3; % Absolute roughness 0.04 mm
 epsD = eps/D;
@@ -46,9 +47,9 @@ P_min = 4.3e6;
 
 % L_bound = 'Outlet';
 % L_bound = 'Wall';
-L_bound = 'Inlet';
+% L_bound = 'Inlet';
 % L_bound = 'P_const';
-% L_bound = 'M_const';
+L_bound = 'M_const';
 if strcmp(L_bound,'Inlet')
     % Q_st_in = 3e5; % standard cubic meters per hour
     % Q_a = Q_st_in/3600;
@@ -67,7 +68,8 @@ elseif strcmp(L_bound,'Outlet')
 elseif strcmp(L_bound,'P_const')
     P_A = 4e6; % 4 MPa
 elseif strcmp(L_bound,'M_const')
-    m_A = -417; % Huntorf, sign indicates flow direction
+    % m_A = -417; % Huntorf, sign indicates flow direction
+    m_A = -100;
 end   
 
 % B - Right side boundary condition
@@ -83,12 +85,15 @@ elseif(strcmp(R_bound,'Wall'))
     v_B = 0;
 elseif(strcmp(R_bound,'Inlet'))
     m_B = -108; % Huntorf  % Remember the sign to indicate the direction of flow (+ right , - left)
-    v_B = m_B/(rho_B*A_h);
+    P_B = 7e6;
+    T_B = 273.15 + 60;
+    % v_B = m_B/(rho_B*A_h);
 elseif strcmp(R_bound,'P_const')
     P_B = 4e6; 
     % P_B = 4.13e6; % 4.13 MPa = Huntorf https://www.sciencedirect.com/science/article/pii/S0196890420302004#s0010
 elseif strcmp(R_bound,'M_const')
-    m_B = 417; % Huntorf    
+    % m_B = 417; % Huntorf    
+    m_B = 100;
 end                     
 
 g = 9.81;
@@ -99,8 +104,9 @@ simType = 'CAESPipe';
 
 if strcmp(simType,'CAESPipe')
     dx = L/(50-1); % CAESPipe
-    dt = 1;
-    tol = 1e-6; % CAESPipe
+    dt = 0.1;
+    tol = 1e-6; % CAESPipe Charging
+    % tol = 1e-3; % CAESPipe discharging
 elseif strcmp(simType,'CAESCav')
     dx = L/(5-1); % CAESCav
     dt = 0.01;
@@ -357,8 +363,8 @@ f_guess = (2*log10(1/epsD)+1.14)^(-2); % Friction factor based on Nikuradse
 
 
 
-
-
+error_hist = [];
+bound_hist = [L_bound];
 
 for j=2:n_t
     % Initial guess for next time step is the same props as the previous t step
@@ -383,12 +389,13 @@ for j=2:n_t
 
         v(1:end-1,j) = alpha_v*(v_star(1:end-1) + v_corr(1:end-1)) + (1-alpha_v)*v_star(1:end-1);
         
+        % L boundary
         if strcmp(L_bound,'Inlet')
             % P(1,:) = P_A;
             % T(1,:) = T_A;
             % rho(1,:) = rho_A;
         elseif strcmp(L_bound,'Wall')
-            % v(1,j) = 0;
+            v(1,j) = 0;
             P_f(1,j) = P(1,j);
             T_f(1,j) = T(1,j);
             rho_f(1,j) = rho(1,j);
@@ -420,10 +427,11 @@ for j=2:n_t
             rho_f(1,j) = rho(1,j);
         end
 
+        % R boundary
         if strcmp(R_bound,'Inlet')
         elseif(strcmp(R_bound,'Wall'))
             % Set by upwind scheme
-            % v(end,j) = 0;
+            v(end,j) = 0;
         elseif strcmp(R_bound,'P_const')
             % P(end,:) = P_B;
             T(end,j) = T(end-1,j);
@@ -721,20 +729,29 @@ for j=2:n_t
         % m_out)
 
         error_P = (P_corr./P(:,j));
+        error_hist = [error_hist error_P];
+
         % error_rho = (rho_corr./rho(:,j));
         % error_v = (v_corr./v(:,j));
         count(j) = count(j)+1;  
 
     end
     
-    if strcmp(L_bound,'Inlet') & P(1,j) >= P_max
+    if strcmp(L_bound,'Inlet') & P(2,j) >= P_max
         % v(1,j+1:end) = 0;
         L_bound = 'Wall';
         t_shut_off = (j-1)*dt;
     elseif strcmp(L_bound,'M_const') & P(1,j) <= P_min
         L_bound = 'Wall';
+    elseif strcmp(R_bound,'Inlet') & P(end-1,j) >= P_max
+        % v(1,j+1:end) = 0;
+        R_bound = 'Wall';
+        t_shut_off = (j-1)*dt;
+    elseif strcmp(R_bound,'M_const') & P(end,j) <= P_min
+        R_bound = 'Wall';
     end
 
+    bound_hist = [bound_hist;L_bound];
     m(j) = sum(rho(:,j)*A_h*dx);
     E(j) = sum(rho(:,j)*A_h*dx.*cp.*T(:,j));
     % [j count(j)]
@@ -754,22 +771,37 @@ toc
 % EE = E(1) + dE.*(0:n_t-1)';
 
 % As a function of inlet velocity (CONSTANT INLET CONDITIONS)
-dm = rho_A*v(1,:)'*A_h*dt;
-mm = m(1) + cumsum(dmm);
-dE = rho_A*v(1,:)'*A_h*cp_A*T_A*dt;
+% if strcmp(L_bound,'Inlet')
+    % dm = rho_A*v(1,:)'*A_h*dt;
+    % dE = rho_A*v(1,:)'*A_h*cp_A*T_A*dt;
+    % dX = rho_A*v(1,:)'*A_h*(h_A - h_o - T_o*(s_A - s_o))*dt; % Flow exergy - kinetic and potential term contributions assumed negligible
+% if strcmp(L_bound,'M_const')
+    dm = rho_f(1,:).*v(1,:)*A_h*dt;
+    dE = rho_f(1,:).*v(1,:)*A_h*cp(1).*T_f(1,:)*dt;
+    % dX = rho(1,:).*v(1,:)*A_h*(h(:,1) - h_o - T_o*(s(:,1) - s_o))*dt; % Flow exergy - kinetic and potential term contributions assumed negligible
+% elseif strcmp(R_bound,'Inlet')
+    % Since the direction is to the left, v is negative, a '-' is used to
+    % correct that
+    % dm = -rho_B*v(end,:)'*A_h*dt;
+    % dE = -rho_B*v(end,:)'*A_h*cp_B*T_B*dt;
+    % dX = -rho_B*v(end,:)'*A_h*(h_B - h_o - T_o*(s_B - s_o))*dt; % Flow exergy - kinetic and potential term contributions assumed negligible
+% end
+
+mm = m(1) + cumsum(dm);
+
 EE = E(1) + cumsum(dE);
-dX = rho_A*v(1,:)'*A_h*(h_A - h_o - T_o*(s_A - s_o))*dt; % Flow exergy - kinetic and potential term contributions assumed negligible
+
 
 x = 0:dx:L;
 x_f = [0:dx:L]';
 x_n = [dx/2:dx:L]';
 
 % Exergy
-X = P*(A_h*L).*(P_amb./P - 1 + log(P./P_amb))./(1e6*3600); % Pipeline Exergy [MWh]
-X_min = P_0*(A_h*L).*(P_amb./P_0 - 1 + log(P_0./P_amb))/(1e6*3600); % Exergy when discharged [MWh]
-
-X_net = X - X_min; % Exergy between current state and discharged state (assuming whole pipeline at P_min)
-X_in = sum(dX);
+% X = P*(A_h*L).*(P_amb./P - 1 + log(P./P_amb))./(1e6*3600); % Pipeline Exergy [MWh]
+% X_min = P_0*(A_h*L).*(P_amb./P_0 - 1 + log(P_0./P_amb))/(1e6*3600); % Exergy when discharged [MWh]
+% 
+% X_net = X - X_min; % Exergy between current state and discharged state (assuming whole pipeline at P_min)
+% X_in = sum(dX);
 
 % Figures of mass and energy over time
 % figure('color',[1 1 1]);plot(m)
@@ -791,9 +823,11 @@ legend('E','$E_o + \dot{m} \Delta E$','Interpreter','latex')
 % % Relative differences between total mass/energy in and change in C.V. mass/energy
 figure('color',[1 1 1]);plot(t,(mm - m)./m)
 title('Difference in mass')
-figure('color',[1 1 1]);plot(t,(EE - E)./E)
+figure('color',[1 1 1]);plot(t,(EE' - E)./E')
 title('Difference in energy')
 
+%%
+profile viewer
 %%
 % Pressure profile
 figure('color',[1 1 1])
