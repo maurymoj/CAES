@@ -17,6 +17,14 @@ D = 0.5;
 % L = 35;
 % D = 40;
 
+% Initial conditions
+% P_0 = 101325;
+% P_0 = 7e6;
+P_0 = 4.3e6; % Huntorf
+T_0 = 273.15 + 25;
+v_0 = 0;
+% v_0 = v_in;
+
 % Dt = 4*3600; % Total simulation time
 % Dt = 3600;
 % Dt = 10;
@@ -30,14 +38,17 @@ A_h = pi*D^2/4;
 P_amb = 101325;
 T_amb = 273.15 + 25;
 
+% System operational limits
+P_max = 7e6;
+P_min = 4.3e6;
 
 % A - Left side - Inlet 
 
-
 % L_bound = 'Outlet';
 % L_bound = 'Wall';
-% L_bound = 'Inlet';
-L_bound = 'P_const';
+L_bound = 'Inlet';
+% L_bound = 'P_const';
+% L_bound = 'M_const';
 if strcmp(L_bound,'Inlet')
     % Q_st_in = 3e5; % standard cubic meters per hour
     % Q_a = Q_st_in/3600;
@@ -55,6 +66,8 @@ elseif strcmp(L_bound,'Outlet')
     % m_A = m_R;
 elseif strcmp(L_bound,'P_const')
     P_A = 4e6; % 4 MPa
+elseif strcmp(L_bound,'M_const')
+    m_A = -417; % Huntorf, sign indicates flow direction
 end   
 
 % B - Right side boundary condition
@@ -62,6 +75,7 @@ end
 % R_bound = 'Inlet';
 % R_bound = 'P_const';
 R_bound = 'Wall';
+% R_bound = 'M_const';
 if strcmp(R_bound,'Outlet')
     % m_out = m_A;
 elseif(strcmp(R_bound,'Wall'))
@@ -73,19 +87,12 @@ elseif(strcmp(R_bound,'Inlet'))
 elseif strcmp(R_bound,'P_const')
     P_B = 4e6; 
     % P_B = 4.13e6; % 4.13 MPa = Huntorf https://www.sciencedirect.com/science/article/pii/S0196890420302004#s0010
+elseif strcmp(R_bound,'M_const')
+    m_B = 417; % Huntorf    
 end                     
-
-% Initial conditions
-% P_0 = 101325;
-% P_0 = 5e6;
-P_0 = 4.3e6; % Huntorf
-T_0 = 273.15 + 25;
-v_0 = 0;
-% v_0 = v_in;
 
 g = 9.81;
 theta = 0;
-
 %--------------------- SIMULATION PARAMETERS ------------------------%
 simType = 'CAESPipe';
 % simType = 'CAESCav';
@@ -150,7 +157,26 @@ cp = CP.PropsSI('C','P',P(1,1),'T',T(1,1),'Air'); % Constant Cp (?)
 % Initial conditions at faces (i -> x, j -> t)
 v(:,1) = v_0; % V profile at t=0
 
-% Boundary conditions (Inlet and Wall)
+
+% UPWIND SCHEME
+% velocity in faces to the nodes
+v_n(:,1) = (v(1:end-1,1) >= 0).*v((1:end-1),1) ...
+    +      (v(1:end-1,1) <  0).*v((2:end),1);
+
+% Properties in nodes to faces
+P_f(2:end-1,1) = (v(1:end-2,1) >= 0).*P(1:end-1,1) ...
+    +            (v(1:end-2,1) <  0).*P(2:end,1);
+T_f(2:end-1,1) = (v(1:end-2,1) >= 0).*T(1:end-1,1) ...
+    +            (v(1:end-2,1) <  0).*T(2:end,1);
+rho_f(2:end-1,1) = (v(1:end-2,1) >= 0).*rho(1:end-1,1) ...
+    +            (v(1:end-2,1) <  0).*rho(2:end,1);
+
+P_f(end,1) = P(end,1); % ASSUMING v >= 0 for t=0!!!!
+T_f(end,1) = T(end,1); % ASSUMING v >= 0 for t=0!!!!
+rho_f(end,1) = rho(end,1); % ASSUMING v >= 0 for t=0!!!!
+
+
+% Boundary conditions (Inlet, Wall, and constant pressure)
 
 % L boundary conditions
 if strcmp(L_bound,'Inlet')
@@ -175,6 +201,10 @@ if strcmp(L_bound,'Inlet')
 elseif strcmp(L_bound,'Wall')
     v(1,:) = 0;
 
+    P_f(1,1) = P(1,1);
+    T_f(1,1) = T(1,1);
+    rho_f(1,1) = rho(1,1);
+
 elseif strcmp(L_bound,'P_const') 
     % Assumptions:
     % - Outflow
@@ -189,6 +219,23 @@ elseif strcmp(L_bound,'P_const')
     P_f(1,1) = P(1,1);
     T_f(1,1) = T(1,1);
     rho_f(1,1) = rho(1,1);
+elseif strcmp(L_bound,'M_const')    
+    % Assumptions:
+    % - Zero gradient for all properties except u-velocity
+    % - Constant cross-sectional area
+    P(1,1) = P(2,1);
+    T(1,1) = T(2,1);
+    rho(1,1) = rho(2,1);
+
+    v_n(1,1) = m_A/(rho(1,1)*A_h);
+
+    % Upwind scheme
+    v(1,1) = v_n(1,1);
+    
+    P_f(1,1) = P(1,1);
+    T_f(1,1) = T(1,1);
+    rho_f(1,1) = rho(1,1);
+    
 end
 
 
@@ -227,37 +274,31 @@ elseif(strcmp(R_bound,'P_const'))
 
     P_f(end,1) = P(end,1);
     T_f(end,1) = T(end,1);
-    rho_f(end,1) = rho(end,1); 
+    rho_f(end,1) = rho(end,1);
+elseif strcmp(R_bound,'M_const')    
+    % Assumptions:
+    % - Zero gradient for all properties except u-velocity
+    % - Constant cross-sectional area
+    P(end,1) = P(end-1,1);
+    T(end,1) = T(end-1,1);
+    rho(end,1) = rho(end-1,1);
+
+    v_n(end,1) = m_B/(rho(end,1)*A_h);
+
+    % Upwind scheme
+    v(end,1) = v_n(end,1);
+    
+    P_f(end,1) = P(end,1);
+    T_f(end,1) = T(end,1);
+    rho_f(end,1) = rho(end,1);    
 end
-
-
-
-
-
-
-% UPWIND SCHEME
-% velocity in faces to the nodes
-v_n(:,1) = (v(1:end-1,1) >= 0).*v((1:end-1),1) ...
-    +      (v(1:end-1,1) <  0).*v((2:end),1);
-
-% Properties in nodes to faces
-P_f(2:end-1,1) = (v(1:end-2,1) >= 0).*P(1:end-1,1) ...
-    +            (v(1:end-2,1) <  0).*P(2:end,1);
-T_f(2:end-1,1) = (v(1:end-2,1) >= 0).*T(1:end-1,1) ...
-    +            (v(1:end-2,1) <  0).*T(2:end,1);
-rho_f(2:end-1,1) = (v(1:end-2,1) >= 0).*rho(1:end-1,1) ...
-    +            (v(1:end-2,1) <  0).*rho(2:end,1);
-
-P_f(end,1) = P(end,1); % ASSUMING v >= 0 for t=0!!!!
-T_f(end,1) = T(end,1); % ASSUMING v >= 0 for t=0!!!!
-rho_f(end,1) = rho(end,1); % ASSUMING v >= 0 for t=0!!!!
 
 
 
 
 % Boundary conditions (Outlet - depend on the other side of the pipeline)
 
-% L boundary conditions
+% L outlet boundary conditions
 if strcmp(L_bound,'Outlet') 
     % Assumptions:
     % - Zero gradient for all properties except u-velocity
@@ -280,7 +321,7 @@ if strcmp(L_bound,'Outlet')
     % m_A = m_R;
 end  
 
-% R boundary conditions
+% R outlet boundary conditions
 if strcmp(R_bound,'Outlet')
     % Assumptions:
     % - Zero gradient for all properties except u-velocity
@@ -343,9 +384,16 @@ for j=2:n_t
         v(1:end-1,j) = alpha_v*(v_star(1:end-1) + v_corr(1:end-1)) + (1-alpha_v)*v_star(1:end-1);
         
         if strcmp(L_bound,'Inlet')
+            % P(1,:) = P_A;
+            % T(1,:) = T_A;
+            % rho(1,:) = rho_A;
         elseif strcmp(L_bound,'Wall')
             % v(1,j) = 0;
+            P_f(1,j) = P(1,j);
+            T_f(1,j) = T(1,j);
+            rho_f(1,j) = rho(1,j);
         elseif strcmp(L_bound,'P_const')
+            % P(1,:) = P_A;
             T(1,j) = T(2,j);
             rho(1,j) = rho(2,j);
 
@@ -354,10 +402,27 @@ for j=2:n_t
             P_f(1,j) = P(1,j);
             T_f(1,j) = T(1,j);
             rho_f(1,j) = rho(1,j);
+        elseif strcmp(L_bound,'M_const') 
+            % Assumptions:
+            % - Zero gradient for all properties except u-velocity
+            % - Constant cross-sectional area
+            P(1,j) = P(2,j);
+            T(1,j) = T(2,j);
+            rho(1,j) = rho(2,j);
+        
+            v_n(1,j) = m_A/(rho(1,j)*A_h);
+        
+            % Upwind scheme
+            v(1,j) = v_n(1,j);
+            
+            P_f(1,j) = P(1,j);
+            T_f(1,j) = T(1,j);
+            rho_f(1,j) = rho(1,j);
         end
 
         if strcmp(R_bound,'Inlet')
         elseif(strcmp(R_bound,'Wall'))
+            % Set by upwind scheme
             % v(end,j) = 0;
         elseif strcmp(R_bound,'P_const')
             % P(end,:) = P_B;
@@ -369,12 +434,46 @@ for j=2:n_t
             P_f(end,j) = P(end,j);
             T_f(end,j) = T(end,j);
             rho_f(end,j) = rho(end,j);   
+        elseif strcmp(R_bound,'M_const')  
+            % Assumptions:
+            % - Zero gradient for all properties except u-velocity
+            % - Constant cross-sectional area
+            P(end,j) = P(end-1,j);
+            T(end,j) = T(end-1,j);
+            rho(end,j) = rho(end-1,j);
+        
+            v_n(end,j) = m_B/(rho(end,j)*A_h);
+        
+            % Upwind scheme
+            v(end,j) = v_n(end,j);
+            
+            P_f(end,j) = P(end,j);
+            T_f(end,j) = T(end,j);
+            rho_f(end,j) = rho(end,j); 
         end 
 
-        if strcmp(R_bound,'Outlet')
-            v(end,j) = rho(1,j)*v(1,j)/rho(end,j); % ENSURING CONSERVATION OF MASS
-        elseif strcmp(L_bound,'Outlet')
-            v(1,j) = rho(end,j)*v(end,j)/rho(1,j); 
+        if strcmp(L_bound,'Outlet')
+            P(1,j) = P(2,j);
+            T(1,j) = T(2,j);
+            rho(1,j) = rho(2,j);
+
+            v_n(1,j) = rho(end,j)*v(end,j)/rho(1,j);
+            v(1,j) = v_n(1,j);
+
+            P_f(1,j) = P(1,j);
+            T_f(1,j) = T(1,j);
+            rho_f(1,j) = rho(1,j);
+        elseif strcmp(R_bound,'Outlet')
+            P(end,j) = P(end-1,j);
+            T(end,j) = T(end-1,j);
+            rho(end,j) = rho(end-1,j);
+        
+            v_n(end,j) = (rho(1,j)*v_n(1,j))/rho(end,j); % Velocity correction
+            v(end,j) = v_n(end,j); % ENSURING CONSERVATION OF MASS
+
+            P_f(end,j) = P(end,j);
+            T_f(end,j) = T(end,j);
+            rho_f(end,j) = rho(end,j);
         end
 
         % Initial guess (properties at t+dt = properties at t) - without
@@ -501,7 +600,7 @@ for j=2:n_t
             + max(rho(1,j)*v_n(1,j)/dx,  0)*v_n(1,j);
         
         B(1) = d(1)*(P(2,j)-P(1,j)) ...
-            + b(1);
+            + b(1);           
         
         
         a(end,end-1) = -max(rho(n_n-1,j)*v_n(n_n-1,j)/dx, 0); % a_N-2 (index N-2, N-3)
@@ -534,6 +633,11 @@ for j=2:n_t
         % v_star = B\a
         v_star = linsolve(a,B);
         v_star = [v(1,j);v_star;v(end,j)];
+        % if strcmp(L_bound,'Outlet')
+        %     v_star(1) = v_star(2);
+        % elseif strcmp(R_bound,'Outlet')
+        %     v_star(end) = v_star(end-1);
+        % end
         % v(:,j) = [v(1,j);v_star;v(end,j)];
 
         %--------------- Pressure correction P' calculations ---------------------%
@@ -545,29 +649,59 @@ for j=2:n_t
         % left node
         % Coefficients of a and d are displaced by 1 (1 = B, 2 = C and so on) 
         A(1,2) = - max(0, -drho_dP(2)*v_star(2)/dx); % A_2
-        A(1,1) = drho_dP_n(1)/dt - (rho_f(2,j)*d(1)/a(1,1))/dx + drho_dP(2)*v_star(2)/dx - A(1,2); % A_1
+        A(1,1) = drho_dP_n(1)/dt - (rho_f(2,j)*d(1)/a(1,1))/dx ...
+               + drho_dP(2)*v_star(2)/dx - A(1,2); % A_1
         
         BB(1) = (rho(1,j-1)-rho(1,j))/dt + (rho_f(1,j)*v_star(1) - rho_f(2,j)*v_star(2))/dx;
-        
+        if strcmp(L_bound,'P_const')
+            A(1,1) = 1;
+            A(1,2) = 0;
+
+            B(1) = 0;
+        elseif strcmp(L_bound,'Outlet')
+            %???
+            A(1,2) = -drho_dP(2)*v_star(2)/dx + rho_f(2,j)*(d(1)/a(1,1))/dx; % A_2
+            A(1,1) = drho_dP_n(1)/dt ...
+                     - (rho_f(2,j)*d(1)/a(1,1))/dx ...
+                     - drho_dP(1)*v_star(1)/dx ; % A_1
+        end
         
         % right node
-        A(n_n,n_n-1) = (rho_f(N_f-1,j)*d(end)/a(end,end))/dx - max(drho_dP(N_f-1)*v_star(N_f-1)/dx, 0);
-        A(n_n,n_n) = drho_dP_n(n_n)/dt - drho_dP(N_f-1)*v_star(N_f-1)/dx - A(n_n,n_n-1); % v_star(end) = 0
+        A(n_n,n_n-1) = (rho_f(N_f-1,j)*d(end)/a(end,end))/dx...
+                       - max(drho_dP(N_f-1)*v_star(N_f-1)/dx, 0);
+        A(n_n,n_n) = drho_dP_n(n_n)/dt ...
+                     - drho_dP(N_f-1)*v_star(N_f-1)/dx... 
+                     - A(n_n,n_n-1); % v_star(end) = 0
         
         BB(n_n) = (rho(n_n,j-1)-rho(n_n,j))/dt + (rho_f(N_f-1,j)*v_star(N_f-1) - rho_f(N_f,j)*v_star(N_f))/dx;
-        
+        if strcmp(R_bound,'P_const')
+            A(n_n,n_n-1) = 0;
+            A(n_n,n_n) = 1;
+
+            B(n_n) = 0;
+        elseif strcmp(R_bound,'Outlet')
+            %???
+            A(n_n,n_n-1) = (rho_f(N_f-1,j)*d(end)/a(end,end))/dx...
+                           - drho_dP(N_f-1)*v_star(N_f-1)/dx;
+            A(n_n,n_n) = drho_dP_n(n_n)/dt ...
+                         - (rho_f(N_f-1,j)*d(end)/a(end,end))/dx ...
+                         + drho_dP(N_f)*v_star(N_f)/dx;
+        end
+
         for i=2:n_n-1
         % Subtracted 1 from a and d as there is no row for the first face -
         % boundary conditions for matrix/vector in momentum eq.
-            A(i,i-1) = (rho_f(i,j)*d(i-1)/a(i-1,i-1))/dx - max(drho_dP(i)*v_star(i)/dx,                     0);
-            A(i,i+1) = (rho_f(i+1,j)*d(i)/a(i,i))/dx - max(              0, -drho_dP(i+1)*v_star(i+1)/dx);
+            A(i,i-1) = (rho_f(i,j)*d(i-1)/a(i-1,i-1))/dx ...
+                       - max(drho_dP(i)*v_star(i)/dx,                     0);
+            A(i,i+1) = (rho_f(i+1,j)*d(i)/a(i,i))/dx ...
+                       - max(              0, -drho_dP(i+1)*v_star(i+1)/dx);
             A(i,i)   = drho_dP_n(i)/dt + (drho_dP(i+1)*v_star(i+1)/dx ...
-                - drho_dP(i)*v_star(i)/dx) - ( A(i,i-1) + A(i,i+1) );
+                       - drho_dP(i)*v_star(i)/dx) - ( A(i,i-1) + A(i,i+1) );
             
-            BB(i) = (rho(i,j-1)-rho(i,j))/dt + (rho_f(i,j)*v_star(i) - rho_f(i+1,j)*v_star(i+1))/dx;
+            BB(i) = (rho(i,j-1)-rho(i,j))/dt ...
+                    + (rho_f(i,j)*v_star(i) - rho_f(i+1,j)*v_star(i+1))/dx;
         end
-        A;
-        BB;
+
         P_corr = linsolve(A,BB);
 
         rho_corr = drho_dP_n.*P_corr;
@@ -575,27 +709,30 @@ for j=2:n_t
         a_i = diag(a);
         v_corr = zeros(N_f,1);
         % v_corr(1)         = d(1)./a_i(1).*P_corr(1);
-        v_corr(1)         = 0;% Inlet boundary condition
         v_corr(2:end-1)   = d./a_i.*(P_corr(2:end)-P_corr(1:end-1));
 % !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-        v_corr(end)       = 0; % Wall boundary condition
+        % Inlet boundary condition
+        v_corr(1)         = 0; 
+        % Outlet boundary condition
+        v_corr(end)       = 0;
 % !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-
-
 
         % v_corr(end)       =  % Velocity corrected based on mass balance (m_in =
         % m_out)
 
         error_P = (P_corr./P(:,j));
-        error_rho = (rho_corr./rho(:,j));
-        error_v = (v_corr./v(:,j));
+        % error_rho = (rho_corr./rho(:,j));
+        % error_v = (v_corr./v(:,j));
         count(j) = count(j)+1;  
 
     end
     
-    if P(1,j) >= P_A
-        v(1,j+1:end) = 0;
+    if strcmp(L_bound,'Inlet') & P(1,j) >= P_max
+        % v(1,j+1:end) = 0;
+        L_bound = 'Wall';
         t_shut_off = (j-1)*dt;
+    elseif strcmp(L_bound,'M_const') & P(1,j) <= P_min
+        L_bound = 'Wall';
     end
 
     m(j) = sum(rho(:,j)*A_h*dx);
