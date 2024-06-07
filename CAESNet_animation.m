@@ -39,22 +39,22 @@ for i=1:length(t_dec)
     % ylim([min(P(:,1+dec*(i-1)))/1e6-0.001 max(P(:,1+dec*(i-1)))/1e6+0.001])
 
     % plot(x_f,P_f(:,1+dec*(i-1))./1e6);
-    plot(x_f,v(:,1+dec*(i-1)));
-    ylim([v_min v_max])
-    ylabel('v [m/s]')
+    % plot(x_f,v(:,1+dec*(i-1)));
+    % ylim([v_min v_max])
+    % ylabel('v [m/s]')
 
     % plot(x_f,rho_f(:,1+dec*(i-1)));
 
     % double plot
-    % yyaxis left
-    % % plot(x_f,P_f(:,1+dec*(i-1))./1e6);
-    % ylim([P_min P_max])
-    % xlabel('x [km]')
-    % ylabel('P [MPa]')
-    % yyaxis right
-    % plot(x_f,v(:,1+dec*(i-1)));
-    % ylim([v_min v_max])
-    % ylabel('v [m/s]')
+    yyaxis left
+    plot(x_f,P_f(:,1+dec*(i-1))./1e6);
+    ylim([P_lower_bound-0.1 P_upper_bound+0.1])
+    xlabel('x [km]')
+    ylabel('P [MPa]')
+    yyaxis right
+    plot(x_f,v(:,1+dec*(i-1)));
+    ylim([v_min v_max])
+    ylabel('v [m/s]')
 
     ti = strcat('t = ',num2str(t_dec(i)),' s');
     title(ti);

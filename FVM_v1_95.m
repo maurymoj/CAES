@@ -122,7 +122,7 @@ simType = 'CAESPipe';
 
 if strcmp(simType,'CAESPipe')
     dx = L/(50-1); % CAESPipe
-    dt = 0.1;
+    dt = 1;
     tol = 1e-6; % CAESPipe Charging
     % tol = 1e-3; % CAESPipe discharging
 elseif strcmp(simType,'CAESCav')
@@ -627,18 +627,18 @@ for j=2:n_t
         
         B(1) = d(1)*(P(2,j)-P(1,j)) ...
             + b(1);           
-        if strcmp(L_bound,'M_const') % Assumed outlet
-            a(1,2) = rho(2,j)*v_n(2,j)/dx;    % a_C
-            a(1,1) = rho_f(2,j)/dt + f(1)*rho_f(2,j)*abs(v(2,j))/(2*D) ...
-                - rho(1,j)*v_n(1,j)/dx;% a_B
-            
-            d(1) = -1/dx;
-            b(1) = (rho_f(2,j-1)*v(2,j-1)/dt)...
-                - rho_f(2,j)*g*sind(theta);
-            
-            B(1) = d(1)*(P(2,j)-P(1,j)) ...
-                + b(1);  
-        end
+        % if strcmp(L_bound,'M_const') % Assumed outlet
+        %     a(1,2) = rho(2,j)*v_n(2,j)/dx;    % a_C
+        %     a(1,1) = rho_f(2,j)/dt + f(1)*rho_f(2,j)*abs(v(2,j))/(2*D) ...
+        %         - rho(1,j)*v_n(1,j)/dx;% a_B
+        % 
+        %     d(1) = -1/dx;
+        %     b(1) = (rho_f(2,j-1)*v(2,j-1)/dt)...
+        %         - rho_f(2,j)*g*sind(theta);
+        % 
+        %     B(1) = d(1)*(P(2,j)-P(1,j)) ...
+        %         + b(1);  
+        % end
         % IMPLEMENT M_CONST BOUNDARY FOR R_bound
         
         a(end,end-1) = -max(rho(n_n-1,j)*v_n(n_n-1,j)/dx, 0); % a_N-2 (index N-2, N-3)
@@ -774,7 +774,13 @@ for j=2:n_t
     end
     
     % THERMODYNAMIC PROPERTIES
+    for i = 1:n_n  % PROPERTIES FROM P AND RHO          
+        % cp(i) = CP.PropsSI('C','P',P(i,j),'D',rho(i,j),'Air');
+        h(i,j) = CP.PropsSI('H','P',P(i,j),'D',rho(i,j),'Air');
+        s(i,j) = CP.PropsSI('S','P',P(i,j),'D',rho(i,j),'Air');
 
+        
+    end
 
     if strcmp(L_bound,'Inlet') & P(2,j) >= P_max
         % v(1,j+1:end) = 0;
@@ -814,11 +820,11 @@ toc
 if strcmp(Process,'Charging_L')
     dm = rho_A*v(1,:)'*A_h*dt;
     dE = rho_A*v(1,:)'*A_h*cp_A*T_A*dt;
-    % dX = rho_A*v(1,:)'*A_h*(h_A - h_o - T_o*(s_A - s_o))*dt; % Flow exergy - kinetic and potential term contributions assumed negligible
+    dX = rho_A*v(1,:)'*A_h*(h_A - h_o - T_o*(s_A - s_o))*dt; % Flow exergy - kinetic and potential term contributions assumed negligible
 elseif strcmp(Process,'Discharging_L')
     dm = rho_f(1,:)'.*v(1,:)'*A_h*dt;
     dE = rho_f(1,:)'.*v(1,:)'*A_h*cp(1).*T_f(1,:)'*dt;
-    % dX = rho(1,:).*v(1,:)*A_h*(h(:,1) - h_o - T_o*(s(:,1) - s_o))*dt; % Flow exergy - kinetic and potential term contributions assumed negligible
+    dX = rho(1,:)'.*v(1,:)'*A_h.*(h(:,1)' - h_o - T_o*(s(:,1)' - s_o))*dt; % Flow exergy - kinetic and potential term contributions assumed negligible
 % elseif strcmp(R_bound,'Inlet')
     % Since the direction is to the left, v is negative, a '-' is used to
     % correct that
