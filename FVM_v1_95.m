@@ -1,7 +1,7 @@
 clear 
 % close all
 clc
-profile on
+% profile on
 tic
 CP = py.importlib.import_module('CoolProp.CoolProp');
 
@@ -18,18 +18,10 @@ D = 0.5;
 % L = 35;
 % D = 40;
 
-% Initial conditions
-% P_0 = 101325;
-P_0 = 7e6;
-% P_0 = 4.3e6; % Huntorf
-T_0 = 273.15 + 25;
-v_0 = 0;
-% v_0 = v_in;
-
 % Dt = 4*3600; % Total simulation time
 % Dt = 3600;
-Dt = 10;
-% Dt = 300;
+% Dt = 10;
+Dt = 300;
 
 eps = 0.04e-3; % Absolute roughness 0.04 mm
 epsD = eps/D;
@@ -43,13 +35,39 @@ T_amb = 273.15 + 25;
 P_max = 7e6;
 P_min = 4.3e6;
 
-% A - Left side - Inlet 
+% CAES process
+% Process = 'Charging_L';
+Process = 'Discharging_L';
+if strcmp(Process,'Charging_L')
+    % Initial conditions
+    % P_0 = 101325;
+    % P_0 = 7e6;
+    P_0 = 4.3e6; % Huntorf
+    T_0 = 273.15 + 25;
+    v_0 = 0;
+    % v_0 = v_in;
 
+    L_bound = 'Inlet';
+    R_bound = 'Wall';
+elseif strcmp(Process,'Discharging_L')
+    % Initial conditions
+    % P_0 = 101325;
+    P_0 = 7e6;
+    % P_0 = 4.3e6; % Huntorf
+    T_0 = 273.15 + 25;
+    v_0 = 0;
+    % v_0 = v_in;
+
+    L_bound = 'M_const';
+    R_bound = 'Wall';
+end
+
+% A - Left side boundary condition
 % L_bound = 'Outlet';
 % L_bound = 'Wall';
 % L_bound = 'Inlet';
 % L_bound = 'P_const';
-L_bound = 'M_const';
+% L_bound = 'M_const';
 if strcmp(L_bound,'Inlet')
     % Q_st_in = 3e5; % standard cubic meters per hour
     % Q_a = Q_st_in/3600;
@@ -76,7 +94,7 @@ end
 % R_bound = 'Outlet';
 % R_bound = 'Inlet';
 % R_bound = 'P_const';
-R_bound = 'Wall';
+% R_bound = 'Wall';
 % R_bound = 'M_const';
 if strcmp(R_bound,'Outlet')
     % m_out = m_A;
@@ -364,7 +382,7 @@ f_guess = (2*log10(1/epsD)+1.14)^(-2); % Friction factor based on Nikuradse
 
 
 error_hist = [];
-bound_hist = [L_bound];
+bound_hist = [string(L_bound) string(R_bound)];
 
 for j=2:n_t
     % Initial guess for next time step is the same props as the previous t step
@@ -609,7 +627,19 @@ for j=2:n_t
         
         B(1) = d(1)*(P(2,j)-P(1,j)) ...
             + b(1);           
-        
+        if strcmp(L_bound,'M_const') % Assumed outlet
+            a(1,2) = rho(2,j)*v_n(2,j)/dx;    % a_C
+            a(1,1) = rho_f(2,j)/dt + f(1)*rho_f(2,j)*abs(v(2,j))/(2*D) ...
+                - rho(1,j)*v_n(1,j)/dx;% a_B
+            
+            d(1) = -1/dx;
+            b(1) = (rho_f(2,j-1)*v(2,j-1)/dt)...
+                - rho_f(2,j)*g*sind(theta);
+            
+            B(1) = d(1)*(P(2,j)-P(1,j)) ...
+                + b(1);  
+        end
+        % IMPLEMENT M_CONST BOUNDARY FOR R_bound
         
         a(end,end-1) = -max(rho(n_n-1,j)*v_n(n_n-1,j)/dx, 0); % a_N-2 (index N-2, N-3)
         % WHAT TO DO REGARDING TO THE a INDICES ??
@@ -711,6 +741,12 @@ for j=2:n_t
         end
 
         P_corr = linsolve(A,BB);
+        
+        if strcmp(L_bound,'M_const')
+            P_corr(1) = 0;
+        elseif strcmp(R_bound,'M_const')
+            P_corr(end) = 0;
+        end
 
         rho_corr = drho_dP_n.*P_corr;
 
@@ -737,6 +773,9 @@ for j=2:n_t
 
     end
     
+    % THERMODYNAMIC PROPERTIES
+
+
     if strcmp(L_bound,'Inlet') & P(2,j) >= P_max
         % v(1,j+1:end) = 0;
         L_bound = 'Wall';
@@ -751,7 +790,8 @@ for j=2:n_t
         R_bound = 'Wall';
     end
 
-    bound_hist = [bound_hist;L_bound];
+    bound_hist = [bound_hist; string(L_bound) string(R_bound)];
+    
     m(j) = sum(rho(:,j)*A_h*dx);
     E(j) = sum(rho(:,j)*A_h*dx.*cp.*T(:,j));
     % [j count(j)]
@@ -771,13 +811,13 @@ toc
 % EE = E(1) + dE.*(0:n_t-1)';
 
 % As a function of inlet velocity (CONSTANT INLET CONDITIONS)
-% if strcmp(L_bound,'Inlet')
-    % dm = rho_A*v(1,:)'*A_h*dt;
-    % dE = rho_A*v(1,:)'*A_h*cp_A*T_A*dt;
+if strcmp(Process,'Charging_L')
+    dm = rho_A*v(1,:)'*A_h*dt;
+    dE = rho_A*v(1,:)'*A_h*cp_A*T_A*dt;
     % dX = rho_A*v(1,:)'*A_h*(h_A - h_o - T_o*(s_A - s_o))*dt; % Flow exergy - kinetic and potential term contributions assumed negligible
-% if strcmp(L_bound,'M_const')
-    dm = rho_f(1,:).*v(1,:)*A_h*dt;
-    dE = rho_f(1,:).*v(1,:)*A_h*cp(1).*T_f(1,:)*dt;
+elseif strcmp(Process,'Discharging_L')
+    dm = rho_f(1,:)'.*v(1,:)'*A_h*dt;
+    dE = rho_f(1,:)'.*v(1,:)'*A_h*cp(1).*T_f(1,:)'*dt;
     % dX = rho(1,:).*v(1,:)*A_h*(h(:,1) - h_o - T_o*(s(:,1) - s_o))*dt; % Flow exergy - kinetic and potential term contributions assumed negligible
 % elseif strcmp(R_bound,'Inlet')
     % Since the direction is to the left, v is negative, a '-' is used to
@@ -785,7 +825,7 @@ toc
     % dm = -rho_B*v(end,:)'*A_h*dt;
     % dE = -rho_B*v(end,:)'*A_h*cp_B*T_B*dt;
     % dX = -rho_B*v(end,:)'*A_h*(h_B - h_o - T_o*(s_B - s_o))*dt; % Flow exergy - kinetic and potential term contributions assumed negligible
-% end
+end
 
 mm = m(1) + cumsum(dm);
 
@@ -823,8 +863,20 @@ legend('E','$E_o + \dot{m} \Delta E$','Interpreter','latex')
 % % Relative differences between total mass/energy in and change in C.V. mass/energy
 figure('color',[1 1 1]);plot(t,(mm - m)./m)
 title('Difference in mass')
-figure('color',[1 1 1]);plot(t,(EE' - E)./E')
+figure('color',[1 1 1]);plot(t,(EE - E)./E)
 title('Difference in energy')
+
+
+%%
+if strcmp(simType,'CAESCav')
+    name = strcat(simType,'_P',num2str(P_A/1e6),'MPa_L',num2str(L),'m_Dt',num2str(floor(Dt/3600)),'h');
+elseif strcmp(simType,'CAESPipe')
+    name = strcat(simType,'_P',num2str(P_A/1e6),'MPa_L',num2str(L/1000),'km_Dt',num2str(floor(Dt/3600)),'h');
+else
+    disp('Unidentified simulation')
+end
+
+save(name)
 
 %%
 profile viewer
