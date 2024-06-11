@@ -8,20 +8,20 @@ CP = py.importlib.import_module('CoolProp.CoolProp');
 %----------------------- PROBLEM PARAMETERS -------------------------%
 % Pipeline parameters
 % Kiuchi
-L = 5000;
-D = 0.5;
-% L = 70000;
-% D = 0.9;
+% L = 5000;
+% D = 0.5;
+L = 70000;
+D = 0.9;
 % L = 213333;
 % L = 300;
 % D = 24;
 % L = 35;
 % D = 40;
 
-% Dt = 4*3600; % Total simulation time
+Dt = 3*3600; % Total simulation time
 % Dt = 3600;
 % Dt = 10;
-Dt = 300;
+% Dt = 300;
 
 eps = 0.04e-3; % Absolute roughness 0.04 mm
 epsD = eps/D;
@@ -35,9 +35,12 @@ T_amb = 273.15 + 25;
 P_max = 7e6;
 P_min = 4.3e6;
 
+simType = 'CAESPipe';
+% simType = 'CAESCav';
+
 % CAES process
-% Process = 'Charging_L';
-Process = 'Discharging_L';
+Process = 'Charging_L';
+% Process = 'Discharging_L';
 if strcmp(Process,'Charging_L')
     % Initial conditions
     % P_0 = 101325;
@@ -117,8 +120,7 @@ end
 g = 9.81;
 theta = 0;
 %--------------------- SIMULATION PARAMETERS ------------------------%
-simType = 'CAESPipe';
-% simType = 'CAESCav';
+
 
 if strcmp(simType,'CAESPipe')
     dx = L/(50-1); % CAESPipe
@@ -763,7 +765,6 @@ for j=2:n_t
 
         % v_corr(end)       =  % Velocity corrected based on mass balance (m_in =
         % m_out)
-
         error_P = (P_corr./P(:,j));
         error_hist = [error_hist error_P];
 
@@ -778,11 +779,10 @@ for j=2:n_t
         % cp(i) = CP.PropsSI('C','P',P(i,j),'D',rho(i,j),'Air');
         h(i,j) = CP.PropsSI('H','P',P(i,j),'D',rho(i,j),'Air');
         s(i,j) = CP.PropsSI('S','P',P(i,j),'D',rho(i,j),'Air');
-
-        
+  
     end
 
-    if strcmp(L_bound,'Inlet') & P(2,j) >= P_max
+    if strcmp(L_bound,'Inlet') & P(ceil(n_n/2),j) >= P_max
         % v(1,j+1:end) = 0;
         L_bound = 'Wall';
         t_shut_off = (j-1)*dt;
@@ -844,10 +844,12 @@ x_n = [dx/2:dx:L]';
 
 % Exergy
 % X = P*(A_h*L).*(P_amb./P - 1 + log(P./P_amb))./(1e6*3600); % Pipeline Exergy [MWh]
-% X_min = P_0*(A_h*L).*(P_amb./P_0 - 1 + log(P_0./P_amb))/(1e6*3600); % Exergy when discharged [MWh]
-% 
-% X_net = X - X_min; % Exergy between current state and discharged state (assuming whole pipeline at P_min)
-% X_in = sum(dX);
+% X_min = P_0*(A_h*L).*(P_amb./P_0 - 1 + log(P_0./P_amb))/(1e6*3600); % Exergy when discharged [MWh] 
+X = P*(A_h*dx).*(P_amb./P - 1 + log(P./P_amb))./(1e6*3600); % Pipeline Exergy [MWh]
+X_min = P_0*(A_h*dx).*(P_amb./P_0 - 1 + log(P_0./P_amb))/(1e6*3600); % Exergy when discharged [MWh] 
+X_net = X - X_min; % Exergy between current state and discharged state (assuming whole pipeline at P_min)
+X_in = sum(dX)
+X_st = sum(X_net(:,end))
 
 % Figures of mass and energy over time
 % figure('color',[1 1 1]);plot(m)
