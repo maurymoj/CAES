@@ -13,15 +13,16 @@ D = 0.5;
 % L = 70000;
 % D = 0.9;
 % L = 213333;
+% Cavern parameters
 % L = 300;
 % D = 24;
-% L = 35;
+% L = 35; % Roughly same volume as 70 km, 0.9 D pipeline
 % D = 40;
 
 % Dt = 3*3600; % Total simulation time
 % Dt = 3600;
 % Dt = 10;
-Dt = 600;
+Dt = 30;
 
 eps = 0.04e-3; % Absolute roughness 0.04 mm
 epsD = eps/D;
@@ -39,10 +40,10 @@ simType = 'CAESPipe';
 % simType = 'CAESCav';
 
 % CAES process
-% Process = 'Charging_L';
+Process = 'Charging_L';
 % Process = 'Discharging_L'
 % Process = 'Charging_R';
-Process = 'Discharging_R';
+% Process = 'Discharging_R';
 if strcmp(Process,'Charging_L')
     % Initial conditions
     % P_0 = 101325;
@@ -148,7 +149,7 @@ theta = 0;
 
 
 if strcmp(simType,'CAESPipe')
-    dx = L/(50-1); % CAESPipe
+    dx = L/(20-1); % CAESPipe
     dt = 1;
     tol = 1e-6; % CAESPipe Charging
     % tol = 1e-3; % CAESPipe discharging
@@ -245,8 +246,8 @@ if strcmp(L_bound,'Inlet')
     v_A = m_A/(rho_A*A_h);
 
     P(1,:) = P_A;
-    T(1,:) = T_A;
-    rho(1,:) = rho_A;
+    % T(1,:) = T_A;
+    % rho(1,:) = rho_A;
 
     P_f(1,:) = P_A;
     T_f(1,:) = T_A;
@@ -257,9 +258,9 @@ if strcmp(L_bound,'Inlet')
 elseif strcmp(L_bound,'Wall')
     v(1,:) = 0;
 
-    P_f(1,1) = P(1,1);
-    T_f(1,1) = T(1,1);
-    rho_f(1,1) = rho(1,1);
+    % P_f(1,1) = P(1,1);
+    % T_f(1,1) = T(1,1);
+    % rho_f(1,1) = rho(1,1);
 
 elseif strcmp(L_bound,'P_const') 
     % Assumptions:
@@ -316,6 +317,11 @@ if strcmp(R_bound,'Inlet')
 
 elseif(strcmp(R_bound,'Wall'))
     v(end,:) = 0;
+
+    P_f(end,1) = P(end,1);
+    T_f(end,1) = T(end,1);
+    rho_f(end,1) = rho(end,1);
+
 
 elseif(strcmp(R_bound,'P_const'))    
     % Assumptions:
@@ -432,7 +438,7 @@ for j=2:n_t
     error_P = 10;
 
     while count(j) < 100 && max(abs(error_P)) > tol
-
+% P_corr
         % Under-relaxed corrections
         P(:,j) = P(:,j) + alpha_P*P_corr;
         rho(:,j) = alpha_rho*(rho(:,j) + rho_corr) + (1-alpha_rho)*rho(:,j);
@@ -444,6 +450,9 @@ for j=2:n_t
             % P(1,:) = P_A;
             % T(1,:) = T_A;
             % rho(1,:) = rho_A;
+
+            % T_f(1,:) = T_A;
+            % rho_f(1,:) = rho_A;
         elseif strcmp(L_bound,'Wall')
             v(1,j) = 0;
             P_f(1,j) = P(1,j);
@@ -554,6 +563,7 @@ for j=2:n_t
         P_f(end,j) = P(end,j); % ASSUMING v >= 0 for t>0!!!!
         rho_f(end,j) = rho(end,j); % ASSUMING v >= 0 for t>0!!!!
 
+        
 
         % Properties
         u_sonic = zeros(N_f,1);
@@ -772,7 +782,7 @@ for j=2:n_t
 
         P_corr = linsolve(A,BB);
         
-        if strcmp(L_bound,'M_const')
+        if strcmp(L_bound,'M_const') %|| strcmp(L_bound,'Inlet')
             P_corr(1) = 0;
         elseif strcmp(R_bound,'M_const')
             P_corr(end) = 0;
@@ -805,9 +815,15 @@ for j=2:n_t
     % THERMODYNAMIC PROPERTIES
     cp(j) = CP.PropsSI('C','P',P(2,j),'D',rho(2,j),'Air');
     for i = 1:n_n  % PROPERTIES FROM P AND RHO          
+        % T(i,j) = CP.PropsSI('T','P',P(i,j),'D',rho(i,j),'Air');
+
         h(i,j) = CP.PropsSI('H','P',P(i,j),'D',rho(i,j),'Air');
         s(i,j) = CP.PropsSI('S','P',P(i,j),'D',rho(i,j),'Air');
     end
+
+    T_f(2:end-1,j) = (v(1:end-2,j) >= 0).*T(1:end-1,j) ...
+                     + (v(1:end-2,j) <  0).*T(2:end,j);
+    T_f(end,j) = T(end,j);
 
     if strcmp(L_bound,'Inlet') & P(ceil(n_n/2),j) >= P_max
         % v(1,j+1:end) = 0;
@@ -851,7 +867,7 @@ if strcmp(Process,'Charging_L')
 elseif strcmp(Process,'Discharging_L')
     dm = rho_f(1,:)'.*v(1,:)'*A_h*dt;
     dE = rho_f(1,:)'.*v(1,:)'*A_h.*cp(1,:)'.*T_f(1,:)'*dt;
-    dX = rho(1,:)'.*v(1,:)'*A_h.*(h(:,1)' - h_o - T_o*(s(:,1)' - s_o))*dt; % Flow exergy - kinetic and potential term contributions assumed negligible
+    dX = rho_f(1,:)'.*v(1,:)'*A_h.*(h(:,1)' - h_o - T_o*(s(:,1)' - s_o))*dt; % Flow exergy - kinetic and potential term contributions assumed negligible
 elseif strcmp(Process,'Charging_R')
     dm = -rho_B*v(end,:)'*A_h*dt;
     dE = -rho_B*v(end,:)'*A_h*cp_B*T_B*dt;
@@ -859,13 +875,12 @@ elseif strcmp(Process,'Charging_R')
 elseif strcmp(Process,'Discharging_R')
     dm = -rho_f(end,:)'.*v(end,:)'*A_h*dt;
     dE = -rho_f(end,:)'.*v(end,:)'*A_h.*cp(end,:)'.*T_f(end,:)'*dt;
-    dX = -rho(end,:)'.*v(end,:)'*A_h.*(h(:,end)' - h_o - T_o*(s(:,end)' - s_o))*dt; % Flow exergy - kinetic and potential term contributions assumed negligible
+    dX = -rho_f(end,:)'.*v(end,:)'*A_h.*(h(:,end)' - h_o - T_o*(s(:,end)' - s_o))*dt; % Flow exergy - kinetic and potential term contributions assumed negligible
 end
 
 m_bal = m(1) + cumsum(dm);
 
 E_bal = E(1) + cumsum(dE);
-
 
 x = 0:dx:L;
 x_f = [0:dx:L]';
@@ -891,7 +906,7 @@ legend('m','$m_o + \dot{m} dt$','Interpreter','latex')
 figure('color',[1 1 1]);plot(t,E)
 hold on; plot(t,E_bal(1:end))
 legend('E','$E_o + \dot{m} \Delta E$','Interpreter','latex')
-
+%%
 % differences between total mass/energy in and change in C.V. mass/energy
 % figure('color',[1 1 1]);plot(t,mm' - m)
 % title('Difference in mass')
