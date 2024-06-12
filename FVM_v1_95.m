@@ -8,20 +8,20 @@ CP = py.importlib.import_module('CoolProp.CoolProp');
 %----------------------- PROBLEM PARAMETERS -------------------------%
 % Pipeline parameters
 % Kiuchi
-% L = 5000;
-% D = 0.5;
-L = 70000;
-D = 0.9;
+L = 5000;
+D = 0.5;
+% L = 70000;
+% D = 0.9;
 % L = 213333;
 % L = 300;
 % D = 24;
 % L = 35;
 % D = 40;
 
-Dt = 3*3600; % Total simulation time
+% Dt = 3*3600; % Total simulation time
 % Dt = 3600;
 % Dt = 10;
-% Dt = 300;
+Dt = 600;
 
 eps = 0.04e-3; % Absolute roughness 0.04 mm
 epsD = eps/D;
@@ -39,8 +39,10 @@ simType = 'CAESPipe';
 % simType = 'CAESCav';
 
 % CAES process
-Process = 'Charging_L';
-% Process = 'Discharging_L';
+% Process = 'Charging_L';
+% Process = 'Discharging_L'
+% Process = 'Charging_R';
+Process = 'Discharging_R';
 if strcmp(Process,'Charging_L')
     % Initial conditions
     % P_0 = 101325;
@@ -63,6 +65,29 @@ elseif strcmp(Process,'Discharging_L')
 
     L_bound = 'M_const';
     R_bound = 'Wall';
+elseif strcmp(Process,'Charging_R')
+    % Initial conditions
+    % P_0 = 101325;
+    % P_0 = 7e6;
+    P_0 = 4.3e6; % Huntorf
+    T_0 = 273.15 + 25;
+    v_0 = 0;
+    % v_0 = v_in;
+
+    L_bound = 'Wall';
+    R_bound = 'Inlet';
+    
+elseif strcmp(Process,'Discharging_R')
+    % Initial conditions
+    % P_0 = 101325;
+    P_0 = 7e6;
+    % P_0 = 4.3e6; % Huntorf
+    T_0 = 273.15 + 25;
+    v_0 = 0;
+    % v_0 = v_in;
+
+    L_bound = 'Wall';
+    R_bound = 'M_const';
 end
 
 % A - Left side boundary condition
@@ -87,7 +112,7 @@ elseif strcmp(L_bound,'Wall')
 elseif strcmp(L_bound,'Outlet')
     % m_A = m_R;
 elseif strcmp(L_bound,'P_const')
-    P_A = 4e6; % 4 MPa
+    P_A = 4.3e6; % 4 MPa
 elseif strcmp(L_bound,'M_const')
     % m_A = -417; % Huntorf, sign indicates flow direction
     m_A = -100;
@@ -160,6 +185,10 @@ v_n = zeros(n_n,n_t);
 P = zeros(n_n,n_t);
 T = zeros(n_n,n_t);
 rho = zeros(n_n,n_t);
+h = zeros(n_n,n_t);
+s = zeros(n_n,n_t);
+cp = zeros(1,n_t);
+
 
 % Sanity check
 m = zeros(n_t,1); % Total mass in pipeline
@@ -168,6 +197,7 @@ E = zeros(n_t,1); % Total energy in pipeline
 %------------------ SETTING INITIAL CONDITIONS ---------------------%
 % Basic calculations
 rho_amb = CP.PropsSI('D','P',P_amb,'T',T_amb,'Air');
+% Dead state parameters
 P_o = P_amb;
 T_o = T_amb;
 h_o = CP.PropsSI('H','P',P_o,'T',T_o,'Air');
@@ -178,7 +208,7 @@ s_o = CP.PropsSI('S','P',P_o,'T',T_o,'Air');
 P(:,1) = P_0*ones(n_n,1);
 T(:,1) = T_0*ones(n_n,1);
 rho(:,1) = CP.PropsSI('D','P',P(1,1),'T',T(1,1),'Air');
-cp = CP.PropsSI('C','P',P(1,1),'T',T(1,1),'Air'); % Constant Cp (?)
+cp(1) = CP.PropsSI('C','P',P(1,1),'T',T(1,1),'Air'); % Constant Cp (?)
 
 % Initial conditions at faces (i -> x, j -> t)
 v(:,1) = v_0; % V profile at t=0
@@ -376,7 +406,7 @@ end
 % T(:,:) = T_0; % Isothermal pipeline assumption
 
 m(1) = sum(rho(:,1)*A_h*dx);
-E(1) = sum(rho(:,1)*A_h*dx.*cp.*T(:,1));
+E(1) = sum(rho(:,1)*A_h*dx.*cp(1).*T(:,1));
 
 count = zeros(n_t,1);
 f_guess = (2*log10(1/epsD)+1.14)^(-2); % Friction factor based on Nikuradse
@@ -532,7 +562,6 @@ for j=2:n_t
 
         u_sonic_n = zeros(n_n,1);
         drho_dP_n = zeros(n_n,1);
-        cp = zeros(n_n,1);
 
         % for i = 1:n % PROPERTIES FROM P AND T
         % 
@@ -553,7 +582,6 @@ for j=2:n_t
 
         for i = 1:n_n  % PROPERTIES FROM P AND RHO
             T(i,j) = CP.PropsSI('T','P',P(i,j),'D',rho(i,j),'Air');
-            cp(i) = CP.PropsSI('C','P',P(i,j),'D',rho(i,j),'Air');
 
             u_sonic(i) = CP.PropsSI('speed_of_sound','P',P_f(i,j),'D',rho_f(i,j),'Air');
             nu = CP.PropsSI('viscosity','P',P_f(i,j),'D',rho_f(i,j),'Air');
@@ -775,11 +803,10 @@ for j=2:n_t
     end
     
     % THERMODYNAMIC PROPERTIES
+    cp(j) = CP.PropsSI('C','P',P(2,j),'D',rho(2,j),'Air');
     for i = 1:n_n  % PROPERTIES FROM P AND RHO          
-        % cp(i) = CP.PropsSI('C','P',P(i,j),'D',rho(i,j),'Air');
         h(i,j) = CP.PropsSI('H','P',P(i,j),'D',rho(i,j),'Air');
         s(i,j) = CP.PropsSI('S','P',P(i,j),'D',rho(i,j),'Air');
-  
     end
 
     if strcmp(L_bound,'Inlet') & P(ceil(n_n/2),j) >= P_max
@@ -799,7 +826,7 @@ for j=2:n_t
     bound_hist = [bound_hist; string(L_bound) string(R_bound)];
     
     m(j) = sum(rho(:,j)*A_h*dx);
-    E(j) = sum(rho(:,j)*A_h*dx.*cp.*T(:,j));
+    E(j) = sum(rho(:,j)*A_h*dx.*cp(j).*T(:,j));
     % [j count(j)]
     if rem((j-1)*dt,1) == 0
         disp(strcat('t= ',num2str((j-1)*dt),'s, n iterations: ',num2str(count(j))))
@@ -823,19 +850,21 @@ if strcmp(Process,'Charging_L')
     dX = rho_A*v(1,:)'*A_h*(h_A - h_o - T_o*(s_A - s_o))*dt; % Flow exergy - kinetic and potential term contributions assumed negligible
 elseif strcmp(Process,'Discharging_L')
     dm = rho_f(1,:)'.*v(1,:)'*A_h*dt;
-    dE = rho_f(1,:)'.*v(1,:)'*A_h*cp(1).*T_f(1,:)'*dt;
+    dE = rho_f(1,:)'.*v(1,:)'*A_h.*cp(1,:)'.*T_f(1,:)'*dt;
     dX = rho(1,:)'.*v(1,:)'*A_h.*(h(:,1)' - h_o - T_o*(s(:,1)' - s_o))*dt; % Flow exergy - kinetic and potential term contributions assumed negligible
-% elseif strcmp(R_bound,'Inlet')
-    % Since the direction is to the left, v is negative, a '-' is used to
-    % correct that
-    % dm = -rho_B*v(end,:)'*A_h*dt;
-    % dE = -rho_B*v(end,:)'*A_h*cp_B*T_B*dt;
-    % dX = -rho_B*v(end,:)'*A_h*(h_B - h_o - T_o*(s_B - s_o))*dt; % Flow exergy - kinetic and potential term contributions assumed negligible
+elseif strcmp(Process,'Charging_R')
+    dm = -rho_B*v(end,:)'*A_h*dt;
+    dE = -rho_B*v(end,:)'*A_h*cp_B*T_B*dt;
+    dX = -rho_B*v(end,:)'*A_h*(h_B - h_o - T_o*(s_B - s_o))*dt; % Flow exergy - kinetic and potential term contributions assumed negligible
+elseif strcmp(Process,'Discharging_R')
+    dm = -rho_f(end,:)'.*v(end,:)'*A_h*dt;
+    dE = -rho_f(end,:)'.*v(end,:)'*A_h.*cp(end,:)'.*T_f(end,:)'*dt;
+    dX = -rho(end,:)'.*v(end,:)'*A_h.*(h(:,end)' - h_o - T_o*(s(:,end)' - s_o))*dt; % Flow exergy - kinetic and potential term contributions assumed negligible
 end
 
-mm = m(1) + cumsum(dm);
+m_bal = m(1) + cumsum(dm);
 
-EE = E(1) + cumsum(dE);
+E_bal = E(1) + cumsum(dE);
 
 
 x = 0:dx:L;
@@ -857,10 +886,10 @@ X_st = sum(X_net(:,end))
 % legend('m','\Delta m')
 
 figure('color',[1 1 1]);plot(t,m)
-hold on; plot(t,mm(1:end))
-legend('m','\Delta m')
+hold on; plot(t,m_bal(1:end))
+legend('m','$m_o + \dot{m} dt$','Interpreter','latex')
 figure('color',[1 1 1]);plot(t,E)
-hold on; plot(t,EE(1:end))
+hold on; plot(t,E_bal(1:end))
 legend('E','$E_o + \dot{m} \Delta E$','Interpreter','latex')
 
 % differences between total mass/energy in and change in C.V. mass/energy
@@ -869,9 +898,9 @@ legend('E','$E_o + \dot{m} \Delta E$','Interpreter','latex')
 % figure('color',[1 1 1]);plot(t,EE' - E)
 % title('Difference in energy')
 % % Relative differences between total mass/energy in and change in C.V. mass/energy
-figure('color',[1 1 1]);plot(t,(mm - m)./m)
+figure('color',[1 1 1]);plot(t,(m_bal - m)./m)
 title('Difference in mass')
-figure('color',[1 1 1]);plot(t,(EE - E)./E)
+figure('color',[1 1 1]);plot(t,(E_bal - E)./E)
 title('Difference in energy')
 
 
