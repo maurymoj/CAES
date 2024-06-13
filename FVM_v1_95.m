@@ -190,7 +190,7 @@ h = zeros(n_n,n_t);
 s = zeros(n_n,n_t);
 cp = zeros(1,n_t);
 
-
+T_sol = zeros(n_n,n_t);
 % Sanity check
 m = zeros(n_t,1); % Total mass in pipeline
 E = zeros(n_t,1); % Total energy in pipeline
@@ -791,6 +791,8 @@ for j=2:n_t
         rho_corr = drho_dP_n.*P_corr;
 
         a_i = diag(a);
+
+
         v_corr = zeros(N_f,1);
         % v_corr(1)         = d(1)./a_i(1).*P_corr(1);
         v_corr(2:end-1)   = d./a_i.*(P_corr(2:end)-P_corr(1:end-1));
@@ -812,6 +814,31 @@ for j=2:n_t
 
     end
     
+    % ENERGY BALANCE
+    % ASSUMING v>0
+    a_T = zeros(n_n,n_n);
+    b_T = zeros(n_n,1);
+    Q(j) = 0; % ADIABATIC ASSUMTION
+
+    a_T(1,1) = rho(1,j)*cp(j-1)/dt + rho_f(2,j)*v(2,j)*cp(j-1)/dx;
+    b_T(1) = Q(j) + (P(1,j)-P(1,j-1))/dt ...
+            + v_n(1,j)*(P_f(2,j) - P_f(1,j))/dx ...
+            + f(1)*rho(1,j)*abs(v_n(1,j))^3/(2*D) ...
+            + rho(1,j-1)*cp(j-1)*T(1,j-1)/dt...
+            + rho_f(1,j)*v(1,j)*cp(j-1)/dx;
+    for i=2:n_n
+        a_T(i,i) = rho(i,j)*cp(j-1)/dt + rho_f(i+1,j)*v(i+1,j)*cp(j-1)/dx;
+        a_T(i,i-1) = -rho_f(i,j)*v(i,j)*cp(j-1)/dx;
+        b_T(i) = Q(j) + (P(i,j)-P(i,j-1))/dt ...
+                + v_n(i,j)*(P_f(i+1,j) - P_f(i,j))/dx ...
+                + f(i)*rho(i,j)*abs(v_n(i,j))^3/(2*D) ...
+                + rho(i,j-1)*cp(j-1)*T(i,j-1)/dt;
+
+        % a_T(i,i+1) = 
+    end
+    T_sol(:,j) = linsolve(a_T,b_T);
+    % T(:,j) = linsolve(a_T,b_T);
+
     % THERMODYNAMIC PROPERTIES
     cp(j) = CP.PropsSI('C','P',P(2,j),'D',rho(2,j),'Air');
     for i = 1:n_n  % PROPERTIES FROM P AND RHO          
