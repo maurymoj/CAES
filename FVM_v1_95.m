@@ -591,7 +591,7 @@ for j=2:n_t
 
 
         for i = 1:n_n  % PROPERTIES FROM P AND RHO
-            T(i,j) = CP.PropsSI('T','P',P(i,j),'D',rho(i,j),'Air');
+            % T(i,j) = CP.PropsSI('T','P',P(i,j),'D',rho(i,j),'Air');
 
             u_sonic(i) = CP.PropsSI('speed_of_sound','P',P_f(i,j),'D',rho_f(i,j),'Air');
             nu = CP.PropsSI('viscosity','P',P_f(i,j),'D',rho_f(i,j),'Air');
@@ -605,10 +605,10 @@ for j=2:n_t
         u_sonic(end) = CP.PropsSI('speed_of_sound','P',P_f(end,j),'D',rho_f(end,j),'Air');
         drho_dP(end) = 1/(u_sonic(end)^2);
 
-        T_f(2:end-1,j) = (v(1:end-2,j) >= 0).*T(1:end-1,j) ...
-            +            (v(1:end-2,j) <  0).*T(2:end,j);
-        T_f(end,j) = T(end,j); % ASSUMING v >= 0 for t>0!!!!
-    
+        % T_f(2:end-1,j) = (v(1:end-2,j) >= 0).*T(1:end-1,j) ...
+        %     +            (v(1:end-2,j) <  0).*T(2:end,j);
+        % T_f(end,j) = T(end,j); % ASSUMING v >= 0 for t>0!!!!
+        % 
         %---------- v* calculation - Momentum control volume ---------------------%
         
         % Friction factor based on Nikuradse - IMPLEMENT COLEBROOK EQUATION
@@ -818,14 +818,14 @@ for j=2:n_t
     % ASSUMING v>0
     a_T = zeros(n_n,n_n);
     b_T = zeros(n_n,1);
-    Q(j) = 0; % ADIABATIC ASSUMTION
+    Q(j) = 0; % ADIABATIC ASSUMPTION
 
     a_T(1,1) = rho(1,j)*cp(j-1)/dt + rho_f(2,j)*v(2,j)*cp(j-1)/dx;
     b_T(1) = Q(j) + (P(1,j)-P(1,j-1))/dt ...
             + v_n(1,j)*(P_f(2,j) - P_f(1,j))/dx ...
             + f(1)*rho(1,j)*abs(v_n(1,j))^3/(2*D) ...
             + rho(1,j-1)*cp(j-1)*T(1,j-1)/dt...
-            + rho_f(1,j)*v(1,j)*cp(j-1)/dx;
+            + rho_f(1,j)*v(1,j)*cp(j-1)*T_f(1,j)/dx;
     for i=2:n_n
         a_T(i,i) = rho(i,j)*cp(j-1)/dt + rho_f(i+1,j)*v(i+1,j)*cp(j-1)/dx;
         a_T(i,i-1) = -rho_f(i,j)*v(i,j)*cp(j-1)/dx;
@@ -836,8 +836,8 @@ for j=2:n_t
 
         % a_T(i,i+1) = 
     end
-    T_sol(:,j) = linsolve(a_T,b_T);
-    % T(:,j) = linsolve(a_T,b_T);
+    % T_sol(:,j) = linsolve(a_T,b_T);
+    T(:,j) = linsolve(a_T,b_T);
 
     % THERMODYNAMIC PROPERTIES
     cp(j) = CP.PropsSI('C','P',P(2,j),'D',rho(2,j),'Air');
@@ -905,9 +905,9 @@ elseif strcmp(Process,'Discharging_R')
     dX = -rho_f(end,:)'.*v(end,:)'*A_h.*(h(:,end)' - h_o - T_o*(s(:,end)' - s_o))*dt; % Flow exergy - kinetic and potential term contributions assumed negligible
 end
 
-m_bal = m(1) + cumsum(dm);
+m_bal = m(1) + [0;cumsum(dm(1:end-1))];
 
-E_bal = E(1) + cumsum(dE);
+E_bal = E(1) + [0;cumsum(dE(1:end-1))];
 
 x = 0:dx:L;
 x_f = [0:dx:L]';
