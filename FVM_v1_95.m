@@ -22,7 +22,7 @@ D = 0.5;
 % Dt = 3*3600; % Total simulation time
 % Dt = 3600;
 % Dt = 10;
-Dt = 30;
+Dt = 600;
 
 eps = 0.04e-3; % Absolute roughness 0.04 mm
 epsD = eps/D;
@@ -409,8 +409,6 @@ end
 
 
 
-% T(:,:) = T_0; % Isothermal pipeline assumption
-
 m(1) = sum(rho(:,1)*A_h*dx);
 E(1) = sum(rho(:,1)*A_h*dx.*cp(1).*T(:,1));
 
@@ -438,7 +436,7 @@ for j=2:n_t
     error_P = 10;
 
     while count(j) < 100 && max(abs(error_P)) > tol
-% P_corr
+        
         % Under-relaxed corrections
         P(:,j) = P(:,j) + alpha_P*P_corr;
         rho(:,j) = alpha_rho*(rho(:,j) + rho_corr) + (1-alpha_rho)*rho(:,j);
@@ -573,23 +571,6 @@ for j=2:n_t
         u_sonic_n = zeros(n_n,1);
         drho_dP_n = zeros(n_n,1);
 
-        % for i = 1:n % PROPERTIES FROM P AND T
-        % 
-        %     u_sonic(i) = CP.PropsSI('speed_of_sound','P',P_f(i,j),'T',T_f(i,j),'Air');
-        %     nu(i) = CP.PropsSI('viscosity','P',P_f(i,j),'T',T_f(i,j),'Air');
-        %     cp(i) = CP.PropsSI('C','P',P_f(i,j),'T',T_f(i,j),'Air');
-        % 
-        %     drho_dP(i) = 1/(u_sonic(i)^2);
-        % 
-        %     u_sonic_n(i) = CP.PropsSI('speed_of_sound','P',P(i,j),'T',T(i,j),'Air');
-        % 
-        %     drho_dP_n(i) = 1/(u_sonic_n(i)^2);
-        % end
-        % 
-        % u_sonic(end) = CP.PropsSI('speed_of_sound','P',P_f(end,j),'T',T_f(end,j),'Air');
-        % drho_dP(end) = 1/(u_sonic(end)^2);
-
-
         for i = 1:n_n  % PROPERTIES FROM P AND RHO
             % T(i,j) = CP.PropsSI('T','P',P(i,j),'D',rho(i,j),'Air');
 
@@ -617,7 +598,7 @@ for j=2:n_t
         % Re = rho_f(:,j).*v(:,j)*D./nu(:);
         % f = zeros(n,1);
         % 
-        % for i=1:n
+        % for i=1:n_n
         %     f_old = f_guess;
         %     df = 10;
         %     count_f = 0;
@@ -919,7 +900,7 @@ x_n = [dx/2:dx:L]';
 X = P*(A_h*dx).*(P_amb./P - 1 + log(P./P_amb))./(1e6*3600); % Pipeline Exergy [MWh]
 X_min = P_0*(A_h*dx).*(P_amb./P_0 - 1 + log(P_0./P_amb))/(1e6*3600); % Exergy when discharged [MWh] 
 X_net = X - X_min; % Exergy between current state and discharged state (assuming whole pipeline at P_min)
-X_in = sum(dX)
+X_in = sum(dX)/(1e6*3600)
 X_st = sum(X_net(:,end))
 
 % Figures of mass and energy over time
