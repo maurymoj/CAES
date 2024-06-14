@@ -22,7 +22,7 @@ D = 0.5;
 % Dt = 3*3600; % Total simulation time
 % Dt = 3600;
 % Dt = 10;
-Dt = 600;
+Dt = 300;
 
 eps = 0.04e-3; % Absolute roughness 0.04 mm
 epsD = eps/D;
@@ -253,7 +253,21 @@ if strcmp(L_bound,'Inlet')
     T_f(1,:) = T_A;
     rho_f(1,:) = rho_A;
     % At face
-    v(1,:) = v_A;
+    v(1,2:end) = v_A;
+    
+    % Sliding pressure inlet test
+
+    v_A = m_A/(rho(1,1)*A_h);
+    % 
+    % P(1,:) = P_0;
+    % T(1,:) = T_A;
+    % rho(1,:) = rho_A;
+    % 
+    % P_f(1,:) = P_0;
+    % T_f(1,:) = T_0;
+    % rho_f(1,:) = rho(1,1);
+    % % At face
+    % v(1,1) = v_A;
 
 elseif strcmp(L_bound,'Wall')
     v(1,:) = 0;
@@ -451,6 +465,7 @@ for j=2:n_t
 
             % T_f(1,:) = T_A;
             % rho_f(1,:) = rho_A;
+            % v(1,j) = m_A/(rho(1,j)*A_h); % Sliding pressure test
         elseif strcmp(L_bound,'Wall')
             v(1,j) = 0;
             P_f(1,j) = P(1,j);
@@ -872,10 +887,15 @@ if strcmp(Process,'Charging_L')
     dm = rho_A*v(1,:)'*A_h*dt;
     dE = rho_A*v(1,:)'*A_h*cp_A*T_A*dt;
     dX = rho_A*v(1,:)'*A_h*(h_A - h_o - T_o*(s_A - s_o))*dt; % Flow exergy - kinetic and potential term contributions assumed negligible
+
+    % Sliding pressure test 
+    % dm = rho_f(1,:)'.*v(1,:)'*A_h*dt;
+    % dE = rho_f(1,:)'.*v(1,:)'.*A_h.*cp(:).*T_f(1,:)'*dt;
+    % dX = rho_f(1,:)'.*v(1,:)'*A_h.*(h(1,:)' - h_o - T_o*(s(1,:)' - s_o))*dt; % Flow exergy - kinetic and potential term contributions assumed negligible
 elseif strcmp(Process,'Discharging_L')
     dm = rho_f(1,:)'.*v(1,:)'*A_h*dt;
     dE = rho_f(1,:)'.*v(1,:)'*A_h.*cp(1,:)'.*T_f(1,:)'*dt;
-    dX = rho_f(1,:)'.*v(1,:)'*A_h.*(h(:,1)' - h_o - T_o*(s(:,1)' - s_o))*dt; % Flow exergy - kinetic and potential term contributions assumed negligible
+    dX = rho_f(1,:)'.*v(1,:)'*A_h.*(h(1,:)' - h_o - T_o*(s(1,:)' - s_o))*dt; % Flow exergy - kinetic and potential term contributions assumed negligible
 elseif strcmp(Process,'Charging_R')
     dm = -rho_B*v(end,:)'*A_h*dt;
     dE = -rho_B*v(end,:)'*A_h*cp_B*T_B*dt;
@@ -886,9 +906,9 @@ elseif strcmp(Process,'Discharging_R')
     dX = -rho_f(end,:)'.*v(end,:)'*A_h.*(h(:,end)' - h_o - T_o*(s(:,end)' - s_o))*dt; % Flow exergy - kinetic and potential term contributions assumed negligible
 end
 
-m_bal = m(1) + [0;cumsum(dm(1:end-1))];
+m_bal = m(1) + cumsum(dm);
 
-E_bal = E(1) + [0;cumsum(dE(1:end-1))];
+E_bal = E(1) + cumsum(dE);
 
 x = 0:dx:L;
 x_f = [0:dx:L]';

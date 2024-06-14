@@ -45,6 +45,9 @@ for i=1:length(t_dec)
     % ylim([v_min v_max])
     % ylabel('v [m/s]')
 
+    % plot(x_f,rho_f(:,1+dec*(i-1)).*v(:,1+dec*(i-1)).*A_h);
+    % ylim([-200 400])
+
     plot(x_n,T(:,1+dec*(i-1)));
     ylim([T_min T_max])
     ylabel('T [K]')
