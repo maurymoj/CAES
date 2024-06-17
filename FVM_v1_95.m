@@ -21,12 +21,10 @@ D = 0.5;
 
 % Dt = 3*3600; % Total simulation time
 % Dt = 3600;
-% Dt = 10;
-Dt = 300;
+Dt = 100;
+% Dt = 300;
 
 eps = 0.04e-3; % Absolute roughness 0.04 mm
-epsD = eps/D;
-A_h = pi*D^2/4;
 
 % Ambient conditions
 P_amb = 101325;
@@ -197,6 +195,9 @@ E = zeros(n_t,1); % Total energy in pipeline
 
 %------------------ SETTING INITIAL CONDITIONS ---------------------%
 % Basic calculations
+epsD = eps/D;
+A_h = pi*D^2/4;
+
 rho_amb = CP.PropsSI('D','P',P_amb,'T',T_amb,'Air');
 % Dead state parameters
 P_o = P_amb;
@@ -210,7 +211,8 @@ P(:,1) = P_0*ones(n_n,1);
 T(:,1) = T_0*ones(n_n,1);
 rho(:,1) = CP.PropsSI('D','P',P(1,1),'T',T(1,1),'Air');
 cp(1) = CP.PropsSI('C','P',P(1,1),'T',T(1,1),'Air'); % Constant Cp (?)
-
+h(:,1) = CP.PropsSI('H','P',P(1,1),'T',T(1,1),'Air'); % Constant Cp (?)
+s(:,1) = CP.PropsSI('S','P',P(1,1),'T',T(1,1),'Air'); % Constant Cp (?)
 % Initial conditions at faces (i -> x, j -> t)
 v(:,1) = v_0; % V profile at t=0
 
@@ -836,7 +838,7 @@ for j=2:n_t
     T(:,j) = linsolve(a_T,b_T);
 
     % THERMODYNAMIC PROPERTIES
-    cp(j) = CP.PropsSI('C','P',P(2,j),'D',rho(2,j),'Air');
+    cp(j) = CP.PropsSI('C','P',P(floor(end/2),j),'D',rho(floor(end/2),j),'Air');
     for i = 1:n_n  % PROPERTIES FROM P AND RHO          
         % T(i,j) = CP.PropsSI('T','P',P(i,j),'D',rho(i,j),'Air');
 
