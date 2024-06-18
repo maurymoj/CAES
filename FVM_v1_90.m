@@ -24,6 +24,8 @@ A_h = pi*D^2/4;
 P_a = 101325;
 T_a = 273.15 + 25;
 rho_a = CP.PropsSI('D','P',P_a,'T',T_a,'Air');
+h_0 = CP.PropsSI('H','P',P_a,'T',T_a,'Air');
+s_0 = CP.PropsSI('S','P',P_a,'T',T_a,'Air');
 
 % A - Left side - Inlet 
 P_in = 7e6;
@@ -33,14 +35,14 @@ Q_st_in = 3e5; % standard cubic meters per hour
 
 rho_in = CP.PropsSI('D','P',P_in,'T',T_in,'Air');
 cp_in = CP.PropsSI('C','P',P_in,'T',T_in,'Air');
+h_in = CP.PropsSI('H','P',P_in,'T',T_in,'Air');
+s_in = CP.PropsSI('S','P',P_in,'T',T_in,'Air');
 
 % m_in = rho_a*Q_a;
 % m_in = 100;
 m_in = 108; % Huntorf
 
 v_in = m_in/(rho_in*A_h);
-
-
 
 % B - Right side boundary condition
 R_bound = 'Wall';
@@ -442,7 +444,7 @@ dm = rho_in*v(1,:)'*A_h*dt;
 mm = m(1) + cumsum(dmm);
 dE = rho_in*v(1,:)'*A_h*cp_in*T_in*dt;
 EE = E(1) + cumsum(dE);
-
+dX = rho_in*v(1,:)'*A_h*(h_in - h_0 - T_0*(s_in - s_0))*dt; % Flow exergy - kinetic and potential term contributions assumed negligible
 
 x = 0:dx:L;
 x_f = [0:dx:L]';
@@ -453,6 +455,7 @@ X = P*(A_h*L).*(P_a./P - 1 + log(P./P_a))./(1e6*3600); % Pipeline Exergy [MWh]
 X_min = P_o*(A_h*L).*(P_a./P_o - 1 + log(P_o./P_a))/(1e6*3600); % Exergy when discharged [MWh]
 
 X_net = X - X_min; % Exergy between current state and discharged state (assuming whole pipeline at P_min)
+X_in = sum(dX);
 
 % Figures of mass and energy over time
 % figure('color',[1 1 1]);plot(m)
