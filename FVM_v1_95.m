@@ -22,7 +22,6 @@ D = 0.5;
 % Dt = 3*3600; % Total simulation time
 % Dt = 3600;
 Dt = 100;
-% Dt = 300;
 
 eps = 0.04e-3; % Absolute roughness 0.04 mm
 
@@ -45,7 +44,6 @@ Process = 'Charging_L';
 if strcmp(Process,'Charging_L')
     % Initial conditions
     % P_0 = 101325;
-    % P_0 = 7e6;
     P_0 = 4.3e6; % Huntorf
     T_0 = 273.15 + 25;
     v_0 = 0;
@@ -55,9 +53,7 @@ if strcmp(Process,'Charging_L')
     R_bound = 'Wall';
 elseif strcmp(Process,'Discharging_L')
     % Initial conditions
-    % P_0 = 101325;
     P_0 = 7e6;
-    % P_0 = 4.3e6; % Huntorf
     T_0 = 273.15 + 25;
     v_0 = 0;
     % v_0 = v_in;
@@ -67,7 +63,6 @@ elseif strcmp(Process,'Discharging_L')
 elseif strcmp(Process,'Charging_R')
     % Initial conditions
     % P_0 = 101325;
-    % P_0 = 7e6;
     P_0 = 4.3e6; % Huntorf
     T_0 = 273.15 + 25;
     v_0 = 0;
@@ -78,9 +73,7 @@ elseif strcmp(Process,'Charging_R')
     
 elseif strcmp(Process,'Discharging_R')
     % Initial conditions
-    % P_0 = 101325;
     P_0 = 7e6;
-    % P_0 = 4.3e6; % Huntorf
     T_0 = 273.15 + 25;
     v_0 = 0;
     % v_0 = v_in;
@@ -100,21 +93,21 @@ if strcmp(L_bound,'Inlet')
     % Q_a = Q_st_in/3600;
     % m_in = rho_a*Q_a;
     % m_in = 100;
-    m_A = 108; % Huntorf
+    m_L = 108; % Huntorf
     % v_A = ?
-    P_A = 7e6;
-    T_A = 273.15 + 60;
+    P_L = 7e6;
+    T_L = 273.15 + 60;
 
 elseif strcmp(L_bound,'Wall')
-    m_A = 0;
-    v_A = 0;
+    m_L = 0;
+    v_L = 0;
 elseif strcmp(L_bound,'Outlet')
     % m_A = m_R;
 elseif strcmp(L_bound,'P_const')
-    P_A = 4.3e6; % 4 MPa
+    P_L = 4.3e6; % 4 MPa
 elseif strcmp(L_bound,'M_const')
     % m_A = -417; % Huntorf, sign indicates flow direction
-    m_A = -100;
+    m_L = -100;
 end   
 
 % B - Right side boundary condition
@@ -126,19 +119,19 @@ end
 if strcmp(R_bound,'Outlet')
     % m_out = m_A;
 elseif(strcmp(R_bound,'Wall'))
-    m_B = 0;
-    v_B = 0;
+    m_R = 0;
+    v_R = 0;
 elseif(strcmp(R_bound,'Inlet'))
-    m_B = -108; % Huntorf  % Remember the sign to indicate the direction of flow (+ right , - left)
-    P_B = 7e6;
-    T_B = 273.15 + 60;
+    m_R = -108; % Huntorf  % Remember the sign to indicate the direction of flow (+ right , - left)
+    P_R = 7e6;
+    T_R = 273.15 + 60;
     % v_B = m_B/(rho_B*A_h);
 elseif strcmp(R_bound,'P_const')
-    P_B = 4e6; 
+    P_R = 4e6; 
     % P_B = 4.13e6; % 4.13 MPa = Huntorf https://www.sciencedirect.com/science/article/pii/S0196890420302004#s0010
 elseif strcmp(R_bound,'M_const')
     % m_B = 417; % Huntorf    
-    m_B = 100;
+    m_R = 100;
 end                     
 
 g = 9.81;
@@ -240,26 +233,26 @@ rho_f(end,1) = rho(end,1); % ASSUMING v >= 0 for t=0!!!!
 % L boundary conditions
 if strcmp(L_bound,'Inlet')
     % At node
-    rho_A = CP.PropsSI('D','P',P_A,'T',T_A,'Air');
-    cp_A = CP.PropsSI('C','P',P_A,'T',T_A,'Air');
-    h_A = CP.PropsSI('H','P',P_A,'T',T_A,'Air');
-    s_A = CP.PropsSI('S','P',P_A,'T',T_A,'Air');
+    rho_L = CP.PropsSI('D','P',P_L,'T',T_L,'Air');
+    cp_L = CP.PropsSI('C','P',P_L,'T',T_L,'Air');
+    h_L = CP.PropsSI('H','P',P_L,'T',T_L,'Air');
+    s_L = CP.PropsSI('S','P',P_L,'T',T_L,'Air');
 
-    v_A = m_A/(rho_A*A_h);
+    v_L = m_L/(rho_L*A_h);
 
-    P(1,:) = P_A;
+    P(1,:) = P_L;
     % T(1,:) = T_A;
     % rho(1,:) = rho_A;
 
-    P_f(1,:) = P_A;
-    T_f(1,:) = T_A;
-    rho_f(1,:) = rho_A;
+    P_f(1,:) = P_L;
+    T_f(1,:) = T_L;
+    rho_f(1,:) = rho_L;
     % At face
-    v(1,2:end) = v_A;
+    v(1,2:end) = v_L;
     
     % Sliding pressure inlet test
 
-    v_A = m_A/(rho(1,1)*A_h);
+    v_L = m_L/(rho(1,1)*A_h);
     % 
     % P(1,:) = P_0;
     % T(1,:) = T_A;
@@ -283,7 +276,7 @@ elseif strcmp(L_bound,'P_const')
     % - Outflow
     % - Zero gradient for all properties
     % - Constant cross-sectional area
-    P(1,:) = P_A;
+    P(1,:) = P_L;
     T(1,1) = T(2,1);
     rho(1,1) = rho(2,1);
 
@@ -300,7 +293,7 @@ elseif strcmp(L_bound,'M_const')
     T(1,1) = T(2,1);
     rho(1,1) = rho(2,1);
 
-    v_n(1,1) = m_A/(rho(1,1)*A_h);
+    v_n(1,1) = m_L/(rho(1,1)*A_h);
 
     % Upwind scheme
     v(1,1) = v_n(1,1);
@@ -314,22 +307,22 @@ end
 
 % R boundary conditions
 if strcmp(R_bound,'Inlet')
-    rho_B = CP.PropsSI('D','P',P_B,'T',T_B,'Air');
-    cp_B = CP.PropsSI('C','P',P_B,'T',T_B,'Air');
-    h_B = CP.PropsSI('H','P',P_B,'T',T_B,'Air');
-    s_B = CP.PropsSI('S','P',P_B,'T',T_B,'Air');
+    rho_B = CP.PropsSI('D','P',P_R,'T',T_R,'Air');
+    cp_B = CP.PropsSI('C','P',P_R,'T',T_R,'Air');
+    h_B = CP.PropsSI('H','P',P_R,'T',T_R,'Air');
+    s_B = CP.PropsSI('S','P',P_R,'T',T_R,'Air');
 
-    v_B = m_B/(rho_B*A_h);
+    v_R = m_R/(rho_B*A_h);
 
-    P(end,:) = P_B;
-    T(end,:) = T_B;
+    P(end,:) = P_R;
+    T(end,:) = T_R;
     rho(end,:) = rho_B;
 
-    P_f(end,:) = P_B;
-    T_f(end,:) = T_B;
+    P_f(end,:) = P_R;
+    T_f(end,:) = T_R;
     rho_f(end,:) = rho_B;
     % At face
-    v(end,:) = v_B;
+    v(end,:) = v_R;
 
 elseif(strcmp(R_bound,'Wall'))
     v(end,:) = 0;
@@ -344,7 +337,7 @@ elseif(strcmp(R_bound,'P_const'))
     % - Outflow
     % - Zero gradient for all properties
     % - Constant cross-sectional area
-    P(end,:) = P_B;
+    P(end,:) = P_R;
     T(end,1) = T(end-1,1);
     rho(end,1) = rho(end-1,1);
 
@@ -361,7 +354,7 @@ elseif strcmp(R_bound,'M_const')
     T(end,1) = T(end-1,1);
     rho(end,1) = rho(end-1,1);
 
-    v_n(end,1) = m_B/(rho(end,1)*A_h);
+    v_n(end,1) = m_R/(rho(end,1)*A_h);
 
     % Upwind scheme
     v(end,1) = v_n(end,1);
@@ -491,7 +484,7 @@ for j=2:n_t
             T(1,j) = T(2,j);
             rho(1,j) = rho(2,j);
         
-            v_n(1,j) = m_A/(rho(1,j)*A_h);
+            v_n(1,j) = m_L/(rho(1,j)*A_h);
         
             % Upwind scheme
             v(1,j) = v_n(1,j);
@@ -524,7 +517,7 @@ for j=2:n_t
             T(end,j) = T(end-1,j);
             rho(end,j) = rho(end-1,j);
         
-            v_n(end,j) = m_B/(rho(end,j)*A_h);
+            v_n(end,j) = m_R/(rho(end,j)*A_h);
         
             % Upwind scheme
             v(end,j) = v_n(end,j);
@@ -886,9 +879,9 @@ toc
 
 % As a function of inlet velocity (CONSTANT INLET CONDITIONS)
 if strcmp(Process,'Charging_L')
-    dm = rho_A*v(1,:)'*A_h*dt;
-    dE = rho_A*v(1,:)'*A_h*cp_A*T_A*dt;
-    dX = rho_A*v(1,:)'*A_h*(h_A - h_o - T_o*(s_A - s_o))*dt; % Flow exergy - kinetic and potential term contributions assumed negligible
+    dm = rho_L*v(1,:)'*A_h*dt;
+    dE = rho_L*v(1,:)'*A_h*cp_L*T_L*dt;
+    dX = rho_L*v(1,:)'*A_h*(h_L - h_o - T_o*(s_L - s_o))*dt; % Flow exergy - kinetic and potential term contributions assumed negligible
 
     % Sliding pressure test 
     % dm = rho_f(1,:)'.*v(1,:)'*A_h*dt;
@@ -900,7 +893,7 @@ elseif strcmp(Process,'Discharging_L')
     dX = rho_f(1,:)'.*v(1,:)'*A_h.*(h(1,:)' - h_o - T_o*(s(1,:)' - s_o))*dt; % Flow exergy - kinetic and potential term contributions assumed negligible
 elseif strcmp(Process,'Charging_R')
     dm = -rho_B*v(end,:)'*A_h*dt;
-    dE = -rho_B*v(end,:)'*A_h*cp_B*T_B*dt;
+    dE = -rho_B*v(end,:)'*A_h*cp_B*T_R*dt;
     dX = -rho_B*v(end,:)'*A_h*(h_B - h_o - T_o*(s_B - s_o))*dt; % Flow exergy - kinetic and potential term contributions assumed negligible
 elseif strcmp(Process,'Discharging_R')
     dm = -rho_f(end,:)'.*v(end,:)'*A_h*dt;
@@ -951,9 +944,9 @@ title('Difference in energy')
 
 %%
 if strcmp(simType,'CAESCav')
-    name = strcat(simType,'_P',num2str(P_A/1e6),'MPa_L',num2str(L),'m_Dt',num2str(floor(Dt/3600)),'h');
+    name = strcat(simType,'_P',num2str(P_L/1e6),'MPa_L',num2str(L),'m_Dt',num2str(floor(Dt/3600)),'h');
 elseif strcmp(simType,'CAESPipe')
-    name = strcat(simType,'_P',num2str(P_A/1e6),'MPa_L',num2str(L/1000),'km_Dt',num2str(floor(Dt/3600)),'h');
+    name = strcat(simType,'_P',num2str(P_L/1e6),'MPa_L',num2str(L/1000),'km_Dt',num2str(floor(Dt/3600)),'h');
 else
     disp('Unidentified simulation')
 end
@@ -1176,9 +1169,9 @@ legend(ts_leg)
 title('Velocity profiles (faces)')
 
 if strcmp(simType,'CAESCav')
-    name = strcat(simType,'_P',num2str(P_A/1e6),'MPa_L',num2str(L),'m_Dt',num2str(floor(Dt/3600)),'h');
+    name = strcat(simType,'_P',num2str(P_L/1e6),'MPa_L',num2str(L),'m_Dt',num2str(floor(Dt/3600)),'h');
 elseif strcmp(simType,'CAESPipe')
-    name = strcat(simType,'_P',num2str(P_A/1e6),'MPa_L',num2str(L/1000),'km_Dt',num2str(floor(Dt/3600)),'h');
+    name = strcat(simType,'_P',num2str(P_L/1e6),'MPa_L',num2str(L/1000),'km_Dt',num2str(floor(Dt/3600)),'h');
 else
     disp('Unidentified simulation')
 end
