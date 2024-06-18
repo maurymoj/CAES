@@ -95,8 +95,8 @@ if strcmp(L_bound,'Inlet')
     % m_in = 100;
     m_L = 108; % Huntorf
     % v_A = ?
-    P_L = 7e6;
-    T_L = 273.15 + 60;
+    P_L = P_0;
+    T_L = 273.15 + 25;
 
 elseif strcmp(L_bound,'Wall')
     m_L = 0;
@@ -179,9 +179,15 @@ T = zeros(n_n,n_t);
 rho = zeros(n_n,n_t);
 h = zeros(n_n,n_t);
 s = zeros(n_n,n_t);
-cp = zeros(1,n_t);
+u = zeros(n_n,n_t);
+cp = zeros(n_n,n_t);
+T_sol = zeros(n_n,n_t); % temporary var to store T as solved using energy 
+% equation and compare to using only mass and momentum eqs
 
-T_sol = zeros(n_n,n_t);
+cp_f = zeros(1,n_t);
+h_f = zeros(1,n_t);
+s_f = zeros(1,n_t);
+
 % Sanity check
 m = zeros(n_t,1); % Total mass in pipeline
 E = zeros(n_t,1); % Total energy in pipeline
@@ -203,9 +209,11 @@ s_o = CP.PropsSI('S','P',P_o,'T',T_o,'Air');
 P(:,1) = P_0*ones(n_n,1);
 T(:,1) = T_0*ones(n_n,1);
 rho(:,1) = CP.PropsSI('D','P',P(1,1),'T',T(1,1),'Air');
-cp(1) = CP.PropsSI('C','P',P(1,1),'T',T(1,1),'Air'); % Constant Cp (?)
+cp(:,1) = CP.PropsSI('C','P',P(1,1),'T',T(1,1),'Air'); % Constant Cp (?)
 h(:,1) = CP.PropsSI('H','P',P(1,1),'T',T(1,1),'Air'); % Constant Cp (?)
 s(:,1) = CP.PropsSI('S','P',P(1,1),'T',T(1,1),'Air'); % Constant Cp (?)
+u(:,1) = CP.PropsSI('U','P',P(1,1),'T',T(1,1),'Air'); % Constant Cp (?)
+
 % Initial conditions at faces (i -> x, j -> t)
 v(:,1) = v_0; % V profile at t=0
 
@@ -240,7 +248,7 @@ if strcmp(L_bound,'Inlet')
 
     v_L = m_L/(rho_L*A_h);
 
-    P(1,:) = P_L;
+    % P(1,:) = P_L;
     % T(1,:) = T_A;
     % rho(1,:) = rho_A;
 
@@ -248,7 +256,7 @@ if strcmp(L_bound,'Inlet')
     T_f(1,:) = T_L;
     rho_f(1,:) = rho_L;
     % At face
-    v(1,2:end) = v_L;
+    % v(1,2:end) = v_L;
     
     % Sliding pressure inlet test
 
@@ -419,7 +427,7 @@ end
 
 
 m(1) = sum(rho(:,1)*A_h*dx);
-E(1) = sum(rho(:,1)*A_h*dx.*cp(1).*T(:,1));
+E(1) = sum(rho(:,1)*A_h*dx.*u(:,1));
 
 count = zeros(n_t,1);
 f_guess = (2*log10(1/epsD)+1.14)^(-2); % Friction factor based on Nikuradse
@@ -458,9 +466,10 @@ for j=2:n_t
             % T(1,:) = T_L;
             % rho(1,:) = rho_L;
 
-            % T_f(1,:) = T_L;
-            % rho_f(1,:) = rho_L;
-            % v(1,j) = m_L/(rho(1,j)*A_h); % Sliding pressure test
+            P_f(1,j) = P(1,j);
+            T_f(1,j) = T_L;            
+            rho_f(1,j) = CP.PropsSI('D','P',P_f(1,j),'T',T_f(1,j),'Air');
+            v(1,j) = m_L/(rho_f(1,j)*A_h); % Sliding pressure test
         elseif strcmp(L_bound,'Wall')
             v(1,j) = 0;
             P_f(1,j) = P(1,j);
@@ -811,19 +820,19 @@ for j=2:n_t
     b_T = zeros(n_n,1);
     Q(j) = 0; % ADIABATIC ASSUMPTION
 
-    a_T(1,1) = rho(1,j)*cp(j-1)/dt + rho_f(2,j)*v(2,j)*cp(j-1)/dx;
+    a_T(1,1) = rho(1,j)*cp(i,j-1)/dt + rho_f(2,j)*v(2,j)*cp(i,j-1)/dx;
     b_T(1) = Q(j) + (P(1,j)-P(1,j-1))/dt ...
             + v_n(1,j)*(P_f(2,j) - P_f(1,j))/dx ...
             + f(1)*rho(1,j)*abs(v_n(1,j))^3/(2*D) ...
-            + rho(1,j-1)*cp(j-1)*T(1,j-1)/dt...
-            + rho_f(1,j)*v(1,j)*cp(j-1)*T_f(1,j)/dx;
+            + rho(1,j-1)*cp(i,j-1)*T(1,j-1)/dt...
+            + rho_f(1,j)*v(1,j)*cp(i,j-1)*T_f(1,j)/dx;
     for i=2:n_n
-        a_T(i,i) = rho(i,j)*cp(j-1)/dt + rho_f(i+1,j)*v(i+1,j)*cp(j-1)/dx;
-        a_T(i,i-1) = -rho_f(i,j)*v(i,j)*cp(j-1)/dx;
+        a_T(i,i) = rho(i,j)*cp(i,j-1)/dt + rho_f(i+1,j)*v(i+1,j)*cp(i,j-1)/dx;
+        a_T(i,i-1) = -rho_f(i,j)*v(i,j)*cp(i,j-1)/dx;
         b_T(i) = Q(j) + (P(i,j)-P(i,j-1))/dt ...
                 + v_n(i,j)*(P_f(i+1,j) - P_f(i,j))/dx ...
                 + f(i)*rho(i,j)*abs(v_n(i,j))^3/(2*D) ...
-                + rho(i,j-1)*cp(j-1)*T(i,j-1)/dt;
+                + rho(i,j-1)*cp(i,j-1)*T(i,j-1)/dt;
 
         % a_T(i,i+1) = 
     end
@@ -831,12 +840,17 @@ for j=2:n_t
     T(:,j) = linsolve(a_T,b_T);
 
     % THERMODYNAMIC PROPERTIES
-    cp(j) = CP.PropsSI('C','P',P(floor(end/2),j),'D',rho(floor(end/2),j),'Air');
+    % cp(i,j) = CP.PropsSI('C','P',P(floor(end/2),j),'D',rho(floor(end/2),j),'Air');
+    cp_f(j) = CP.PropsSI('C','P',P_f(1,j),'D',rho_f(1,j),'Air');
+    h_f(j) = CP.PropsSI('H','P',P_f(1,j),'D',rho_f(1,j),'Air');
+    s_f(j) = CP.PropsSI('S','P',P_f(1,j),'D',rho_f(1,j),'Air');
+
     for i = 1:n_n  % PROPERTIES FROM P AND RHO          
         % T(i,j) = CP.PropsSI('T','P',P(i,j),'D',rho(i,j),'Air');
-
+        cp(i,j) = CP.PropsSI('C','P',P(i,j),'D',rho(i,j),'Air');
         h(i,j) = CP.PropsSI('H','P',P(i,j),'D',rho(i,j),'Air');
         s(i,j) = CP.PropsSI('S','P',P(i,j),'D',rho(i,j),'Air');
+        u(i,j) = CP.PropsSI('U','P',P(i,j),'D',rho(i,j),'Air');
     end
 
     T_f(2:end-1,j) = (v(1:end-2,j) >= 0).*T(1:end-1,j) ...
@@ -860,11 +874,14 @@ for j=2:n_t
     bound_hist = [bound_hist; string(L_bound) string(R_bound)];
     
     m(j) = sum(rho(:,j)*A_h*dx);
-    E(j) = sum(rho(:,j)*A_h*dx.*cp(j).*T(:,j));
+    % E(j) = sum(rho(:,j)*A_h*dx.*cp(:,j).*T(:,j));
+    E(j) = sum(rho(:,j)*A_h*dx.*u(:,j));
+    
+    % Simulation iteration update
     % [j count(j)]
-    if rem((j-1)*dt,1) == 0
-        disp(strcat('t= ',num2str((j-1)*dt),'s, n iterations: ',num2str(count(j))))
-    end
+    % if rem((j-1)*dt,1) == 0
+    %     disp(strcat('t= ',num2str((j-1)*dt),'s, n iterations: ',num2str(count(j))))
+    % end
 end
 
 toc
@@ -876,17 +893,21 @@ toc
 % EE = E(1) + [0; cumsum(dE(1:end-1))];
 % mm = m(1) + dm.*(v~=0).*(0:n_t-1)';
 % EE = E(1) + dE.*(0:n_t-1)';
+dm = zeros(n_t,1);
+dE = zeros(n_t,1);
+% m_bal = zeros(n_t,1);
+% E_bal = zeros(n_t,1);
 
 % As a function of inlet velocity (CONSTANT INLET CONDITIONS)
 if strcmp(Process,'Charging_L')
-    dm = rho_L*v(1,:)'*A_h*dt;
-    dE = rho_L*v(1,:)'*A_h*cp_L*T_L*dt;
-    dX = rho_L*v(1,:)'*A_h*(h_L - h_o - T_o*(s_L - s_o))*dt; % Flow exergy - kinetic and potential term contributions assumed negligible
+    % dm = rho_L*v(1,:)'*A_h*dt;
+    % dE = rho_L*v(1,:)'*A_h*cp_L*T_L*dt;
+    % dX = rho_L*v(1,:)'*A_h*(h_L - h_o - T_o*(s_L - s_o))*dt; % Flow exergy - kinetic and potential term contributions assumed negligible
 
     % Sliding pressure test 
-    % dm = rho_f(1,:)'.*v(1,:)'*A_h*dt;
-    % dE = rho_f(1,:)'.*v(1,:)'.*A_h.*cp(:).*T_f(1,:)'*dt;
-    % dX = rho_f(1,:)'.*v(1,:)'*A_h.*(h(1,:)' - h_o - T_o*(s(1,:)' - s_o))*dt; % Flow exergy - kinetic and potential term contributions assumed negligible
+    dm = rho_f(1,:)'.*v(1,:)'*A_h*dt;
+    dE = rho_f(1,:)'.*v(1,:)'.*A_h.*cp_f(:).*T_f(1,:)'*dt;
+    dX = rho_f(1,:)'.*v(1,:)'*A_h.*(h_f(:) - h_o - T_o*(s_f(:) - s_o))*dt; % Flow exergy - kinetic and potential term contributions assumed negligible
 elseif strcmp(Process,'Discharging_L')
     dm = rho_f(1,:)'.*v(1,:)'*A_h*dt;
     dE = rho_f(1,:)'.*v(1,:)'*A_h.*cp(1,:)'.*T_f(1,:)'*dt;
@@ -902,7 +923,6 @@ elseif strcmp(Process,'Discharging_R')
 end
 
 m_bal = m(1) + cumsum(dm);
-
 E_bal = E(1) + cumsum(dE);
 
 x = 0:dx:L;
