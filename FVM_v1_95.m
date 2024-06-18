@@ -307,20 +307,20 @@ end
 
 % R boundary conditions
 if strcmp(R_bound,'Inlet')
-    rho_B = CP.PropsSI('D','P',P_R,'T',T_R,'Air');
-    cp_B = CP.PropsSI('C','P',P_R,'T',T_R,'Air');
-    h_B = CP.PropsSI('H','P',P_R,'T',T_R,'Air');
-    s_B = CP.PropsSI('S','P',P_R,'T',T_R,'Air');
+    rho_R = CP.PropsSI('D','P',P_R,'T',T_R,'Air');
+    cp_R = CP.PropsSI('C','P',P_R,'T',T_R,'Air');
+    h_R = CP.PropsSI('H','P',P_R,'T',T_R,'Air');
+    s_R = CP.PropsSI('S','P',P_R,'T',T_R,'Air');
 
-    v_R = m_R/(rho_B*A_h);
+    v_R = m_R/(rho_R*A_h);
 
     P(end,:) = P_R;
     T(end,:) = T_R;
-    rho(end,:) = rho_B;
+    rho(end,:) = rho_R;
 
     P_f(end,:) = P_R;
     T_f(end,:) = T_R;
-    rho_f(end,:) = rho_B;
+    rho_f(end,:) = rho_R;
     % At face
     v(end,:) = v_R;
 
@@ -454,20 +454,20 @@ for j=2:n_t
         
         % L boundary
         if strcmp(L_bound,'Inlet')
-            % P(1,:) = P_A;
-            % T(1,:) = T_A;
-            % rho(1,:) = rho_A;
+            % P(1,:) = P_L;
+            % T(1,:) = T_L;
+            % rho(1,:) = rho_L;
 
-            % T_f(1,:) = T_A;
-            % rho_f(1,:) = rho_A;
-            % v(1,j) = m_A/(rho(1,j)*A_h); % Sliding pressure test
+            % T_f(1,:) = T_L;
+            % rho_f(1,:) = rho_L;
+            % v(1,j) = m_L/(rho(1,j)*A_h); % Sliding pressure test
         elseif strcmp(L_bound,'Wall')
             v(1,j) = 0;
             P_f(1,j) = P(1,j);
             T_f(1,j) = T(1,j);
             rho_f(1,j) = rho(1,j);
         elseif strcmp(L_bound,'P_const')
-            % P(1,:) = P_A;
+            % P(1,:) = P_L;
             T(1,j) = T(2,j);
             rho(1,j) = rho(2,j);
 
@@ -500,7 +500,7 @@ for j=2:n_t
             % Set by upwind scheme
             v(end,j) = 0;
         elseif strcmp(R_bound,'P_const')
-            % P(end,:) = P_B;
+            % P(end,:) = P_R;
             T(end,j) = T(end-1,j);
             rho(end,j) = rho(end-1,j);
         
@@ -892,9 +892,9 @@ elseif strcmp(Process,'Discharging_L')
     dE = rho_f(1,:)'.*v(1,:)'*A_h.*cp(1,:)'.*T_f(1,:)'*dt;
     dX = rho_f(1,:)'.*v(1,:)'*A_h.*(h(1,:)' - h_o - T_o*(s(1,:)' - s_o))*dt; % Flow exergy - kinetic and potential term contributions assumed negligible
 elseif strcmp(Process,'Charging_R')
-    dm = -rho_B*v(end,:)'*A_h*dt;
-    dE = -rho_B*v(end,:)'*A_h*cp_B*T_R*dt;
-    dX = -rho_B*v(end,:)'*A_h*(h_B - h_o - T_o*(s_B - s_o))*dt; % Flow exergy - kinetic and potential term contributions assumed negligible
+    dm = -rho_R*v(end,:)'*A_h*dt;
+    dE = -rho_R*v(end,:)'*A_h*cp_R*T_R*dt;
+    dX = -rho_R*v(end,:)'*A_h*(h_R - h_o - T_o*(s_R - s_o))*dt; % Flow exergy - kinetic and potential term contributions assumed negligible
 elseif strcmp(Process,'Discharging_R')
     dm = -rho_f(end,:)'.*v(end,:)'*A_h*dt;
     dE = -rho_f(end,:)'.*v(end,:)'*A_h.*cp(end,:)'.*T_f(end,:)'*dt;
