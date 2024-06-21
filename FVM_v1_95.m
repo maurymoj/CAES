@@ -21,7 +21,7 @@ D = 0.5;
 
 % Dt = 3*3600; % Total simulation time
 % Dt = 3600;
-Dt = 100;
+Dt = 200;
 
 eps = 0.04e-3; % Absolute roughness 0.04 mm
 
@@ -209,10 +209,10 @@ s_o = CP.PropsSI('S','P',P_o,'T',T_o,'Air');
 P(:,1) = P_0*ones(n_n,1);
 T(:,1) = T_0*ones(n_n,1);
 rho(:,1) = CP.PropsSI('D','P',P(1,1),'T',T(1,1),'Air');
-cp(:,1) = CP.PropsSI('C','P',P(1,1),'T',T(1,1),'Air'); % Constant Cp (?)
-h(:,1) = CP.PropsSI('H','P',P(1,1),'T',T(1,1),'Air'); % Constant Cp (?)
-s(:,1) = CP.PropsSI('S','P',P(1,1),'T',T(1,1),'Air'); % Constant Cp (?)
-u(:,1) = CP.PropsSI('U','P',P(1,1),'T',T(1,1),'Air'); % Constant Cp (?)
+cp(:,1) = CP.PropsSI('C','P',P(1,1),'T',T(1,1),'Air'); 
+h(:,1) = CP.PropsSI('H','P',P(1,1),'T',T(1,1),'Air'); 
+s(:,1) = CP.PropsSI('S','P',P(1,1),'T',T(1,1),'Air'); 
+u(:,1) = CP.PropsSI('U','P',P(1,1),'T',T(1,1),'Air'); 
 
 % Initial conditions at faces (i -> x, j -> t)
 v(:,1) = v_0; % V profile at t=0
@@ -261,7 +261,7 @@ if strcmp(L_bound,'Inlet')
     % Sliding pressure inlet test
 
     v_L = m_L/(rho(1,1)*A_h);
-    % 
+    
     % P(1,:) = P_0;
     % T(1,:) = T_A;
     % rho(1,:) = rho_A;
@@ -420,8 +420,6 @@ if strcmp(R_bound,'Outlet')
     T_f(end,1) = T(end,1);
     rho_f(end,1) = rho(end,1);
 end 
-
-
 
 
 
@@ -726,9 +724,12 @@ for j=2:n_t
         
         % left node
         % Coefficients of a and d are displaced by 1 (1 = B, 2 = C and so on) 
-        A(1,2) = - max(0, -drho_dP(2)*v_star(2)/dx); % A_2
-        A(1,1) = drho_dP_n(1)/dt - (rho_f(2,j)*d(1)/a(1,1))/dx ...
-               + drho_dP(2)*v_star(2)/dx - A(1,2); % A_1
+        % A(1,2) = - max(0, -drho_dP(2)*v_star(2)/dx); % A_2
+        % A(1,1) = drho_dP_n(1)/dt - (rho_f(2,j)*d(1)/a(1,1))/dx ...
+        %        + drho_dP(2)*v_star(2)/dx - A(1,2); % A_1
+        A(1,2) = (rho_f(2,j)*d(1)/a(1,1))/dx - max(0, -drho_dP(2)*v_star(2)/dx); % A_2
+        A(1,1) = drho_dP_n(1)/dt + drho_dP(2)*v_star(2)/dx ...
+               - A(1,2); % A_1
         
         BB(1) = (rho(1,j-1)-rho(1,j))/dt + (rho_f(1,j)*v_star(1) - rho_f(2,j)*v_star(2))/dx;
         if strcmp(L_bound,'P_const')
@@ -879,9 +880,9 @@ for j=2:n_t
     
     % Simulation iteration update
     % [j count(j)]
-    % if rem((j-1)*dt,1) == 0
-    %     disp(strcat('t= ',num2str((j-1)*dt),'s, n iterations: ',num2str(count(j))))
-    % end
+    if rem((j-1)*dt,10) == 0
+        disp(strcat('t= ',num2str((j-1)*dt),'s, n iterations: ',num2str(count(j))))
+    end
 end
 
 toc
@@ -906,7 +907,7 @@ if strcmp(Process,'Charging_L')
 
     % Sliding pressure test 
     dm = rho_f(1,:)'.*v(1,:)'*A_h*dt;
-    dE = rho_f(1,:)'.*v(1,:)'.*A_h.*cp_f(:).*T_f(1,:)'*dt;
+    dE = rho_f(1,:)'.*v(1,:)'.*A_h.*h_f(:)*dt;
     dX = rho_f(1,:)'.*v(1,:)'*A_h.*(h_f(:) - h_o - T_o*(s_f(:) - s_o))*dt; % Flow exergy - kinetic and potential term contributions assumed negligible
 elseif strcmp(Process,'Discharging_L')
     dm = rho_f(1,:)'.*v(1,:)'*A_h*dt;
@@ -930,11 +931,14 @@ x_f = [0:dx:L]';
 x_n = [dx/2:dx:L]';
 
 % Exergy
-% X = P*(A_h*L).*(P_amb./P - 1 + log(P./P_amb))./(1e6*3600); % Pipeline Exergy [MWh]
+% X = P*(A_h*L).*(P_amb./P - 1 + log(P./P_amb))./(1e6*3600);          % Pipeline Exergy [MWh]
 % X_min = P_0*(A_h*L).*(P_amb./P_0 - 1 + log(P_0./P_amb))/(1e6*3600); % Exergy when discharged [MWh] 
-X = P*(A_h*dx).*(P_amb./P - 1 + log(P./P_amb))./(1e6*3600); % Pipeline Exergy [MWh]
-X_min = P_0*(A_h*dx).*(P_amb./P_0 - 1 + log(P_0./P_amb))/(1e6*3600); % Exergy when discharged [MWh] 
-X_net = X - X_min; % Exergy between current state and discharged state (assuming whole pipeline at P_min)
+X = P*(A_h*dx).*(P_amb./P - 1 + log(P./P_amb))./(1e6*3600);           % Pipeline Exergy [MWh]
+X_min = P_0*(A_h*dx).*(P_amb./P_0 - 1 + log(P_0./P_amb))/(1e6*3600);  % Exergy when discharged [MWh] 
+
+% IS THE e - eo TERM MISSING ??
+
+X_net = X - X_min;                                                   % Exergy between current state and discharged state (assuming whole pipeline at P_min)
 X_in = sum(dX)/(1e6*3600)
 X_st = sum(X_net(:,end))
 
@@ -961,6 +965,18 @@ title('Difference in mass')
 figure('color',[1 1 1]);plot(t,(E_bal - E)./E)
 title('Difference in energy')
 
+figure('color',[1 1 1])
+title('before')
+yyaxis left
+plot(t,(m_bal - m)./m);
+% ylim([P_lower_bound-0.1 P_upper_bound+0.1])
+xlabel('time [s]')
+ylabel('Mass residual')
+yyaxis right
+plot(t,(E_bal - E)./E);
+ylabel('Energy residual')
+% ylim([v_min v_max])
+% ylabel('v [m/s]')
 
 %%
 if strcmp(simType,'CAESCav')
