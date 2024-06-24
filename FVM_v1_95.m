@@ -21,7 +21,7 @@ D = 0.5;
 
 % Dt = 3*3600; % Total simulation time
 % Dt = 3600;
-Dt = 200;
+Dt = 180;
 
 eps = 0.04e-3; % Absolute roughness 0.04 mm
 
@@ -140,7 +140,7 @@ theta = 0;
 
 
 if strcmp(simType,'CAESPipe')
-    dx = L/(20-1); % CAESPipe
+    dx = L/(40-1); % CAESPipe
     dt = 1;
     tol = 1e-6; % CAESPipe Charging
     % tol = 1e-3; % CAESPipe discharging
@@ -191,6 +191,9 @@ s_f = zeros(1,n_t);
 % Sanity check
 m = zeros(n_t,1); % Total mass in pipeline
 E = zeros(n_t,1); % Total energy in pipeline
+
+m_n = zeros(n_n,n_t); % Mass per node
+E_n = zeros(n_n,n_t); % Energy per node
 
 %------------------ SETTING INITIAL CONDITIONS ---------------------%
 % Basic calculations
@@ -427,6 +430,9 @@ end
 m(1) = sum(rho(:,1)*A_h*dx);
 E(1) = sum(rho(:,1)*A_h*dx.*u(:,1));
 
+m_n(:,1) = rho(:,1)*A_h*dx;
+E_n(:,1) = rho(:,1)*A_h*dx.*u(:,1);
+
 count = zeros(n_t,1);
 f_guess = (2*log10(1/epsD)+1.14)^(-2); % Friction factor based on Nikuradse
 
@@ -465,7 +471,7 @@ for j=2:n_t
             % rho(1,:) = rho_L;
 
             P_f(1,j) = P(1,j);
-            T_f(1,j) = T_L;            
+            T_f(1,j) = T_L;           
             rho_f(1,j) = CP.PropsSI('D','P',P_f(1,j),'T',T_f(1,j),'Air');
             v(1,j) = m_L/(rho_f(1,j)*A_h); % Sliding pressure test
         elseif strcmp(L_bound,'Wall')
@@ -657,11 +663,26 @@ for j=2:n_t
         a(1,1) = rho_f(2,j)/dt + f(1)*rho_f(2,j)*abs(v(2,j))/(2*D) ...
             + (rho(2,j)*v_n(2,j) - rho(1,j)*v_n(1,j))/dx ...
             - (a(1,2) - max(rho(1,j)*v_n(1,j)/dx,  0) );% a_B
-        
+                
         d(1) = -1/dx;
+        
+        
+        
+        
+        
+        
+        
+        % b(1) = (rho_f(2,j-1)*v(2,j-1)/dt)...
+        %     - rho_f(2,j)*g*sind(theta)...
+        %     + max(rho(1,j)*v_n(1,j)/dx,  0)*v_n(1,j);
         b(1) = (rho_f(2,j-1)*v(2,j-1)/dt)...
             - rho_f(2,j)*g*sind(theta)...
             + max(rho(1,j)*v_n(1,j)/dx,  0)*v_n(1,j);
+
+
+
+
+
         
         B(1) = d(1)*(P(2,j)-P(1,j)) ...
             + b(1);           
@@ -878,11 +899,14 @@ for j=2:n_t
     % E(j) = sum(rho(:,j)*A_h*dx.*cp(:,j).*T(:,j));
     E(j) = sum(rho(:,j)*A_h*dx.*u(:,j));
     
+    m_n(:,j) = rho(:,j)*A_h*dx;
+    E_n(:,j) = rho(:,j)*A_h*dx.*u(:,j);
+
     % Simulation iteration update
     % [j count(j)]
-    if rem((j-1)*dt,10) == 0
-        disp(strcat('t= ',num2str((j-1)*dt),'s, n iterations: ',num2str(count(j))))
-    end
+    % if rem((j-1)*dt,10) == 0
+    %     disp(strcat('t= ',num2str((j-1)*dt),'s, n iterations: ',num2str(count(j))))
+    % end
 end
 
 toc
