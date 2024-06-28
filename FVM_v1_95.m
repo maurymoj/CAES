@@ -249,7 +249,7 @@ if strcmp(L_bound,'Inlet')
     h_L = CP.PropsSI('H','P',P_L,'T',T_L,'Air');
     s_L = CP.PropsSI('S','P',P_L,'T',T_L,'Air');
 
-    v_L = m_L/(rho_L*A_h);
+    % v_L = m_L/(rho_L*A_h);
 
     % P(1,:) = P_L;
     % T(1,:) = T_A;
@@ -264,7 +264,7 @@ if strcmp(L_bound,'Inlet')
     % Sliding pressure inlet test
 
     v_L = m_L/(rho(1,1)*A_h);
-    
+    v_n(1,1) = 0;
     % P(1,:) = P_0;
     % T(1,:) = T_A;
     % rho(1,:) = rho_A;
@@ -434,6 +434,7 @@ m_n(:,1) = rho(:,1)*A_h*dx;
 E_n(:,1) = rho(:,1)*A_h*dx.*u(:,1);
 
 count = zeros(n_t,1);
+
 f_guess = (2*log10(1/epsD)+1.14)^(-2); % Friction factor based on Nikuradse
 
 
@@ -471,9 +472,13 @@ for j=2:n_t
             % rho(1,:) = rho_L;
 
             P_f(1,j) = P(1,j);
-            T_f(1,j) = T_L;           
+            T_f(1,j) = T_L; 
+            % T_f(1,j) = T(1,j); 
             rho_f(1,j) = CP.PropsSI('D','P',P_f(1,j),'T',T_f(1,j),'Air');
             v(1,j) = m_L/(rho_f(1,j)*A_h); % Sliding pressure test
+            
+            v_n(1,j) = m_L/(rho(1,j)*A_h);
+
         elseif strcmp(L_bound,'Wall')
             v(1,j) = 0;
             P_f(1,j) = P(1,j);
@@ -572,8 +577,10 @@ for j=2:n_t
         % v(:,j) = v_star(:) + v_corr;
         
         % Upwind scheme
-        v_n(:,j) = (v(1:end-1,j) >= 0).*v((1:end-1),j) ...
-            +      (v(1:end-1,j) <  0).*v((2:end),j);
+        % v_n(:,j) = (v(1:end-1,j) >= 0).*v((1:end-1),j) ...
+        %     +      (v(1:end-1,j) <  0).*v((2:end),j);
+        v_n(2:end,j) = (v(2:end-1,j) >= 0).*v((2:end-1),j) ...
+            +      (v(2:end-1,j) <  0).*v((3:end),j);
         
         % Properties in nodes to faces
         P_f(2:end-1,j) = (v(1:end-2,j) >= 0).*P(1:end-1,j) ...
@@ -842,12 +849,12 @@ for j=2:n_t
     b_T = zeros(n_n,1);
     Q(j) = 0; % ADIABATIC ASSUMPTION
 
-    a_T(1,1) = rho(1,j)*cp(i,j-1)/dt + rho_f(2,j)*v(2,j)*cp(i,j-1)/dx;
+    a_T(1,1) = rho(1,j)*cp(1,j-1)/dt + rho_f(2,j)*v(2,j)*cp(2,j-1)/dx;
     b_T(1) = Q(j) + (P(1,j)-P(1,j-1))/dt ...
             + v_n(1,j)*(P_f(2,j) - P_f(1,j))/dx ...
             + f(1)*rho(1,j)*abs(v_n(1,j))^3/(2*D) ...
-            + rho(1,j-1)*cp(i,j-1)*T(1,j-1)/dt...
-            + rho_f(1,j)*v(1,j)*cp(i,j-1)*T_f(1,j)/dx;
+            + rho(1,j-1)*cp(1,j-1)*T(1,j-1)/dt...
+            + rho_f(1,j)*v(1,j)*cp(1,j-1)*T_f(1,j)/dx;
     for i=2:n_n
         a_T(i,i) = rho(i,j)*cp(i,j-1)/dt + rho_f(i+1,j)*v(i+1,j)*cp(i,j-1)/dx;
         a_T(i,i-1) = -rho_f(i,j)*v(i,j)*cp(i,j-1)/dx;
