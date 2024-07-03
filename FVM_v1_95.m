@@ -426,7 +426,6 @@ end
 
 
 
-
 m(1) = sum(rho(:,1)*A_h*dx);
 E(1) = sum(rho(:,1)*A_h*dx.*u(:,1));
 

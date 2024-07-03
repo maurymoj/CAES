@@ -245,7 +245,204 @@ T_f(2:end-1,1) = (v(2:end-1,1) >= 0).*T(1:end-1,1) ...
     +            (v(2:end-1,1) <  0).*T(2:end,1);
 rho_f(2:end-1,1) = (v(2:end-1,1) >= 0).*rho(1:end-1,1) ...
     +            (v(2:end-1,1) <  0).*rho(2:end,1);
+% 
+% P_f(end,1) = P(end,1); % Assuming v >= 0 for t=0 at x=L
+% T_f(end,1) = T(end,1); 
+% rho_f(end,1) = rho(end,1);
 
-P_f(end,1) = P(end,1); % Assuming v >= 0 for t=0 at x=L
-T_f(end,1) = T(end,1); 
-rho_f(end,1) = rho(end,1);
+% BOUNDARY CONDITIONS 
+% (Inlet, Wall, Constant pressure, and Constant flow rate)
+
+% L boundary conditions
+if strcmp(L_bound,'Inlet')
+    % At "outside" node
+    rho_L = CP.PropsSI('D','P',P_L,'T',T_L,'Air');
+    cp_L = CP.PropsSI('C','P',P_L,'T',T_L,'Air');
+    h_L = CP.PropsSI('H','P',P_L,'T',T_L,'Air');
+    s_L = CP.PropsSI('S','P',P_L,'T',T_L,'Air');
+
+    % v_L = m_L/(rho_L*A_h);
+
+    % P(1,:) = P_L;
+    % T(1,:) = T_A;
+    % rho(1,:) = rho_A;
+
+    P_f(1,1) = P_L;
+    T_f(1,:) = T_L;
+    rho_f(1,1) = rho_L;
+    
+    % v_L = m_L/(rho_f(1,1)*A_h);
+    v(1,1) = m_L/(rho_f(1,1)*A_h);
+
+elseif strcmp(L_bound,'Wall')
+    v(1,:) = 0;
+
+    P_f(1,1) = P(1,1);
+    T_f(1,1) = T(1,1);
+    rho_f(1,1) = rho(1,1);
+
+elseif strcmp(L_bound,'P_const') 
+    % Assumptions:
+    % - Outflow
+    % - Zero gradient for all properties
+    % - Constant cross-sectional area
+    P(1,:) = P_L;
+    T(1,1) = T(2,1);
+    rho(1,1) = rho(2,1);
+
+    v(1,1) = v(2,1);
+
+    P_f(1,1) = P(1,1);
+    T_f(1,1) = T(1,1);
+    rho_f(1,1) = rho(1,1);
+elseif strcmp(L_bound,'M_const')    
+    % Assumptions:
+    % - Zero gradient for all properties except u-velocity
+    % - Constant cross-sectional area
+    P(1,1) = P(2,1);
+    T(1,1) = T(2,1);
+    rho(1,1) = rho(2,1);
+
+    v_n(1,1) = m_L/(rho(1,1)*A_h);
+
+    % Upwind scheme
+    v(1,1) = v_n(1,1);
+    
+    P_f(1,1) = P(1,1);
+    T_f(1,1) = T(1,1);
+    rho_f(1,1) = rho(1,1);
+    
+end
+
+
+% R boundary conditions
+if strcmp(R_bound,'Inlet')
+    rho_R = CP.PropsSI('D','P',P_R,'T',T_R,'Air');
+    cp_R = CP.PropsSI('C','P',P_R,'T',T_R,'Air');
+    h_R = CP.PropsSI('H','P',P_R,'T',T_R,'Air');
+    s_R = CP.PropsSI('S','P',P_R,'T',T_R,'Air');
+
+    % P(end,:) = P_R;
+    % T(end,:) = T_R;
+    % rho(end,:) = rho_R;
+
+    P_f(end,:) = P_R;
+    T_f(end,:) = T_R;
+    rho_f(end,:) = rho_R;
+    % At face
+    v(end,1) = m_R/(rho_f(end,1)*A_h);
+
+elseif(strcmp(R_bound,'Wall'))
+    v(end,:) = 0;
+
+    P_f(end,1) = P(end,1);
+    T_f(end,1) = T(end,1);
+    rho_f(end,1) = rho(end,1);
+
+
+elseif(strcmp(R_bound,'P_const'))    
+    % Assumptions:
+    % - Outflow
+    % - Zero gradient for all properties
+    % - Constant cross-sectional area
+    P(end,:) = P_R;
+    T(end,1) = T(end-1,1);
+    rho(end,1) = rho(end-1,1);
+
+    v(end,1) = v(end-1,1);
+
+    P_f(end,1) = P(end,1);
+    T_f(end,1) = T(end,1);
+    rho_f(end,1) = rho(end,1);
+elseif strcmp(R_bound,'M_const')    
+    % Assumptions:
+    % - Zero gradient for all properties except u-velocity
+    % - Constant cross-sectional area
+    P(end,1) = P(end-1,1);
+    T(end,1) = T(end-1,1);
+    rho(end,1) = rho(end-1,1);
+
+    v_n(end,1) = m_R/(rho(end,1)*A_h);
+
+    % Upwind scheme
+    v(end,1) = v_n(end,1);
+    
+    P_f(end,1) = P(end,1);
+    T_f(end,1) = T(end,1);
+    rho_f(end,1) = rho(end,1);    
+end
+
+
+
+
+% Boundary conditions (Outlet - depend on the other side of the pipeline)
+
+% L outlet boundary conditions
+if strcmp(L_bound,'Outlet') 
+    % Assumptions:
+    % - Zero gradient for all properties except u-velocity
+    % - Velocity at neighbouting node is corrected to ensure conservation of
+    % mass with the inlet
+    % - Constant cross-sectional area
+    P(1,1) = P(2,1);
+    T(1,1) = T(2,1);
+    rho(1,1) = rho(2,1);
+
+    v_n(1,1) = (rho(end,1)*v_n(end,1))/rho(1,1); % Velocity correction
+
+    % Upwind scheme
+    v(1,1) = v_n(1,1);
+    
+    P_f(1,1) = P(1,1);
+    T_f(1,1) = T(1,1);
+    rho_f(1,1) = rho(1,1);
+    
+    % m_A = m_R;
+end  
+
+% R outlet boundary conditions
+if strcmp(R_bound,'Outlet')
+    % Assumptions:
+    % - Zero gradient for all properties except u-velocity
+    % - Velocity at neighbouting node is corrected to ensure conservation of
+    % mass with the inlet
+    % - Constant cross-sectional area
+    P(end,1) = P(end-1,1);
+    T(end,1) = T(end-1,1);
+    rho(end,1) = rho(end-1,1);
+
+    v_n(end,1) = (rho(1,1)*v_n(1,1))/rho(end,1); % Velocity correction
+
+    % Upwind scheme
+    v(end,1) = v_n(end,1);
+    
+    P_f(end,1) = P(end,1);
+    T_f(end,1) = T(end,1);
+    rho_f(end,1) = rho(end,1);
+end 
+
+m(1) = sum(rho(:,1)*A_h*dx);
+E(1) = sum(rho(:,1)*A_h*dx.*u(:,1));
+
+m_n(:,1) = rho(:,1)*A_h*dx;
+E_n(:,1) = rho(:,1)*A_h*dx.*u(:,1);
+
+count = zeros(n_t,1);
+
+% Friction factor based on Nikuradse
+f_guess = (2*log10(1/epsD)+1.14)^(-2);
+
+
+error_hist = [];
+bound_hist = [string(L_bound) string(R_bound)];
+
+for j=2:n_t
+    % Initial guess for next time step is the same props as the previous t step
+    
+
+
+    % Momentum and mass balance loop
+    
+
+
+end
