@@ -705,49 +705,61 @@ for j=2:n_t
 
         % IMPLEMENT M_CONST BOUNDARY FOR R_bound
         
-
-
-
-
-
-        a_M(n_f-1,n_f-2) = -max(rho(n_n-1,j)*v_n(n_n-1,j)/dx, 0); % a_N-2
+        a_M(end-1,end-2) = -max(rho(n_n-1,j)*v_n(n_n-1,j)/dx, 0); % a_N-2
         % WHAT TO DO REGARDING TO THE a INDICES ??
-        a_M(n_f-1,n_f-1) = ...                                  % a_N-1
+        a_M(end-1,end-1) = ...                                  % a_N-1
             rho_f(n_f-1,j)/dt + f(n_f-1)*rho_f(n_f-1,j)*abs(v(n_f-1,j))/(2*D)...
             +(rho(n_n,j)*v_n(n_n,j) - rho(n_n-1,j)*v_n(n_n-1,j))/dx...
-            - (a_M(n_f-1,n_f-2) - max(0, -rho(n_n,j)*v_n(n_n,j)/dx) );
+            - (a_M(end-1,end-2) - max(-rho(n_n,j)*v_n(n_n,j)/dx,  0) );
         
-        d_M(n_f-1) = -1/dx;
-        b_M(n_f-1) = rho_f(n_f-1,j-1)*v(n_f-1,j-1)/dt...
-            -rho_f(n_f-1,j)*g*sind(theta)...
-            + max(0, -rho(n_n,j)*v_n(n_n,j)/dx)*v_n(n_n,j);
+        d_M(end) = -1/dx;
+        b_M(end) = (rho_f(n_f-1,j-1)*v(n_f-1,j-1)/dt)-rho_f(n_f-1,j)*g*sind(theta);
         
-        B_M(n_f-1) = d_M(n_f-1)*(P(n_n,j)-P(n_n-1,j)) + b_M(n_f-1);
+        B_M(end) = d_M(end)*(P(n_n,j)-P(n_n-1,j)) + b_M(end);
+
+
+
+
+
+        % a_M(end,end-1) = -max(rho(n_n-1,j)*v_n(n_n-1,j)/dx, 0); % a_N-2 (index N-2, N-3)
+        % % WHAT TO DO REGARDING TO THE a INDICES ??
+        % a_M(end,end) = ...                                  % a_N-1 (index N-2, N-2)
+        %     rho_f(n_f-1,j)/dt + f(n_f-1)*rho_f(n_f-1,j)*abs(v(n_f-1,j))/(2*D)...
+        %     +(rho(n_n,j)*v_n(n_n,j) - rho(n_n-1,j)*v_n(n_n-1,j))/dx...
+        %     - (a_M(end,end-1) - max(-rho(n_n,j)*v_n(n_n,j)/dx,  0) );
+        % 
+        % d_M(end) = -1/dx;
+        % b_M(end) = (rho_f(n_f-1,j-1)*v(n_f-1,j-1)/dt)-rho_f(n_f-1,j)*g*sind(theta);
+        % 
+        % B_M(end) = d_M(end)*(P(n_n,j)-P(n_n-1,j)) + b_M(end);
         
 
         
 
-        for i=3:n_f-2
-
-            a_M(i,i-1) = -max(rho(i-1,j)*v_n(i-1,j)/dx,                     0);
-            a_M(i,i+1) = -max(                       0, -rho(i,j)*v_n(i,j)/dx);
-            a_M(i,i)   = rho_f(i,j)/dt + f(i)*rho_f(i,j)*abs(v(i,j))/(2*D) ...
-                + ( rho(i,j)*v_n(i,j) - rho(i-1,j)*v_n(i-1,j) )/dx...
-                - ( a_M(i,i-1) + a_M(i,i+1) );
+        for i=2:n_f-3
+        % The indices of the node and face properties have to be added by 1, since
+        % the 1st line was ommited (as we have it solved from the boundary
+        % condition 
+            a_M(i,i-1) = -max(rho(i,j)*v_n(i,j)/dx,                     0);
+            a_M(i,i+1) = -max(                       0, -rho(i+1,j)*v_n(i+1,j)/dx);
+            a_M(i,i)   = rho_f(i+1,j)/dt + f(i+1)*rho_f(i+1,j)*abs(v(i+1,j))/(2*D) ...
+                - (a_M(i,i-1) + a_M(i,i+1)) ...
+                + (rho(i+1,j)*v_n(i+1,j)/dx - rho(i,j)*v_n(i,j)/dx);
             d_M(i) = -1/dx;
-            b_M(i) = (rho_f(i,j-1)*v(i,j-1)/dt)-rho_f(i,j)*g*sind(theta);
+            b_M(i) = (rho_f(i+1,j-1)*v(i+1,j-1)/dt)-rho_f(i+1,j)*g*sind(theta);
             
-            B_M(i) = d_M(i)*(P(i,j)-P(i-1,j)) + b_M(i);
+            B_M(i) = d_M(i)*(P(i+1,j)-P(i,j)) + b_M(i);
         end
         
         % v_star = B\a
         v_star = linsolve(a_M,B_M);
-        % v_star = [v(1,j);v_star;v(end,j)];
+        v_star = [v(1,j);v_star;v(end,j)];
         % if strcmp(L_bound,'Outlet')
         %     v_star(1) = v_star(2);
         % elseif strcmp(R_bound,'Outlet')
         %     v_star(end) = v_star(end-1);
         % end
+        % v(:,j) = [v(1,j);v_star;v(end,j)];
 
     end
 
