@@ -127,7 +127,8 @@ elseif(strcmp(R_bound,'Wall'))
     v_R = 0;
 elseif(strcmp(R_bound,'Inlet'))
     m_R = -108; % Huntorf  % Remember the sign to indicate the direction of flow (+ right , - left)
-    P_R = 7e6;
+    % P_R = 7e6;
+    P_R = P_0; % Sliding pressure at pipeline inlet
     T_R = 273.15 + 60;
     % v_B = m_B/(rho_B*A_h);
 elseif strcmp(R_bound,'P_const')
@@ -192,23 +193,23 @@ cp = zeros(n_n,n_t);
 T_sol = zeros(n_n,n_t); % temporary var to store T as solved using energy 
 % equation and compare to using only mass and momentum eqs
 
+% SHOULD THESE BE MATRICES OR VECTORS ???
 cp_f = zeros(1,n_t);
 h_f = zeros(1,n_t);
 s_f = zeros(1,n_t);
 
 % Sanity check
-m = zeros(n_t,1); % Total mass in pipeline
-E = zeros(n_t,1); % Total energy in pipeline
+m = zeros(1,n_t); % Total mass in pipeline
+E = zeros(1,n_t); % Total energy in pipeline
 
-m_n = zeros(n_n,n_t); % Mass per node
-E_n = zeros(n_n,n_t); % Energy per node
+m_n = zeros(n_n,n_t); % Mass at each node
+E_n = zeros(n_n,n_t); % Energy at each node
 
 %------------------ SETTING INITIAL CONDITIONS ---------------------%
 % Basic calculations
-epsD = eps/D;
-A_h = pi*D^2/4;
+epsD = eps/D;   % Relative roughness
+A_h = pi*D^2/4; % Cross-section area
 
-rho_amb = CP.PropsSI('D','P',P_amb,'T',T_amb,'Air');
 % Dead state parameters
 P_o = P_amb;
 T_o = T_amb;
@@ -235,9 +236,6 @@ v(:,1) = v_0; % V profile at t=0
 v_n(:,1) = (v(1:end-1,1) >= 0).*v((1:end-1),1) ...
     +      (v(1:end-1,1) <  0).*v((2:end),1);
 
-P = 1:10;
-v = -5:5;
-
 % Properties in nodes to faces
 P_f(2:end-1,1) = (v(2:end-1,1) >= 0).*P(1:end-1,1) ...
     +            (v(2:end-1,1) <  0).*P(2:end,1);
@@ -245,7 +243,7 @@ T_f(2:end-1,1) = (v(2:end-1,1) >= 0).*T(1:end-1,1) ...
     +            (v(2:end-1,1) <  0).*T(2:end,1);
 rho_f(2:end-1,1) = (v(2:end-1,1) >= 0).*rho(1:end-1,1) ...
     +            (v(2:end-1,1) <  0).*rho(2:end,1);
-% 
+
 % P_f(end,1) = P(end,1); % Assuming v >= 0 for t=0 at x=L
 % T_f(end,1) = T(end,1); 
 % rho_f(end,1) = rho(end,1);
@@ -261,8 +259,6 @@ if strcmp(L_bound,'Inlet')
     h_L = CP.PropsSI('H','P',P_L,'T',T_L,'Air');
     s_L = CP.PropsSI('S','P',P_L,'T',T_L,'Air');
 
-    % v_L = m_L/(rho_L*A_h);
-
     % P(1,:) = P_L;
     % T(1,:) = T_A;
     % rho(1,:) = rho_A;
@@ -277,7 +273,7 @@ if strcmp(L_bound,'Inlet')
 elseif strcmp(L_bound,'Wall')
     v(1,:) = 0;
 
-    P_f(1,1) = P(1,1);
+    P_f(1,1) = P(1,1); % Zero gradient assumption
     T_f(1,1) = T(1,1);
     rho_f(1,1) = rho(1,1);
 
@@ -335,7 +331,7 @@ if strcmp(R_bound,'Inlet')
 elseif(strcmp(R_bound,'Wall'))
     v(end,:) = 0;
 
-    P_f(end,1) = P(end,1);
+    P_f(end,1) = P(end,1); % Zero gradient assumption
     T_f(end,1) = T(end,1);
     rho_f(end,1) = rho(end,1);
 
@@ -438,11 +434,162 @@ bound_hist = [string(L_bound) string(R_bound)];
 
 for j=2:n_t
     % Initial guess for next time step is the same props as the previous t step
-    
+    P(:,j) = P(:,j-1);
+    rho(:,j) = rho(:,j-1);
+    T(:,j) = T(:,j-1);
 
+
+
+    v(:,j) = v(:,j-1);
+    % v(2:end-1,j) = v(2:end-1,j-1);
+
+
+    P_corr = zeros(n_n,1);
+    rho_corr = zeros(n_n,1);
+    v_corr = zeros(N_f,1);
+    
+    v_star = v(:,j);
+    count(j) = 0;
+    error_P = 10;
 
     % Momentum and mass balance loop
-    
+    while count(j) < 100 && max(abs(error_P)) > tol
+        % Under-relaxed corrections
+        P(:,j) = P(:,j) + alpha_P*P_corr;
+        rho(:,j) = alpha_rho*(rho(:,j) + rho_corr) + (1-alpha_rho)*rho(:,j);
+
+        v(:,j) = alpha_v*(v_star + v_corr) + (1-alpha_v)*v_star;
+        % v(1:end-1,j) = alpha_v*(v_star(1:end-1) + v_corr(1:end-1)) + (1-alpha_v)*v_star(1:end-1);
+
+        % Boundary conditions
+        if strcmp(L_bound,'Inlet')
+            % P(1,:) = P_L;
+            % T(1,:) = T_L;
+            % rho(1,:) = rho_L;
+
+            P_f(1,j) = P(1,j); % Assumption of constant pressure between 
+                               % face and first node
+            T_f(1,j) = T_L; 
+            % T_f(1,j) = T(1,j); 
+            rho_f(1,j) = CP.PropsSI('D','P',P_f(1,j),'T',T_f(1,j),'Air');
+            v(1,j) = m_L/(rho_f(1,j)*A_h); % Sliding pressure test
+            
+            v_n(1,j) = m_L/(rho(1,j)*A_h);
+
+        elseif strcmp(L_bound,'Wall')
+            v(1,j) = 0;
+            P_f(1,j) = P(1,j);
+            T_f(1,j) = T(1,j);
+            rho_f(1,j) = rho(1,j);
+        elseif strcmp(L_bound,'P_const')
+            % P(1,:) = P_L;
+            P(1,j) = P_L;
+            T(1,j) = T(2,j);
+            rho(1,j) = rho(2,j);
+
+            v(1,j) = v(2,j);
+        
+            P_f(1,j) = P(1,j);
+            T_f(1,j) = T(1,j);
+            rho_f(1,j) = rho(1,j);
+        elseif strcmp(L_bound,'M_const') 
+            % Assumptions:
+            % - Zero gradient for all properties except u-velocity
+            % - Constant cross-sectional area
+            P(1,j) = P(2,j);
+            T(1,j) = T(2,j);
+            rho(1,j) = rho(2,j);
+        
+            v_n(1,j) = m_L/(rho(1,j)*A_h);
+        
+            % Upwind scheme
+            v(1,j) = v_n(1,j);
+            
+            P_f(1,j) = P(1,j);
+            T_f(1,j) = T(1,j);
+            rho_f(1,j) = rho(1,j);
+        end
+
+        % R boundary
+        if strcmp(R_bound,'Inlet')
+            % P(end,:) = P_R;
+            % T(end,:) = T_R;
+            % rho(end,:) = rho_R;
+
+            P_f(end,j) = P(end,j); % Assumption of constant pressure between 
+                               % face and first node
+            T_f(end,j) = T_R; 
+            % T_f(end,j) = T(end,j); 
+            rho_f(end,j) = CP.PropsSI('D','P',P_f(end,j),'T',T_f(end,j),'Air');
+            v(end,j) = m_R/(rho_f(end,j)*A_h); % Sliding pressure test
+            
+            v_n(end,j) = m_R/(rho(end,j)*A_h);
+        elseif(strcmp(R_bound,'Wall'))
+            % Set by upwind scheme
+            v(end,j) = 0;
+
+            P_f(end,j) = P(end,j); % Zero gradient assumption
+            T_f(end,j) = T(end,j);
+            rho_f(end,j) = rho(end,j);
+
+        elseif strcmp(R_bound,'P_const')
+            % P(end,j) = P(end-1,j);
+            P(end,j) = P_R;
+            T(end,j) = T(end-1,j);
+            rho(end,j) = rho(end-1,j);
+        
+            v(end,j) = v(end-1,j);
+        
+            P_f(end,j) = P(end,j);
+            T_f(end,j) = T(end,j);
+            rho_f(end,j) = rho(end,j);   
+        elseif strcmp(R_bound,'M_const')  
+            % Assumptions:
+            % - Zero gradient for all properties except u-velocity
+            % - Constant cross-sectional area
+            P(end,j) = P(end-1,j);
+            T(end,j) = T(end-1,j);
+            rho(end,j) = rho(end-1,j);
+        
+            v_n(end,j) = m_R/(rho(end,j)*A_h);
+        
+            % Upwind scheme
+            v(end,j) = v_n(end,j);
+            
+            P_f(end,j) = P(end,j);
+            T_f(end,j) = T(end,j);
+            rho_f(end,j) = rho(end,j); 
+        end 
+
+        if strcmp(L_bound,'Outlet')
+            P(1,j) = P(2,j);
+            T(1,j) = T(2,j);
+            rho(1,j) = rho(2,j);
+
+            v_n(1,j) = rho(end,j)*v(end,j)/rho(1,j);
+            v(1,j) = v_n(1,j);
+
+            P_f(1,j) = P(1,j);
+            T_f(1,j) = T(1,j);
+            rho_f(1,j) = rho(1,j);
+        elseif strcmp(R_bound,'Outlet')
+            P(end,j) = P(end-1,j);
+            T(end,j) = T(end-1,j);
+            rho(end,j) = rho(end-1,j);
+        
+            v_n(end,j) = (rho(1,j)*v_n(1,j))/rho(end,j); % Velocity correction
+            v(end,j) = v_n(end,j); % ENSURING CONSERVATION OF MASS
+
+            P_f(end,j) = P(end,j);
+            T_f(end,j) = T(end,j);
+            rho_f(end,j) = rho(end,j);
+        end
+
+
+        
+
+
+    end
 
 
 end
