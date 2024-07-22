@@ -14,7 +14,7 @@ Dt = 50;
 %----------------------- PROBLEM PARAMETERS -------------------------%
 % Pipeline parameters
 L = 5000;
-D = 0.75;
+D = 0.5;
 eps = 0.04e-3; % Absolute roughness 0.04 mm
 epsD = eps/D;
 A_h = pi*D^2/4;

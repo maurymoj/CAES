@@ -1,6 +1,6 @@
 clear 
 % close all
-clc
+% clc
 % profile on
 tic
 CP = py.importlib.import_module('CoolProp.CoolProp');

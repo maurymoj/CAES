@@ -192,11 +192,12 @@ u = zeros(n_n,n_t);
 cp = zeros(n_n,n_t);
 T_sol = zeros(n_n,n_t); % temporary var to store T as solved using energy 
 % equation and compare to using only mass and momentum eqs
+Q = zeros(1,n_t);
 
 % SHOULD THESE BE MATRICES OR VECTORS ???
-cp_f = zeros(1,n_t);
-h_f = zeros(1,n_t);
-s_f = zeros(1,n_t);
+cp_f = zeros(n_f,n_t);
+h_f = zeros(n_f,n_t);
+s_f = zeros(n_f,n_t);
 
 % Sanity check
 m = zeros(1,n_t); % Total mass in pipeline
@@ -248,6 +249,7 @@ rho_f(2:end-1,1) = (v(2:end-1,1) >= 0).*rho(1:end-1,1) ...
 % T_f(end,1) = T(end,1); 
 % rho_f(end,1) = rho(end,1);
 
+
 % BOUNDARY CONDITIONS 
 % (Inlet, Wall, Constant pressure, and Constant flow rate)
 
@@ -268,7 +270,7 @@ if strcmp(L_bound,'Inlet')
     rho_f(1,1) = rho_L;
     
     % v_L = m_L/(rho_f(1,1)*A_h);
-    v(1,1) = m_L/(rho_f(1,1)*A_h);
+    % v(1,1) = m_L/(rho_f(1,1)*A_h);
 
 elseif strcmp(L_bound,'Wall')
     v(1,:) = 0;
@@ -326,7 +328,7 @@ if strcmp(R_bound,'Inlet')
     T_f(end,:) = T_R;
     rho_f(end,:) = rho_R;
     % At face
-    v(end,1) = m_R/(rho_f(end,1)*A_h);
+    % v(end,1) = m_R/(rho_f(end,1)*A_h);
 
 elseif(strcmp(R_bound,'Wall'))
     v(end,:) = 0;
@@ -416,6 +418,12 @@ if strcmp(R_bound,'Outlet')
     T_f(end,1) = T(end,1);
     rho_f(end,1) = rho(end,1);
 end 
+
+% Thermodynamic properties
+cp_f(1,1) = CP.PropsSI('C','P',P_f(1,1),'D',rho_f(1,1),'Air');
+h_f(1,1) = CP.PropsSI('H','P',P_f(1,1),'D',rho_f(1,1),'Air');
+s_f(1,1) = CP.PropsSI('S','P',P_f(1,1),'D',rho_f(1,1),'Air');
+
 
 m(1) = sum(rho(:,1)*A_h*dx);
 E(1) = sum(rho(:,1)*A_h*dx.*u(:,1));
@@ -669,8 +677,8 @@ for j=2:n_t
                     % known from boundary conditions
         B_M(1) = v(1,j);
         
-        a_M(end,end) = 1;
-        B_M(end) = v(end,j);
+        a_M(n_f,n_f) = 1;
+        B_M(n_f) = v(n_f,j);
         
 
         a_M(2,3) = -max( 0, -rho(2,j)*v_n(2,j)/dx);    % a_C
@@ -705,63 +713,328 @@ for j=2:n_t
 
         % IMPLEMENT M_CONST BOUNDARY FOR R_bound
         
-        a_M(end-1,end-2) = -max(rho(n_n-1,j)*v_n(n_n-1,j)/dx, 0); % a_N-2
+
+
+
+
+
+        a_M(n_f-1,n_f-2) = -max(rho(n_n-1,j)*v_n(n_n-1,j)/dx, 0); % a_N-2
         % WHAT TO DO REGARDING TO THE a INDICES ??
-        a_M(end-1,end-1) = ...                                  % a_N-1
+        a_M(n_f-1,n_f-1) = ...                                  % a_N-1
             rho_f(n_f-1,j)/dt + f(n_f-1)*rho_f(n_f-1,j)*abs(v(n_f-1,j))/(2*D)...
             +(rho(n_n,j)*v_n(n_n,j) - rho(n_n-1,j)*v_n(n_n-1,j))/dx...
-            - (a_M(end-1,end-2) - max(-rho(n_n,j)*v_n(n_n,j)/dx,  0) );
+            - (a_M(n_f-1,n_f-2) - max(0, -rho(n_n,j)*v_n(n_n,j)/dx) );
         
-        d_M(end) = -1/dx;
-        b_M(end) = (rho_f(n_f-1,j-1)*v(n_f-1,j-1)/dt)-rho_f(n_f-1,j)*g*sind(theta);
+        a_M(n_f-1) = -1/dx;
+        b_M(n_f-1) = rho_f(n_f-1,j-1)*v(n_f-1,j-1)/dt...
+            -rho_f(n_f-1,j)*g*sind(theta)...
+            + max(0, -rho(n_n,j)*v_n(n_n,j)/dx)*v_n(n_n,j);
         
-        B_M(end) = d_M(end)*(P(n_n,j)-P(n_n-1,j)) + b_M(end);
-
-
-
-
-
-        % a_M(end,end-1) = -max(rho(n_n-1,j)*v_n(n_n-1,j)/dx, 0); % a_N-2 (index N-2, N-3)
-        % % WHAT TO DO REGARDING TO THE a INDICES ??
-        % a_M(end,end) = ...                                  % a_N-1 (index N-2, N-2)
-        %     rho_f(n_f-1,j)/dt + f(n_f-1)*rho_f(n_f-1,j)*abs(v(n_f-1,j))/(2*D)...
-        %     +(rho(n_n,j)*v_n(n_n,j) - rho(n_n-1,j)*v_n(n_n-1,j))/dx...
-        %     - (a_M(end,end-1) - max(-rho(n_n,j)*v_n(n_n,j)/dx,  0) );
-        % 
-        % d_M(end) = -1/dx;
-        % b_M(end) = (rho_f(n_f-1,j-1)*v(n_f-1,j-1)/dt)-rho_f(n_f-1,j)*g*sind(theta);
-        % 
-        % B_M(end) = d_M(end)*(P(n_n,j)-P(n_n-1,j)) + b_M(end);
+        B_M(n_f-1) = d_M(n_f-1)*(P(n_n,j)-P(n_n-1,j)) + b_M(n_f-1);
         
 
         
 
-        for i=2:n_f-3
-        % The indices of the node and face properties have to be added by 1, since
-        % the 1st line was ommited (as we have it solved from the boundary
-        % condition 
-            a_M(i,i-1) = -max(rho(i,j)*v_n(i,j)/dx,                     0);
-            a_M(i,i+1) = -max(                       0, -rho(i+1,j)*v_n(i+1,j)/dx);
-            a_M(i,i)   = rho_f(i+1,j)/dt + f(i+1)*rho_f(i+1,j)*abs(v(i+1,j))/(2*D) ...
-                - (a_M(i,i-1) + a_M(i,i+1)) ...
-                + (rho(i+1,j)*v_n(i+1,j)/dx - rho(i,j)*v_n(i,j)/dx);
+        for i=3:n_f-2
+
+            a_M(i,i-1) = -max(rho(i-1,j)*v_n(i-1,j)/dx,                     0);
+            a_M(i,i+1) = -max(                       0, -rho(i,j)*v_n(i,j)/dx);
+            a_M(i,i)   = rho_f(i,j)/dt + f(i)*rho_f(i,j)*abs(v(i,j))/(2*D) ...
+                + ( rho(i,j)*v_n(i,j) - rho(i-1,j)*v_n(i-1,j) )/dx...
+                - ( a_M(i,i-1) + a_M(i,i+1) );
             d_M(i) = -1/dx;
-            b_M(i) = (rho_f(i+1,j-1)*v(i+1,j-1)/dt)-rho_f(i+1,j)*g*sind(theta);
+            b_M(i) = (rho_f(i,j-1)*v(i,j-1)/dt)-rho_f(i,j)*g*sind(theta);
             
-            B_M(i) = d_M(i)*(P(i+1,j)-P(i,j)) + b_M(i);
+            B_M(i) = d_M(i)*(P(i,j)-P(i-1,j)) + b_M(i);
         end
         
-        % v_star = B\a
         v_star = linsolve(a_M,B_M);
-        v_star = [v(1,j);v_star;v(end,j)];
+                
         % if strcmp(L_bound,'Outlet')
         %     v_star(1) = v_star(2);
         % elseif strcmp(R_bound,'Outlet')
         %     v_star(end) = v_star(end-1);
         % end
-        % v(:,j) = [v(1,j);v_star;v(end,j)];
 
+
+
+        %--------------- Pressure correction P' calculations ---------------------%
+        % The matrices/vectors in P' calculations have no shift, so index 1 means
+        % control volume 1 and so on
+        a_C = zeros(n_n);
+        B_C = zeros(n_n,1);
+        
+        % left node
+        % A(1,2) = - max(0, -drho_dP(2)*v_star(2)/dx); % A_2
+        % A(1,1) = drho_dP_n(1)/dt - (rho_f(2,j)*d(1)/a(1,1))/dx ...
+        %        + drho_dP(2)*v_star(2)/dx - A(1,2); % A_1
+        a_C(1,2) = (rho_f(2,j)*d_M(2)/a_M(2,2))/dx - max(0, -drho_dP_f(2)*v_star(2)/dx); % A_2
+        a_C(1,1) = drho_dP_n(1)/dt + drho_dP_f(2)*v_star(2)/dx ...
+               - a_C(1,2); % A_1
+        
+        B_C(1) = (rho(1,j-1)-rho(1,j))/dt + (rho_f(1,j)*v_star(1) - rho_f(2,j)*v_star(2))/dx;
+        
+        if strcmp(L_bound,'P_const')
+            a_C(1,1) = 1;
+            a_C(1,2) = 0;
+
+            B_C(1) = 0;
+        elseif strcmp(L_bound,'Outlet')
+            %???
+            a_C(1,2) = -drho_dP_f(2)*v_star(2)/dx + rho_f(2,j)*(d_M(1)/a_M(1,1))/dx; % A_2
+            a_C(1,1) = drho_dP_n(1)/dt ...
+                     - (rho_f(2,j)*d_M(1)/a_M(1,1))/dx ...
+                     - drho_dP_f(1)*v_star(1)/dx ; % A_1
+        end
+        
+        
+        % right node
+        a_C(n_n,n_n-1) = (rho_f(n_f-1,j)*d_M(n_f-1)/a_M(n_f-1,n_f-1))/dx...
+                       - max(drho_dP_f(n_f-1)*v_star(n_f-1)/dx, 0);
+        a_C(n_n,n_n) = drho_dP_n(n_n)/dt ...
+                     - drho_dP_f(n_f-1)*v_star(n_f-1)/dx... 
+                     - a_C(n_n,n_n-1); % v_star(end) = 0
+        
+        B_C(n_n) = (rho(n_n,j-1)-rho(n_n,j))/dt + (rho_f(n_f-1,j)*v_star(n_f-1) - rho_f(n_f,j)*v_star(n_f))/dx;
+        
+        
+
+        if strcmp(R_bound,'P_const')
+            a_C(n_n,n_n-1) = 0;
+            a_C(n_n,n_n) = 1;
+
+            B(n_n) = 0;
+        elseif strcmp(R_bound,'Outlet')
+            %???
+            a_C(n_n,n_n-1) = (rho_f(N_f-1,j)*d_M(end)/a_M(end,end))/dx...
+                           - drho_dP_f(N_f-1)*v_star(N_f-1)/dx;
+            a_C(n_n,n_n) = drho_dP_n(n_n)/dt ...
+                         - (rho_f(N_f-1,j)*d_M(end)/a_M(end,end))/dx ...
+                         + drho_dP_f(N_f)*v_star(N_f)/dx;
+        end
+
+
+
+
+        for i=2:n_n-1
+            a_C(i,i-1) = (rho_f(i,j)*d_M(i)/a_M(i,i))/dx ...
+                       - max(drho_dP_f(i)*v_star(i)/dx,           0);
+            a_C(i,i+1) = (rho_f(i+1,j)*d_M(i+1)/a_M(i+1,i+1))/dx ...
+                       - max( 0, -drho_dP_f(i+1)*v_star(i+1)/dx);
+            a_C(i,i)   = drho_dP_n(i)/dt + (drho_dP_f(i+1)*v_star(i+1)/dx ...
+                       - drho_dP_f(i)*v_star(i)/dx) - ( a_C(i,i-1) + a_C(i,i+1) );
+            
+            B_C(i) = (rho(i,j-1)-rho(i,j))/dt ...
+                    + (rho_f(i,j)*v_star(i) - rho_f(i+1,j)*v_star(i+1))/dx;
+        end
+
+        P_corr = linsolve(a_C,B_C);
+        
+        if strcmp(L_bound,'M_const') %|| strcmp(L_bound,'Inlet')
+            P_corr(1) = 0;
+        elseif strcmp(R_bound,'M_const')
+            P_corr(end) = 0;
+        end
+
+        rho_corr = drho_dP_n.*P_corr;
+
+        a_diag = diag(a_M);
+
+
+        v_corr = zeros(n_f,1);
+        % v_corr(1)         = d(1)./a_i(1).*P_corr(1);
+        v_corr(2:end-1)   = d_M(2:end-1)./a_diag(2:end-1).*(P_corr(2:end)-P_corr(1:end-1));
+% !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        % Inlet boundary condition
+        % v_corr(1)         = 0; 
+        % Outlet boundary condition
+        % v_corr(end)       = 0;
+% !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+        % v_corr(end)       =  % Velocity corrected based on mass balance (m_in =
+        % m_out)
+        error_P = (P_corr./P(:,j));
+        error_hist = [error_hist error_P];
+
+        % error_rho = (rho_corr./rho(:,j));
+        % error_v = (v_corr./v(:,j));
+        count(j) = count(j)+1;  
     end
+
+    % ENERGY BALANCE
+    % ASSUMING v>0
+    a_T = zeros(n_n,n_n);
+    b_T = zeros(n_n,1);
+
+    Q(j) = 0; % ADIABATIC ASSUMPTION
+
+        a_T(1,2) = -max(0, -rho_f(2,j)*v(2,j)*cp_f(2,j-1)/dx);    
+
+    a_T(1,1) = rho(1,j)*cp(1,j-1)/dt ...
+        + (rho_f(2,j)*v(2,j)*cp_f(2,j-1) - rho_f(1,j)*v(1,j)*cp_f(1,j-1))/dx...
+        - (a_T(1,2) - max(rho_f(1,j)*v(1,j)*cp_f(1,j-1)/dx, 0));
+    
+    b_T(1) = Q(j) + (P(1,j)-P(1,j-1))/dt ...
+            + v_n(1,j)*(P_f(2,j) - P_f(1,j))/dx ...
+            + f(1)*rho(1,j)*abs(v_n(1,j))^3/(2*D) ...
+            + rho(1,j-1)*cp(1,j-1)*T(1,j-1)/dt...
+            + max(rho_f(1,j)*v(1,j)*cp_f(1,j-1)/dx, 0)*T_f(1,j);
+
+
+    a_T(n_n,n_n-1) = -max(rho_f(n_f-1,j)*v(n_f-1,j)*cp_f(n_f-1,j-1)/dx, 0);
+
+    a_T(n_n,n_n) = rho(n_n,j)*cp(n_n,j-1)/dt ...
+        + (rho_f(n_f,j)*v(n_f,j)*cp_f(n_f,j-1) - rho_f(n_f-1,j)*v(n_f-1,j)*cp_f(n_f-1,j-1))/dx...
+        - (a_T(n_n,n_n-1) - max(0, -rho_f(n_f,j)*v(n_f,j)*cp_f(n_f,j-1)/dx));
+    
+    b_T(n_n) = Q(n_n) + (P(n_n,j)-P(n_n,j-1))/dt ...
+            + v_n(n_n,j)*(P_f(n_f,j) - P_f(n_f-1,j))/dx ...
+            + f(n_n)*rho(n_n,j)*abs(v_n(n_n,j))^3/(2*D) ...
+            + rho(n_n,j-1)*cp(n_n,j-1)*T(n_n,j-1)/dt...
+            + max(0, rho_f(n_f,j)*v(n_f,j)*cp_f(n_f,j-1)/dx)*T_f(n_f,j);
+
+
+
+    % a_T(n_n) ??
+
+    for i=2:n_n-1
+        a_T(i,i-1) = -max( rho_f(i,j)*v(i,j)*cp(i,j-1)/dx, 0);
+        a_T(i,i+1) = -max(   0, -rho_f(i+1,j)*v(i+1,j)*cp(i+1,j-1)/dx);
+        a_T(i,i) = rho(i,j)*cp(i,j-1)/dt ...
+            + (rho_f(i+1,j)*v(i+1,j)*cp(i+1,j-1) - rho_f(i,j)*v(i,j)*cp(i,j-1))/dx...
+            - (a_T(i,i+1) + a_T(i,i-1));
+        
+        b_T(i) = Q(j) + (P(i,j)-P(i,j-1))/dt ...
+                + v_n(i,j)*(P_f(i+1,j) - P_f(i,j))/dx ...
+                + f(i)*rho(i,j)*abs(v_n(i,j))^3/(2*D) ...
+                + rho(i,j-1)*cp(i,j-1)*T(i,j-1)/dt;
+
+        % a_T(i,i+1) = 
+    end
+    % T_sol(:,j) = linsolve(a_T,b_T);
+    T(:,j) = linsolve(a_T,b_T);
+
+    % THERMODYNAMIC PROPERTIES
+    % cp(i,j) = CP.PropsSI('C','P',P(floor(end/2),j),'D',rho(floor(end/2),j),'Air');
+    % cp_f(j) = CP.PropsSI('C','P',P_f(1,j),'D',rho_f(1,j),'Air');
+    % h_f(j) = CP.PropsSI('H','P',P_f(1,j),'D',rho_f(1,j),'Air');
+    % s_f(j) = CP.PropsSI('S','P',P_f(1,j),'D',rho_f(1,j),'Air');
+
+    for i = 1:n_n  % PROPERTIES FROM P AND RHO          
+        % T(i,j) = CP.PropsSI('T','P',P(i,j),'D',rho(i,j),'Air');
+        cp(i,j) = CP.PropsSI('C','P',P(i,j),'D',rho(i,j),'Air');
+        h(i,j) = CP.PropsSI('H','P',P(i,j),'D',rho(i,j),'Air');
+        s(i,j) = CP.PropsSI('S','P',P(i,j),'D',rho(i,j),'Air');
+        u(i,j) = CP.PropsSI('U','P',P(i,j),'D',rho(i,j),'Air');
+        cp_f(i,j) = CP.PropsSI('C','P',P_f(i,j),'D',rho_f(i,j),'Air');
+        h_f(i,j) = CP.PropsSI('H','P',P_f(i,j),'D',rho_f(i,j),'Air');
+        s_f(i,j) = CP.PropsSI('S','P',P_f(i,j),'D',rho_f(i,j),'Air');
+    end
+    
+    cp_f(n_f,j) = CP.PropsSI('C','P',P_f(n_f,j),'D',rho_f(n_f,j),'Air');
+    h_f(n_f,j) = CP.PropsSI('H','P',P_f(n_f,j),'D',rho_f(n_f,j),'Air');
+    s_f(n_f,j) = CP.PropsSI('S','P',P_f(n_f,j),'D',rho_f(n_f,j),'Air');
+
+    % Upwind scheme
+    T_f(2:end-1,j) = (v(1:end-2,j) >= 0).*T(1:end-1,j) ...
+                     + (v(1:end-2,j) <  0).*T(2:end,j);
+    
+    T_f(end,j) = T(end,j); % ASSUMING UPWIND SCHEME !!!!!!!!!!
+                           % Implement other cases
+
+    if strcmp(L_bound,'Inlet') & P(ceil(n_n/2),j) >= P_max
+        % Charging from L boundary
+        % v(1,j+1:end) = 0;
+        L_bound = 'Wall';
+        t_shut_off = (j-1)*dt;
+    elseif strcmp(L_bound,'M_const') & P(1,j) <= P_min
+        % Discharging from L boundary
+        L_bound = 'Wall';
+    elseif strcmp(R_bound,'Inlet') & P(end-1,j) >= P_max
+        % Charging from R boundary
+        % v(1,j+1:end) = 0;
+        R_bound = 'Wall';
+        t_shut_off = (j-1)*dt;
+    elseif strcmp(R_bound,'M_const') & P(end,j) <= P_min
+        % Discharging from R boundary
+        R_bound = 'Wall';
+    end
+
+    bound_hist = [bound_hist; string(L_bound) string(R_bound)];
+    
+    m(j) = sum(rho(:,j)*A_h*dx);
+    E(j) = sum(rho(:,j)*A_h*dx.*u(:,j));
+    
+    m_n(:,j) = rho(:,j)*A_h*dx;
+    E_n(:,j) = rho(:,j)*A_h*dx.*u(:,j);
+    
+
 
 
 end
+
+toc
+
+
+dm = zeros(n_t,1);
+dE = zeros(n_t,1);
+% m_bal = zeros(n_t,1);
+% E_bal = zeros(n_t,1);
+
+% As a function of inlet velocity (CONSTANT INLET CONDITIONS)
+if strcmp(Process,'Charging_L')
+    % dm = rho_L*v(1,:)'*A_h*dt;
+    % dE = rho_L*v(1,:)'*A_h*cp_L*T_L*dt;
+    % dX = rho_L*v(1,:)'*A_h*(h_L - h_o - T_o*(s_L - s_o))*dt; % Flow exergy - kinetic and potential term contributions assumed negligible
+
+    % Sliding pressure test 
+    dm = rho_f(1,:)'.*v(1,:)'*A_h*dt;
+    dE = rho_f(1,:)'.*v(1,:)'.*A_h.*h_f(1,:)'*dt;
+    dX = rho_f(1,:)'.*v(1,:)'*A_h.*(h_f(1,:)' - h_o - T_o*(s_f(1,:)' - s_o))*dt; % Flow exergy - kinetic and potential term contributions assumed negligible
+elseif strcmp(Process,'Discharging_L')
+    dm = rho_f(1,:)'.*v(1,:)'*A_h*dt;
+    dE = rho_f(1,:)'.*v(1,:)'*A_h.*cp_f(1,:)'.*T_f(1,:)'*dt;
+    dX = rho_f(1,:)'.*v(1,:)'*A_h.*(h(1,:)' - h_o - T_o*(s(1,:)' - s_o))*dt; % Flow exergy - kinetic and potential term contributions assumed negligible
+elseif strcmp(Process,'Charging_R')
+    dm = -rho_R*v(end,:)'*A_h*dt;
+    dE = -rho_R*v(end,:)'*A_h*cp_R*T_R*dt;
+    dX = -rho_R*v(end,:)'*A_h*(h_R - h_o - T_o*(s_R - s_o))*dt; % Flow exergy - kinetic and potential term contributions assumed negligible
+elseif strcmp(Process,'Discharging_R')
+    dm = -rho_f(end,:)'.*v(end,:)'*A_h*dt;
+    dE = -rho_f(end,:)'.*v(end,:)'*A_h.*cp_f(end,:)'.*T_f(end,:)'*dt;
+    dX = -rho_f(end,:)'.*v(end,:)'*A_h.*(h(:,end)' - h_o - T_o*(s(:,end)' - s_o))*dt; % Flow exergy - kinetic and potential term contributions assumed negligible
+end
+
+m_bal = m(1) + cumsum(dm);
+E_bal = E(1) + cumsum(dE);
+
+x = 0:dx:L;
+x_f = [0:dx:L]';
+x_n = [dx/2:dx:L]';
+
+% Exergy
+% X = P*(A_h*L).*(P_amb./P - 1 + log(P./P_amb))./(1e6*3600);          % Pipeline Exergy [MWh]
+% X_min = P_0*(A_h*L).*(P_amb./P_0 - 1 + log(P_0./P_amb))/(1e6*3600); % Exergy when discharged [MWh] 
+% X = P*(A_h*dx).*(P_amb./P - 1 + log(P./P_amb))./(1e6*3600);           % Pipeline Exergy [MWh]
+% X_min = P_0*(A_h*dx).*(P_amb./P_0 - 1 + log(P_0./P_amb))/(1e6*3600);  % Exergy when discharged [MWh] 
+
+X = P*(A_h*dx).*(P_amb./P - 1 + log(P./P_amb))./(1e6*3600);           % Pipeline Exergy [MWh]
+X_min = P_0*(A_h*dx).*(P_amb./P_0 - 1 + log(P_0./P_amb))/(1e6*3600);  % Exergy when discharged [MWh] 
+
+% IS THE e - eo TERM MISSING ??
+
+X_net = X - X_min;                                                   % Exergy between current state and discharged state (assuming whole pipeline at P_min)
+X_in = sum(dX)/(1e6*3600)
+X_st = sum(X_net(:,end))
+
+% Figures of mass and energy over time
+% figure('color',[1 1 1]);plot(m)
+% hold on; plot(mm)
+% legend('m','\Delta m')
+
+figure('color',[1 1 1]);plot(t,m)
+hold on; plot(t,m_bal(1:end))
+legend('m','$m_o + \dot{m} dt$','Interpreter','latex')
+figure('color',[1 1 1]);plot(t,E)
+hold on; plot(t,E_bal(1:end))
+legend('E','$E_o + \dot{m} \Delta E$','Interpreter','latex')

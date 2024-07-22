@@ -1,14 +1,16 @@
 clear 
 % close all
-clc
+% clc
 tic
 CP = py.importlib.import_module('CoolProp.CoolProp');
 CP.PropsSI('D','P',101325,'T',298,'Air');
 
 %----------------------- PROBLEM PARAMETERS -------------------------%
 % Pipeline parameters
-L = 10000;
-D = 0.9;
+L = 5000;
+D = 0.5;
+% L = 10000;
+% D = 0.9;
 % L = 213333;
 % L = 300;
 % D = 24;

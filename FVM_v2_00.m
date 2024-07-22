@@ -1,6 +1,6 @@
 clear 
 % close all
-clc
+% clc
 
 % profile on
 tic
@@ -1023,10 +1023,8 @@ x_n = [dx/2:dx:L]';
 % X = P*(A_h*dx).*(P_amb./P - 1 + log(P./P_amb))./(1e6*3600);           % Pipeline Exergy [MWh]
 % X_min = P_0*(A_h*dx).*(P_amb./P_0 - 1 + log(P_0./P_amb))/(1e6*3600);  % Exergy when discharged [MWh] 
 
-X = ( u - u_o + P_o*R*(T./P - T_o/P_o) - T_o*(s - s_o) )./(1e6*3600);           % Pipeline Exergy [MWh]
-X_min = ( u_0 - u_o + P_o*R*(T_0./P_0 - T_o/P_o) - T_o*(s_0 - s_o) )/(1e6*3600);  % Exergy when discharged [MWh] 
-
-% IS THE e - eo TERM MISSING ??
+X = sum(m_n.*( u - u_o + P_o*R*(T./P - T_o/P_o) - T_o*(s - s_o) ) )./(1e6*3600);           % Pipeline Exergy [MWh]
+X_min = m(1)*(u_0 - u_o + P_o*R*(T_0./P_0 - T_o/P_o) - T_o*(s_0 - s_o) )/(1e6*3600);  % Exergy when discharged [MWh] 
 
 X_net = X - X_min;                                                   % Exergy between current state and discharged state (assuming whole pipeline at P_min)
 X_in = sum(dX)/(1e6*3600)
