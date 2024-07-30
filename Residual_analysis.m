@@ -107,15 +107,15 @@ plot(t,res_E(4,:))
 legend('1','2','3','4')
 title('Energy residual x time for four first nodes')
 
-figure('Color',[1 1 1])
-% plot(x_n,res(:,1))
-hold all
-plot(t(floor(n_t/3):end),res_E(1,(floor(n_t/3):end)))
-plot(t(floor(n_t/3):end),res_E(floor(n_n/5),(floor(n_t/3):end)))
-plot(t(floor(n_t/3):end),res_E(floor(2*n_n/5),floor(n_t/3):end))
-plot(t(floor(n_t/3):end),res_E(floor(3*n_n/5),floor(n_t/3):end))
-plot(t(floor(n_t/3):end),res_E(floor(4*n_n/5),floor(n_t/3):end))
-plot(t(floor(n_t/3):end),res_E(n_n,floor(n_t/3):end))
-legend('1',num2str([floor(n_n/5);floor(2*n_n/5);...
-         floor(3*n_n/5);floor(4*n_n/5);n_n]))
-title('Energy residual x time for different positions and t > dt/3')
+% figure('Color',[1 1 1])
+% % plot(x_n,res(:,1))
+% hold all
+% plot(t(floor(n_t/3):end),res_E(1,(floor(n_t/3):end)))
+% plot(t(floor(n_t/3):end),res_E(floor(n_n/5),(floor(n_t/3):end)))
+% plot(t(floor(n_t/3):end),res_E(floor(2*n_n/5),floor(n_t/3):end))
+% plot(t(floor(n_t/3):end),res_E(floor(3*n_n/5),floor(n_t/3):end))
+% plot(t(floor(n_t/3):end),res_E(floor(4*n_n/5),floor(n_t/3):end))
+% plot(t(floor(n_t/3):end),res_E(n_n,floor(n_t/3):end))
+% legend('1',num2str([floor(n_n/5);floor(2*n_n/5);...
+%          floor(3*n_n/5);floor(4*n_n/5);n_n]))
+% title('Energy residual x time for different positions and t > dt/3')

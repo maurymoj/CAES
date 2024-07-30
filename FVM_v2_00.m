@@ -8,7 +8,7 @@ CP = py.importlib.import_module('CoolProp.CoolProp'); % Simplifies coolprop call
 
 %----------------------- PROBLEM PARAMETERS -------------------------%
 % Pipeline parameters
-% Parameters from Kiuchi (
+% Parameters from Kiuchi (1994)
 L = 5000;
 D = 0.5;
 % L = 70000; % Reference case 70 km length, 0.9 m diam
@@ -24,7 +24,8 @@ D = 0.5;
 % Total simulation time
 % Dt = 3*3600; 
 % Dt = 3600;
-Dt = 180;
+% Dt = 180; Charging time for 5 km pipeline
+Dt = 90;
 
 eps = 0.04e-3; % Absolute roughness 0.04 mm
 
@@ -100,7 +101,7 @@ if strcmp(L_bound,'Inlet')
     m_L = 108; % Huntorf
     % v_A = ?
     P_L = P_0;
-    T_L = 273.15 + 25;
+    T_L = 273.15 + 60;
 
 elseif strcmp(L_bound,'Wall')
     m_L = 0;
@@ -147,7 +148,10 @@ theta = 0;
 
 if strcmp(simType,'CAESPipe')
     dx = L/(40-1); % CAESPipe
-    dt = 1;
+    dt = 0.1;
+    if dx/400 < dt % 400 upper limit for the speed of sound
+        warning('dt > time needed for pressure wave to cross a node')
+    end
     tol = 1e-6; % CAESPipe Charging
     % tol = 1e-3; % CAESPipe discharging
 elseif strcmp(simType,'CAESCav')
@@ -199,6 +203,7 @@ Q = zeros(1,n_t);
 cp_f = zeros(n_f,n_t);
 h_f = zeros(n_f,n_t);
 s_f = zeros(n_f,n_t);
+u_f = zeros(n_f,n_t);
 
 % Sanity check
 m = zeros(1,n_t); % Total mass in pipeline
@@ -485,7 +490,7 @@ for j=2:n_t
             T_f(1,j) = T_L; 
             % T_f(1,j) = T(1,j); 
             rho_f(1,j) = CP.PropsSI('D','P',P_f(1,j),'T',T_f(1,j),'Air');
-            v(1,j) = m_L/(rho_f(1,j)*A_h); % Sliding pressure test
+            v(1,j) = m_L/(rho_f(1,j)*A_h); % Sliding pressure
             
             v_n(1,j) = m_L/(rho(1,j)*A_h);
 
@@ -670,7 +675,6 @@ for j=2:n_t
         % end
         
 
-
         % Matrix/vector initialization (only need to solve for the inner faces -
         % boundary faces are dealt with the boundary conditions)
         a_M = zeros(n_f);
@@ -808,7 +812,7 @@ for j=2:n_t
             a_C(n_n,n_n-1) = 0;
             a_C(n_n,n_n) = 1;
 
-            B(n_n) = 0;
+            B_C(n_n) = 0;
         elseif strcmp(R_bound,'Outlet')
             %???
             a_C(n_n,n_n-1) = (rho_f(N_f-1,j)*d_M(end)/a_M(end,end))/dx...
@@ -817,7 +821,6 @@ for j=2:n_t
                          - (rho_f(N_f-1,j)*d_M(end)/a_M(end,end))/dx ...
                          + drho_dP_f(N_f)*v_star(N_f)/dx;
         end
-
 
 
 
@@ -968,10 +971,12 @@ for j=2:n_t
     bound_hist = [bound_hist; string(L_bound) string(R_bound)];
     
     m(j) = sum(rho(:,j)*A_h*dx);
-    E(j) = sum(rho(:,j)*A_h*dx.*u(:,j));
+    % E(j) = sum(rho(:,j)*A_h*dx.*u(:,j));
+    E(j) = sum(rho(:,j)*A_h*dx.*( u(:,j) + v_n(:,j).^2/2 ) );
     
     m_n(:,j) = rho(:,j)*A_h*dx;
-    E_n(:,j) = rho(:,j)*A_h*dx.*u(:,j);
+    % E_n(:,j) = rho(:,j)*A_h*dx.*u(:,j);
+    E_n(:,j) = rho(:,j)*A_h*dx.*( u(:,j) + v_n(:,j).^2/2 );
     
 
 
@@ -979,7 +984,6 @@ for j=2:n_t
 end
 
 toc
-
 
 dm = zeros(n_t,1);
 dE = zeros(n_t,1);
@@ -994,7 +998,8 @@ if strcmp(Process,'Charging_L')
 
     % Sliding pressure test 
     dm = rho_f(1,:)'.*v(1,:)'*A_h*dt;
-    dE = rho_f(1,:)'.*v(1,:)'.*A_h.*h_f(1,:)'*dt;
+    % dE = rho_f(1,:)'.*v(1,:)'.*A_h.*h_f(1,:)'*dt;
+    dE = rho_f(1,:)'.*v(1,:)'.*A_h.*( h_f(1,:)' + v(1,:)'.^2/2 )*dt;
     dX = rho_f(1,:)'.*v(1,:)'*A_h.*(h_f(1,:)' - h_o - T_o*(s_f(1,:)' - s_o))*dt; % Flow exergy - kinetic and potential term contributions assumed negligible
 elseif strcmp(Process,'Discharging_L')
     dm = rho_f(1,:)'.*v(1,:)'*A_h*dt;
