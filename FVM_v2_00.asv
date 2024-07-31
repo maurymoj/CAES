@@ -1,6 +1,6 @@
 clear 
 % close all
-% clc
+clc
 
 % profile on
 tic
@@ -8,7 +8,7 @@ CP = py.importlib.import_module('CoolProp.CoolProp'); % Simplifies coolprop call
 
 %----------------------- PROBLEM PARAMETERS -------------------------%
 % Pipeline parameters
-% Parameters from Kiuchi (1994)
+% Parameters from Kiuchi (
 L = 5000;
 D = 0.5;
 % L = 70000; % Reference case 70 km length, 0.9 m diam
@@ -24,8 +24,7 @@ D = 0.5;
 % Total simulation time
 % Dt = 3*3600; 
 % Dt = 3600;
-% Dt = 180; Charging time for 5 km pipeline
-Dt = 90;
+Dt = 180;
 
 eps = 0.04e-3; % Absolute roughness 0.04 mm
 
@@ -101,7 +100,7 @@ if strcmp(L_bound,'Inlet')
     m_L = 108; % Huntorf
     % v_A = ?
     P_L = P_0;
-    T_L = 273.15 + 60;
+    T_L = 273.15 + 25;
 
 elseif strcmp(L_bound,'Wall')
     m_L = 0;
@@ -140,7 +139,6 @@ elseif strcmp(R_bound,'M_const')
     m_R = 100;
 end                     
 
-R = 287;
 g = 9.81;
 theta = 0;
 
@@ -148,10 +146,7 @@ theta = 0;
 
 if strcmp(simType,'CAESPipe')
     dx = L/(40-1); % CAESPipe
-    dt = 0.1;
-    if dx/400 < dt % 400 upper limit for the speed of sound
-        warning('dt > time needed for pressure wave to cross a node')
-    end
+    dt = 1;
     tol = 1e-6; % CAESPipe Charging
     % tol = 1e-3; % CAESPipe discharging
 elseif strcmp(simType,'CAESCav')
@@ -203,7 +198,6 @@ Q = zeros(1,n_t);
 cp_f = zeros(n_f,n_t);
 h_f = zeros(n_f,n_t);
 s_f = zeros(n_f,n_t);
-u_f = zeros(n_f,n_t);
 
 % Sanity check
 m = zeros(1,n_t); % Total mass in pipeline
@@ -221,13 +215,9 @@ A_h = pi*D^2/4; % Cross-section area
 P_o = P_amb;
 T_o = T_amb;
 h_o = CP.PropsSI('H','P',P_o,'T',T_o,'Air');
-u_o = CP.PropsSI('U','P',P_o,'T',T_o,'Air');
 s_o = CP.PropsSI('S','P',P_o,'T',T_o,'Air');
 
 % Initial conditions at nodes (i -> x, j -> t)
-u_0 = CP.PropsSI('U','P',P_0,'T',T_0,'Air');
-s_0 = CP.PropsSI('S','P',P_0,'T',T_0,'Air');
-
 % Thermodynamic properties over all solution space
 P(:,1) = P_0*ones(n_n,1);
 T(:,1) = T_0*ones(n_n,1);
@@ -490,7 +480,7 @@ for j=2:n_t
             T_f(1,j) = T_L; 
             % T_f(1,j) = T(1,j); 
             rho_f(1,j) = CP.PropsSI('D','P',P_f(1,j),'T',T_f(1,j),'Air');
-            v(1,j) = m_L/(rho_f(1,j)*A_h); % Sliding pressure
+            v(1,j) = m_L/(rho_f(1,j)*A_h); % Sliding pressure test
             
             v_n(1,j) = m_L/(rho(1,j)*A_h);
 
@@ -675,6 +665,7 @@ for j=2:n_t
         % end
         
 
+
         % Matrix/vector initialization (only need to solve for the inner faces -
         % boundary faces are dealt with the boundary conditions)
         a_M = zeros(n_f);
@@ -812,7 +803,7 @@ for j=2:n_t
             a_C(n_n,n_n-1) = 0;
             a_C(n_n,n_n) = 1;
 
-            B_C(n_n) = 0;
+            B(n_n) = 0;
         elseif strcmp(R_bound,'Outlet')
             %???
             a_C(n_n,n_n-1) = (rho_f(N_f-1,j)*d_M(end)/a_M(end,end))/dx...
@@ -821,6 +812,7 @@ for j=2:n_t
                          - (rho_f(N_f-1,j)*d_M(end)/a_M(end,end))/dx ...
                          + drho_dP_f(N_f)*v_star(N_f)/dx;
         end
+
 
 
 
@@ -971,12 +963,10 @@ for j=2:n_t
     bound_hist = [bound_hist; string(L_bound) string(R_bound)];
     
     m(j) = sum(rho(:,j)*A_h*dx);
-    % E(j) = sum(rho(:,j)*A_h*dx.*u(:,j));
-    E(j) = sum(rho(:,j)*A_h*dx.*( u(:,j) + v_n(:,j).^2/2 ) );
+    E(j) = sum(rho(:,j)*A_h*dx.*u(:,j));
     
     m_n(:,j) = rho(:,j)*A_h*dx;
-    % E_n(:,j) = rho(:,j)*A_h*dx.*u(:,j);
-    E_n(:,j) = rho(:,j)*A_h*dx.*( u(:,j) + v_n(:,j).^2/2 );
+    E_n(:,j) = rho(:,j)*A_h*dx.*u(:,j);
     
 
 
@@ -984,6 +974,7 @@ for j=2:n_t
 end
 
 toc
+
 
 dm = zeros(n_t,1);
 dE = zeros(n_t,1);
@@ -998,8 +989,7 @@ if strcmp(Process,'Charging_L')
 
     % Sliding pressure test 
     dm = rho_f(1,:)'.*v(1,:)'*A_h*dt;
-    % dE = rho_f(1,:)'.*v(1,:)'.*A_h.*h_f(1,:)'*dt;
-    dE = rho_f(1,:)'.*v(1,:)'.*A_h.*( h_f(1,:)' + v(1,:)'.^2/2 )*dt;
+    dE = rho_f(1,:)'.*v(1,:)'.*A_h.*h_f(1,:)'*dt;
     dX = rho_f(1,:)'.*v(1,:)'*A_h.*(h_f(1,:)' - h_o - T_o*(s_f(1,:)' - s_o))*dt; % Flow exergy - kinetic and potential term contributions assumed negligible
 elseif strcmp(Process,'Discharging_L')
     dm = rho_f(1,:)'.*v(1,:)'*A_h*dt;
@@ -1028,8 +1018,10 @@ x_n = [dx/2:dx:L]';
 % X = P*(A_h*dx).*(P_amb./P - 1 + log(P./P_amb))./(1e6*3600);           % Pipeline Exergy [MWh]
 % X_min = P_0*(A_h*dx).*(P_amb./P_0 - 1 + log(P_0./P_amb))/(1e6*3600);  % Exergy when discharged [MWh] 
 
-X = sum(m_n.*( u - u_o + P_o*R*(T./P - T_o/P_o) - T_o*(s - s_o) ) )./(1e6*3600);           % Pipeline Exergy [MWh]
-X_min = m(1)*(u_0 - u_o + P_o*R*(T_0./P_0 - T_o/P_o) - T_o*(s_0 - s_o) )/(1e6*3600);  % Exergy when discharged [MWh] 
+X = P*(A_h*dx).*(P_amb./P - 1 + log(P./P_amb))./(1e6*3600);           % Pipeline Exergy [MWh]
+X_min = P_0*(A_h*dx).*(P_amb./P_0 - 1 + log(P_0./P_amb))/(1e6*3600);  % Exergy when discharged [MWh] 
+
+% IS THE e - eo TERM MISSING ??
 
 X_net = X - X_min;                                                   % Exergy between current state and discharged state (assuming whole pipeline at P_min)
 X_in = sum(dX)/(1e6*3600)

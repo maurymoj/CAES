@@ -41,16 +41,16 @@ for i=1:length(t_dec)
     % ylim([min(P(:,1+dec*(i-1)))/1e6-0.001 max(P(:,1+dec*(i-1)))/1e6+0.001])
 
     % plot(x_f,P_f(:,1+dec*(i-1))./1e6);
-    % plot(x_f,v(:,1+dec*(i-1)));
-    % ylim([v_min v_max])
-    % ylabel('v [m/s]')
+    plot(x_f,v(:,1+dec*(i-1)));
+    ylim([v_min v_max])
+    ylabel('v [m/s]')
 
     % plot(x_f,rho_f(:,1+dec*(i-1)).*v(:,1+dec*(i-1)).*A_h);
     % ylim([-200 400])
 
-    plot(x_n,T(:,1+dec*(i-1)));
-    ylim([T_min T_max])
-    ylabel('T [K]')
+    % plot(x_n,T(:,1+dec*(i-1)));
+    % ylim([T_min T_max])
+    % ylabel('T [K]')
 
     % plot(x_f,rho_f(:,1+dec*(i-1)));
 

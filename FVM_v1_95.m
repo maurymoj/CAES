@@ -1,6 +1,6 @@
 clear 
 % close all
-clc
+% clc
 % profile on
 tic
 CP = py.importlib.import_module('CoolProp.CoolProp');
@@ -21,7 +21,7 @@ D = 0.5;
 
 % Dt = 3*3600; % Total simulation time
 % Dt = 3600;
-Dt = 100;
+Dt = 180;
 
 eps = 0.04e-3; % Absolute roughness 0.04 mm
 
@@ -95,8 +95,8 @@ if strcmp(L_bound,'Inlet')
     % m_in = 100;
     m_L = 108; % Huntorf
     % v_A = ?
-    P_L = 7e6;
-    T_L = 273.15 + 60;
+    P_L = P_0;
+    T_L = 273.15 + 25;
 
 elseif strcmp(L_bound,'Wall')
     m_L = 0;
@@ -140,7 +140,7 @@ theta = 0;
 
 
 if strcmp(simType,'CAESPipe')
-    dx = L/(20-1); % CAESPipe
+    dx = L/(40-1); % CAESPipe
     dt = 1;
     tol = 1e-6; % CAESPipe Charging
     % tol = 1e-3; % CAESPipe discharging
@@ -179,12 +179,21 @@ T = zeros(n_n,n_t);
 rho = zeros(n_n,n_t);
 h = zeros(n_n,n_t);
 s = zeros(n_n,n_t);
-cp = zeros(1,n_t);
+u = zeros(n_n,n_t);
+cp = zeros(n_n,n_t);
+T_sol = zeros(n_n,n_t); % temporary var to store T as solved using energy 
+% equation and compare to using only mass and momentum eqs
 
-T_sol = zeros(n_n,n_t);
+cp_f = zeros(1,n_t);
+h_f = zeros(1,n_t);
+s_f = zeros(1,n_t);
+
 % Sanity check
 m = zeros(n_t,1); % Total mass in pipeline
 E = zeros(n_t,1); % Total energy in pipeline
+
+m_n = zeros(n_n,n_t); % Mass per node
+E_n = zeros(n_n,n_t); % Energy per node
 
 %------------------ SETTING INITIAL CONDITIONS ---------------------%
 % Basic calculations
@@ -203,9 +212,11 @@ s_o = CP.PropsSI('S','P',P_o,'T',T_o,'Air');
 P(:,1) = P_0*ones(n_n,1);
 T(:,1) = T_0*ones(n_n,1);
 rho(:,1) = CP.PropsSI('D','P',P(1,1),'T',T(1,1),'Air');
-cp(1) = CP.PropsSI('C','P',P(1,1),'T',T(1,1),'Air'); % Constant Cp (?)
-h(:,1) = CP.PropsSI('H','P',P(1,1),'T',T(1,1),'Air'); % Constant Cp (?)
-s(:,1) = CP.PropsSI('S','P',P(1,1),'T',T(1,1),'Air'); % Constant Cp (?)
+cp(:,1) = CP.PropsSI('C','P',P(1,1),'T',T(1,1),'Air'); 
+h(:,1) = CP.PropsSI('H','P',P(1,1),'T',T(1,1),'Air'); 
+s(:,1) = CP.PropsSI('S','P',P(1,1),'T',T(1,1),'Air'); 
+u(:,1) = CP.PropsSI('U','P',P(1,1),'T',T(1,1),'Air'); 
+
 % Initial conditions at faces (i -> x, j -> t)
 v(:,1) = v_0; % V profile at t=0
 
@@ -238,9 +249,9 @@ if strcmp(L_bound,'Inlet')
     h_L = CP.PropsSI('H','P',P_L,'T',T_L,'Air');
     s_L = CP.PropsSI('S','P',P_L,'T',T_L,'Air');
 
-    v_L = m_L/(rho_L*A_h);
+    % v_L = m_L/(rho_L*A_h);
 
-    P(1,:) = P_L;
+    % P(1,:) = P_L;
     % T(1,:) = T_A;
     % rho(1,:) = rho_A;
 
@@ -248,12 +259,12 @@ if strcmp(L_bound,'Inlet')
     T_f(1,:) = T_L;
     rho_f(1,:) = rho_L;
     % At face
-    v(1,2:end) = v_L;
+    % v(1,2:end) = v_L;
     
     % Sliding pressure inlet test
 
     v_L = m_L/(rho(1,1)*A_h);
-    % 
+    v_n(1,1) = 0;
     % P(1,:) = P_0;
     % T(1,:) = T_A;
     % rho(1,:) = rho_A;
@@ -415,13 +426,14 @@ end
 
 
 
-
-
-
 m(1) = sum(rho(:,1)*A_h*dx);
-E(1) = sum(rho(:,1)*A_h*dx.*cp(1).*T(:,1));
+E(1) = sum(rho(:,1)*A_h*dx.*u(:,1));
+
+m_n(:,1) = rho(:,1)*A_h*dx;
+E_n(:,1) = rho(:,1)*A_h*dx.*u(:,1);
 
 count = zeros(n_t,1);
+
 f_guess = (2*log10(1/epsD)+1.14)^(-2); % Friction factor based on Nikuradse
 
 
@@ -458,9 +470,14 @@ for j=2:n_t
             % T(1,:) = T_L;
             % rho(1,:) = rho_L;
 
-            % T_f(1,:) = T_L;
-            % rho_f(1,:) = rho_L;
-            % v(1,j) = m_L/(rho(1,j)*A_h); % Sliding pressure test
+            P_f(1,j) = P(1,j);
+            T_f(1,j) = T_L; 
+            % T_f(1,j) = T(1,j); 
+            rho_f(1,j) = CP.PropsSI('D','P',P_f(1,j),'T',T_f(1,j),'Air');
+            v(1,j) = m_L/(rho_f(1,j)*A_h); % Sliding pressure test
+            
+            v_n(1,j) = m_L/(rho(1,j)*A_h);
+
         elseif strcmp(L_bound,'Wall')
             v(1,j) = 0;
             P_f(1,j) = P(1,j);
@@ -559,8 +576,10 @@ for j=2:n_t
         % v(:,j) = v_star(:) + v_corr;
         
         % Upwind scheme
-        v_n(:,j) = (v(1:end-1,j) >= 0).*v((1:end-1),j) ...
-            +      (v(1:end-1,j) <  0).*v((2:end),j);
+        % v_n(:,j) = (v(1:end-1,j) >= 0).*v((1:end-1),j) ...
+        %     +      (v(1:end-1,j) <  0).*v((2:end),j);
+        v_n(2:end,j) = (v(2:end-1,j) >= 0).*v((2:end-1),j) ...
+            +      (v(2:end-1,j) <  0).*v((3:end),j);
         
         % Properties in nodes to faces
         P_f(2:end-1,j) = (v(1:end-2,j) >= 0).*P(1:end-1,j) ...
@@ -650,11 +669,26 @@ for j=2:n_t
         a(1,1) = rho_f(2,j)/dt + f(1)*rho_f(2,j)*abs(v(2,j))/(2*D) ...
             + (rho(2,j)*v_n(2,j) - rho(1,j)*v_n(1,j))/dx ...
             - (a(1,2) - max(rho(1,j)*v_n(1,j)/dx,  0) );% a_B
-        
+                
         d(1) = -1/dx;
+        
+        
+        
+        
+        
+        
+        
+        % b(1) = (rho_f(2,j-1)*v(2,j-1)/dt)...
+        %     - rho_f(2,j)*g*sind(theta)...
+        %     + max(rho(1,j)*v_n(1,j)/dx,  0)*v_n(1,j);
         b(1) = (rho_f(2,j-1)*v(2,j-1)/dt)...
             - rho_f(2,j)*g*sind(theta)...
             + max(rho(1,j)*v_n(1,j)/dx,  0)*v_n(1,j);
+
+
+
+
+
         
         B(1) = d(1)*(P(2,j)-P(1,j)) ...
             + b(1);           
@@ -717,9 +751,12 @@ for j=2:n_t
         
         % left node
         % Coefficients of a and d are displaced by 1 (1 = B, 2 = C and so on) 
-        A(1,2) = - max(0, -drho_dP(2)*v_star(2)/dx); % A_2
-        A(1,1) = drho_dP_n(1)/dt - (rho_f(2,j)*d(1)/a(1,1))/dx ...
-               + drho_dP(2)*v_star(2)/dx - A(1,2); % A_1
+        % A(1,2) = - max(0, -drho_dP(2)*v_star(2)/dx); % A_2
+        % A(1,1) = drho_dP_n(1)/dt - (rho_f(2,j)*d(1)/a(1,1))/dx ...
+        %        + drho_dP(2)*v_star(2)/dx - A(1,2); % A_1
+        A(1,2) = (rho_f(2,j)*d(1)/a(1,1))/dx - max(0, -drho_dP(2)*v_star(2)/dx); % A_2
+        A(1,1) = drho_dP_n(1)/dt + drho_dP(2)*v_star(2)/dx ...
+               - A(1,2); % A_1
         
         BB(1) = (rho(1,j-1)-rho(1,j))/dt + (rho_f(1,j)*v_star(1) - rho_f(2,j)*v_star(2))/dx;
         if strcmp(L_bound,'P_const')
@@ -811,19 +848,19 @@ for j=2:n_t
     b_T = zeros(n_n,1);
     Q(j) = 0; % ADIABATIC ASSUMPTION
 
-    a_T(1,1) = rho(1,j)*cp(j-1)/dt + rho_f(2,j)*v(2,j)*cp(j-1)/dx;
+    a_T(1,1) = rho(1,j)*cp(1,j-1)/dt + rho_f(2,j)*v(2,j)*cp(2,j-1)/dx;
     b_T(1) = Q(j) + (P(1,j)-P(1,j-1))/dt ...
             + v_n(1,j)*(P_f(2,j) - P_f(1,j))/dx ...
             + f(1)*rho(1,j)*abs(v_n(1,j))^3/(2*D) ...
-            + rho(1,j-1)*cp(j-1)*T(1,j-1)/dt...
-            + rho_f(1,j)*v(1,j)*cp(j-1)*T_f(1,j)/dx;
+            + rho(1,j-1)*cp(1,j-1)*T(1,j-1)/dt...
+            + rho_f(1,j)*v(1,j)*cp(1,j-1)*T_f(1,j)/dx;
     for i=2:n_n
-        a_T(i,i) = rho(i,j)*cp(j-1)/dt + rho_f(i+1,j)*v(i+1,j)*cp(j-1)/dx;
-        a_T(i,i-1) = -rho_f(i,j)*v(i,j)*cp(j-1)/dx;
+        a_T(i,i) = rho(i,j)*cp(i,j-1)/dt + rho_f(i+1,j)*v(i+1,j)*cp(i,j-1)/dx;
+        a_T(i,i-1) = -rho_f(i,j)*v(i,j)*cp(i,j-1)/dx;
         b_T(i) = Q(j) + (P(i,j)-P(i,j-1))/dt ...
                 + v_n(i,j)*(P_f(i+1,j) - P_f(i,j))/dx ...
                 + f(i)*rho(i,j)*abs(v_n(i,j))^3/(2*D) ...
-                + rho(i,j-1)*cp(j-1)*T(i,j-1)/dt;
+                + rho(i,j-1)*cp(i,j-1)*T(i,j-1)/dt;
 
         % a_T(i,i+1) = 
     end
@@ -831,12 +868,17 @@ for j=2:n_t
     T(:,j) = linsolve(a_T,b_T);
 
     % THERMODYNAMIC PROPERTIES
-    cp(j) = CP.PropsSI('C','P',P(floor(end/2),j),'D',rho(floor(end/2),j),'Air');
+    % cp(i,j) = CP.PropsSI('C','P',P(floor(end/2),j),'D',rho(floor(end/2),j),'Air');
+    cp_f(j) = CP.PropsSI('C','P',P_f(1,j),'D',rho_f(1,j),'Air');
+    h_f(j) = CP.PropsSI('H','P',P_f(1,j),'D',rho_f(1,j),'Air');
+    s_f(j) = CP.PropsSI('S','P',P_f(1,j),'D',rho_f(1,j),'Air');
+
     for i = 1:n_n  % PROPERTIES FROM P AND RHO          
         % T(i,j) = CP.PropsSI('T','P',P(i,j),'D',rho(i,j),'Air');
-
+        cp(i,j) = CP.PropsSI('C','P',P(i,j),'D',rho(i,j),'Air');
         h(i,j) = CP.PropsSI('H','P',P(i,j),'D',rho(i,j),'Air');
         s(i,j) = CP.PropsSI('S','P',P(i,j),'D',rho(i,j),'Air');
+        u(i,j) = CP.PropsSI('U','P',P(i,j),'D',rho(i,j),'Air');
     end
 
     T_f(2:end-1,j) = (v(1:end-2,j) >= 0).*T(1:end-1,j) ...
@@ -860,11 +902,17 @@ for j=2:n_t
     bound_hist = [bound_hist; string(L_bound) string(R_bound)];
     
     m(j) = sum(rho(:,j)*A_h*dx);
-    E(j) = sum(rho(:,j)*A_h*dx.*cp(j).*T(:,j));
+    % E(j) = sum(rho(:,j)*A_h*dx.*cp(:,j).*T(:,j));
+    E(j) = sum(rho(:,j)*A_h*dx.*u(:,j));
+    
+    m_n(:,j) = rho(:,j)*A_h*dx;
+    E_n(:,j) = rho(:,j)*A_h*dx.*u(:,j);
+
+    % Simulation iteration update
     % [j count(j)]
-    if rem((j-1)*dt,1) == 0
-        disp(strcat('t= ',num2str((j-1)*dt),'s, n iterations: ',num2str(count(j))))
-    end
+    % if rem((j-1)*dt,10) == 0
+    %     disp(strcat('t= ',num2str((j-1)*dt),'s, n iterations: ',num2str(count(j))))
+    % end
 end
 
 toc
@@ -876,17 +924,21 @@ toc
 % EE = E(1) + [0; cumsum(dE(1:end-1))];
 % mm = m(1) + dm.*(v~=0).*(0:n_t-1)';
 % EE = E(1) + dE.*(0:n_t-1)';
+dm = zeros(n_t,1);
+dE = zeros(n_t,1);
+% m_bal = zeros(n_t,1);
+% E_bal = zeros(n_t,1);
 
 % As a function of inlet velocity (CONSTANT INLET CONDITIONS)
 if strcmp(Process,'Charging_L')
-    dm = rho_L*v(1,:)'*A_h*dt;
-    dE = rho_L*v(1,:)'*A_h*cp_L*T_L*dt;
-    dX = rho_L*v(1,:)'*A_h*(h_L - h_o - T_o*(s_L - s_o))*dt; % Flow exergy - kinetic and potential term contributions assumed negligible
+    % dm = rho_L*v(1,:)'*A_h*dt;
+    % dE = rho_L*v(1,:)'*A_h*cp_L*T_L*dt;
+    % dX = rho_L*v(1,:)'*A_h*(h_L - h_o - T_o*(s_L - s_o))*dt; % Flow exergy - kinetic and potential term contributions assumed negligible
 
     % Sliding pressure test 
-    % dm = rho_f(1,:)'.*v(1,:)'*A_h*dt;
-    % dE = rho_f(1,:)'.*v(1,:)'.*A_h.*cp(:).*T_f(1,:)'*dt;
-    % dX = rho_f(1,:)'.*v(1,:)'*A_h.*(h(1,:)' - h_o - T_o*(s(1,:)' - s_o))*dt; % Flow exergy - kinetic and potential term contributions assumed negligible
+    dm = rho_f(1,:)'.*v(1,:)'*A_h*dt;
+    dE = rho_f(1,:)'.*v(1,:)'.*A_h.*h_f(:)*dt;
+    dX = rho_f(1,:)'.*v(1,:)'*A_h.*(h_f(:) - h_o - T_o*(s_f(:) - s_o))*dt; % Flow exergy - kinetic and potential term contributions assumed negligible
 elseif strcmp(Process,'Discharging_L')
     dm = rho_f(1,:)'.*v(1,:)'*A_h*dt;
     dE = rho_f(1,:)'.*v(1,:)'*A_h.*cp(1,:)'.*T_f(1,:)'*dt;
@@ -902,7 +954,6 @@ elseif strcmp(Process,'Discharging_R')
 end
 
 m_bal = m(1) + cumsum(dm);
-
 E_bal = E(1) + cumsum(dE);
 
 x = 0:dx:L;
@@ -910,11 +961,14 @@ x_f = [0:dx:L]';
 x_n = [dx/2:dx:L]';
 
 % Exergy
-% X = P*(A_h*L).*(P_amb./P - 1 + log(P./P_amb))./(1e6*3600); % Pipeline Exergy [MWh]
+% X = P*(A_h*L).*(P_amb./P - 1 + log(P./P_amb))./(1e6*3600);          % Pipeline Exergy [MWh]
 % X_min = P_0*(A_h*L).*(P_amb./P_0 - 1 + log(P_0./P_amb))/(1e6*3600); % Exergy when discharged [MWh] 
-X = P*(A_h*dx).*(P_amb./P - 1 + log(P./P_amb))./(1e6*3600); % Pipeline Exergy [MWh]
-X_min = P_0*(A_h*dx).*(P_amb./P_0 - 1 + log(P_0./P_amb))/(1e6*3600); % Exergy when discharged [MWh] 
-X_net = X - X_min; % Exergy between current state and discharged state (assuming whole pipeline at P_min)
+X = P*(A_h*dx).*(P_amb./P - 1 + log(P./P_amb))./(1e6*3600);           % Pipeline Exergy [MWh]
+X_min = P_0*(A_h*dx).*(P_amb./P_0 - 1 + log(P_0./P_amb))/(1e6*3600);  % Exergy when discharged [MWh] 
+
+% IS THE e - eo TERM MISSING ??
+
+X_net = X - X_min;                                                   % Exergy between current state and discharged state (assuming whole pipeline at P_min)
 X_in = sum(dX)/(1e6*3600)
 X_st = sum(X_net(:,end))
 
@@ -941,6 +995,18 @@ title('Difference in mass')
 figure('color',[1 1 1]);plot(t,(E_bal - E)./E)
 title('Difference in energy')
 
+figure('color',[1 1 1])
+title('before')
+yyaxis left
+plot(t,(m_bal - m)./m);
+% ylim([P_lower_bound-0.1 P_upper_bound+0.1])
+xlabel('time [s]')
+ylabel('Mass residual')
+yyaxis right
+plot(t,(E_bal - E)./E);
+ylabel('Energy residual')
+% ylim([v_min v_max])
+% ylabel('v [m/s]')
 
 %%
 if strcmp(simType,'CAESCav')

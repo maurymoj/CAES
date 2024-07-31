@@ -45,3 +45,5 @@
 /TDMA.m
 /Velocity distribution.fig
 *.avi
+*.fig
+CAESCav_P7MPa_L350m_Dt0.mat
