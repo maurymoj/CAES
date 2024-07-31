@@ -37,8 +37,8 @@ simType = 'CAESPipe';
 % simType = 'CAESCav';
 
 % CAES process
-Process = 'Charging_L';
-% Process = 'Discharging_L'
+% Process = 'Charging_L';
+Process = 'Discharging_L';
 % Process = 'Charging_R';
 % Process = 'Discharging_R';
 if strcmp(Process,'Charging_L')

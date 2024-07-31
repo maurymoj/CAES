@@ -43,7 +43,7 @@ simType = 'CAESPipe';
 
 % CAES process
 Process = 'Charging_L';
-% Process = 'Discharging_L'
+% Process = 'Discharging_L';
 % Process = 'Charging_R';
 % Process = 'Discharging_R';
 if strcmp(Process,'Charging_L')
@@ -979,8 +979,6 @@ for j=2:n_t
     E_n(:,j) = rho(:,j)*A_h*dx.*( u(:,j) + v_n(:,j).^2/2 );
     
 
-
-
 end
 
 toc
@@ -1046,3 +1044,8 @@ legend('m','$m_o + \dot{m} dt$','Interpreter','latex')
 figure('color',[1 1 1]);plot(t,E)
 hold on; plot(t,E_bal(1:end))
 legend('E','$E_o + \dot{m} \Delta E$','Interpreter','latex')
+
+figure('color',[1 1 1]);plot(t,(m_bal - m)./m)
+title('Difference in mass')
+figure('color',[1 1 1]);plot(t,(E_bal' - E)./E)
+title('Difference in energy')
