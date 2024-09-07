@@ -9,8 +9,10 @@ CP = py.importlib.import_module('CoolProp.CoolProp'); % Simplifies coolprop call
 %----------------------- PROBLEM PARAMETERS -------------------------%
 % Pipeline parameters
 % Parameters from Kiuchi (1994)
-L = 5000;
-D = 0.5;
+% L = 5000;
+% D = ;
+L = 10000;
+D = 0.9;
 % L = 70000; % Reference case 70 km length, 0.9 m diam
 % D = 0.9;
 % L = 213333; % Length for eq. vol with Huntorf
@@ -25,7 +27,8 @@ D = 0.5;
 % Dt = 3*3600; 
 % Dt = 3600;
 % Dt = 180; Charging time for 5 km pipeline
-Dt = 90;
+Dt = 1800; % Charging L=10 km, d=0.9 m pipeline (360s = 3.44 MWh,1054 elapsed time)
+% Dt = 90; % Testing case
 
 eps = 0.04e-3; % Absolute roughness 0.04 mm
 
@@ -35,7 +38,8 @@ T_amb = 273.15 + 25;
 
 % System operational limits
 P_max = 7e6;
-P_min = 4.3e6;
+% P_min = 4.3e6; % Huntorf
+P_min = 4e6;
 
 % Type of simulation - Cavern or pipeline storage
 simType = 'CAESPipe';
@@ -43,13 +47,14 @@ simType = 'CAESPipe';
 
 % CAES process
 Process = 'Charging_L';
-% Process = 'Discharging_L'
+% Process = 'Discharging_L';
 % Process = 'Charging_R';
 % Process = 'Discharging_R';
 if strcmp(Process,'Charging_L')
     % Initial conditions
     % P_0 = 101325;
-    P_0 = 4.3e6; % Huntorf
+    P_0 = P_min;
+    % 4.3e6; % Huntorf
     T_0 = 273.15 + 25;
     v_0 = 0;
     % v_0 = v_in;
@@ -58,7 +63,7 @@ if strcmp(Process,'Charging_L')
     R_bound = 'Wall';
 elseif strcmp(Process,'Discharging_L')
     % Initial conditions
-    P_0 = 7e6;
+    P_0 = P_max;
     T_0 = 273.15 + 25;
     v_0 = 0;
     % v_0 = v_in;
@@ -68,7 +73,8 @@ elseif strcmp(Process,'Discharging_L')
 elseif strcmp(Process,'Charging_R')
     % Initial conditions
     % P_0 = 101325;
-    P_0 = 4.3e6; % Huntorf
+    P_0 = P_min;
+    % P_0 = 4.3e6; % Huntorf
     T_0 = 273.15 + 25;
     v_0 = 0;
     % v_0 = v_in;
@@ -78,13 +84,20 @@ elseif strcmp(Process,'Charging_R')
     
 elseif strcmp(Process,'Discharging_R')
     % Initial conditions
-    P_0 = 7e6;
+    P_0 = P_max;
     T_0 = 273.15 + 25;
     v_0 = 0;
     % v_0 = v_in;
 
     L_bound = 'Wall';
     R_bound = 'M_const';
+
+elseif strcmp(Process,'Cycle_L')
+elseif strcmp(Process,'Cycle_R')
+elseif strcmp(Process,'NCycles_L')
+elseif strcmp(Process,'NCycles_R')
+else
+    error('Process not identified !')
 end
 
 % A - Left side boundary condition
@@ -109,7 +122,7 @@ elseif strcmp(L_bound,'Wall')
 elseif strcmp(L_bound,'Outlet')
     % m_A = m_R;
 elseif strcmp(L_bound,'P_const')
-    P_L = 4.3e6; % 4 MPa
+    P_L = P_min; % 4 MPa
 elseif strcmp(L_bound,'M_const')
     % m_A = -417; % Huntorf, sign indicates flow direction
     m_L = -100;
@@ -148,7 +161,7 @@ theta = 0;
 
 if strcmp(simType,'CAESPipe')
     dx = L/(40-1); % CAESPipe
-    dt = 0.1;
+    dt = 0.5;
     if dx/400 < dt % 400 upper limit for the speed of sound
         warning('dt > time needed for pressure wave to cross a node')
     end
@@ -876,7 +889,7 @@ for j=2:n_t
 
     Q(j) = 0; % ADIABATIC ASSUMPTION
 
-        a_T(1,2) = -max(0, -rho_f(2,j)*v(2,j)*cp_f(2,j-1)/dx);    
+    a_T(1,2) = -max(0, -rho_f(2,j)*v(2,j)*cp_f(2,j-1)/dx);    
 
     a_T(1,1) = rho(1,j)*cp(1,j-1)/dt ...
         + (rho_f(2,j)*v(2,j)*cp_f(2,j-1) - rho_f(1,j)*v(1,j)*cp_f(1,j-1))/dx...
@@ -1043,6 +1056,6 @@ X_st = sum(X_net(:,end))
 figure('color',[1 1 1]);plot(t,m)
 hold on; plot(t,m_bal(1:end))
 legend('m','$m_o + \dot{m} dt$','Interpreter','latex')
-figure('color',[1 1 1]);plot(t,E)
-hold on; plot(t,E_bal(1:end))
-legend('E','$E_o + \dot{m} \Delta E$','Interpreter','latex')
+figure('color',[1 1 1]);plot(t,E./(1e6*3600))
+hold on; plot(t,E_bal(1:end)./(1e6*3600))
+legend('E [MWh]','$E_o + \dot{m} \Delta E [MWh]$','Interpreter','latex')

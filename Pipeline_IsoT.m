@@ -8,7 +8,7 @@ clc
 CP = py.importlib.import_module('CoolProp.CoolProp');
 %-------------------- Problem parameters ------------------------------%
 % Ambient conditions
-T_a = 15 + 273.15; % T = 15 oC - ~288 K
+T_a = 15 + 273.15; % T = 15 oC - ~288 K Standard temp used by the UK national gas company
 P_a = 101325 ; % P = 101.325 kPa
 G = 1;      % Specific gas gravity - for air G = 1
 
@@ -224,7 +224,7 @@ for j=1:length(Var)
         W_T(i) = m_dot*cp*T_turb*(1 - (P_a/P(i))^(2/7));
         W_C2(i) = m_dot*cp*T_f*((P_in/P(i))^(2/7) - 1);
 
-        U_erosional(i) = 1.22*100/sqrt(rho(i)); % Erosional velocity - it is advised that the actual 
+        U_l(i) = 1.22*100/sqrt(rho(i)); % Erosional velocity - it is advised that the actual 
                                                 % velocity be up to 50% of the erosional velocity.
                                                 % The constant 100, can be any value from 100 to 250
 
