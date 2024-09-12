@@ -27,8 +27,8 @@ D = 0.9;
 % Dt = 3*3600; 
 % Dt = 3600;
 % Dt = 180; Charging time for 5 km pipeline
-Dt = 1200; % Charging L=10 km, d=0.9 m pipeline (360s = 3.44 MWh,1054 elapsed time)
-% Dt = 90; % Testing case
+% Dt = 1200; % Charging L=10 km, d=0.9 m pipeline (360s = 3.44 MWh,1054 elapsed time)
+Dt = 30; % Testing case
 
 eps = 0.04e-3; % Absolute roughness 0.04 mm
 
@@ -161,12 +161,19 @@ theta = 0;
 
 if strcmp(simType,'CAESPipe')
     dx = L/(40-1); % CAESPipe
-    dt = 0.3;
+    dt = 1;
     if dx/400 < dt % 400 upper limit for the speed of sound
         warning('dt > time needed for pressure wave to cross a node')
     end
-    tol = 1e-6; % CAESPipe Charging
-    % tol = 1e-3; % CAESPipe discharging
+    
+    if strcmp(Process,'Discharging_R') || strcmp(Process,'Discharging_L')
+        tol = 1e-3; % CAESPipe discharging
+    elseif strcmp(Process,'Charging_R') || strcmp(Process,'Charging_L')
+        tol = 1e-6; % CAESPipe Charging
+    else
+        error('Process not found.')
+    end
+
 elseif strcmp(simType,'CAESCav')
     dx = L/(5-1); % CAESCav
     dt = 0.01;
@@ -535,6 +542,8 @@ for j=2:n_t
 
             v_n(1,j) = v(1,j);
         elseif strcmp(L_bound,'M_const') 
+            % Variation of outlet bound. condition, 
+            % with known mass flow rate
             % Assumptions:
             % - Zero gradient for all properties except u-velocity
             % - Constant cross-sectional area
@@ -545,7 +554,7 @@ for j=2:n_t
             v_n(1,j) = m_L/(rho(1,j)*A_h);
         
             % Upwind scheme
-            v(1,j) = v_n(1,j);
+            v(1,j) = v_n(1,j); % zero gradient assumption
             
             P_f(1,j) = P(1,j);
             T_f(1,j) = T(1,j);
@@ -918,7 +927,7 @@ for j=2:n_t
         + (rho_f(n_f,j)*v(n_f,j)*cp_f(n_f,j-1) - rho_f(n_f-1,j)*v(n_f-1,j)*cp_f(n_f-1,j-1))/dx...
         - (a_T(n_n,n_n-1) - max(0, -rho_f(n_f,j)*v(n_f,j)*cp_f(n_f,j-1)/dx));
     
-    b_T(n_n) = Q(n_n) + (P(n_n,j)-P(n_n,j-1))/dt ...
+    b_T(n_n) = Q(j) + (P(n_n,j)-P(n_n,j-1))/dt ...
             + v_n(n_n,j)*(P_f(n_f,j) - P_f(n_f-1,j))/dx ...
             + f(n_n)*rho(n_n,j)*abs(v_n(n_n,j))^3/(2*D) ...
             + rho(n_n,j-1)*cp(n_n,j-1)*T(n_n,j-1)/dt...

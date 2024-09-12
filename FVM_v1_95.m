@@ -21,7 +21,7 @@ D = 0.5;
 
 % Dt = 3*3600; % Total simulation time
 % Dt = 3600;
-Dt = 90;
+Dt = 30;
 
 eps = 0.04e-3; % Absolute roughness 0.04 mm
 
@@ -38,7 +38,7 @@ simType = 'CAESPipe';
 
 % CAES process
 % Process = 'Charging_L';
-Process = 'Discharging_L'
+Process = 'Discharging_L';
 % Process = 'Charging_R';
 % Process = 'Discharging_R';
 if strcmp(Process,'Charging_L')
@@ -141,9 +141,9 @@ theta = 0;
 
 if strcmp(simType,'CAESPipe')
     dx = L/(40-1); % CAESPipe
-    dt = 1;
-    tol = 1e-6; % CAESPipe Charging
-    % tol = 1e-3; % CAESPipe discharging
+    dt = 0.3;
+    % tol = 1e-6; % CAESPipe Charging
+    tol = 1e-3; % CAESPipe discharging
 elseif strcmp(simType,'CAESCav')
     dx = L/(5-1); % CAESCav
     dt = 0.01;
