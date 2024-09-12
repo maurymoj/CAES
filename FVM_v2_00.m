@@ -490,9 +490,11 @@ for j=2:n_t
     while count(j) < 100 && max(abs(error_P)) > tol
         % Under-relaxed corrections
         P(:,j) = P(:,j) + alpha_P*P_corr;
-        rho(:,j) = alpha_rho*(rho(:,j) + rho_corr) + (1-alpha_rho)*rho(:,j);
+        rho(:,j) = alpha_rho*(rho(:,j) + rho_corr) ...
+            + (1-alpha_rho)*rho(:,j);
 
-        v(:,j) = alpha_v*(v_star + v_corr) + (1-alpha_v)*v_star;
+        v(:,j) = alpha_v*(v_star + v_corr) ...
+            + (1-alpha_v)*v_star;
         % v(1:end-1,j) = alpha_v*(v_star(1:end-1) + v_corr(1:end-1)) + (1-alpha_v)*v_star(1:end-1);
 
         % Boundary conditions
@@ -500,7 +502,8 @@ for j=2:n_t
             % P(1,:) = P_L;
             % T(1,:) = T_L;
             % rho(1,:) = rho_L;
-
+            
+            % SLIDING PRESSURE
             P_f(1,j) = P(1,j); % Assumption of constant pressure between 
                                % face and first node
             T_f(1,j) = T_L; 
@@ -1065,3 +1068,5 @@ hold on; plot(t,E_bal(1:end)./(1e6*3600))
 legend('E [MWh]','$E_o + \dot{m} \Delta E [MWh]$','Interpreter','latex')
 
 figure;plot(x_n,P(:,end))
+
+figure; plot(mean(error_hist))
