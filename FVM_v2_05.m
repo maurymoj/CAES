@@ -796,11 +796,13 @@ for j=2:n_t
         % A(1,2) = - max(0, -drho_dP(2)*v_star(2)/dx); % A_2
         % A(1,1) = drho_dP_n(1)/dt - (rho_f(2,j)*d(1)/a(1,1))/dx ...
         %        + drho_dP(2)*v_star(2)/dx - A(1,2); % A_1
-        A_C(1,2) = (rho_f(2,j)*d_M(1)/a_M(1,1))/dx - max(0, -drho_dP_f(2)*v_star(2)/dx); % A_2
+        A_C(1,2) = (rho_f(2,j)*d_M(1)/a_M(1,1))/dx ...
+            - max(0, -drho_dP_f(2)*v_star(2)/dx); % A_2
         A_C(1,1) = drho_dP_n(1)/dt + drho_dP_f(2)*v_star(2)/dx ...
                - A_C(1,2); % A_1
         
-        B_C(1) = (rho(1,j-1)-rho(1,j))/dt + (rho_f(1,j)*v_star(1) - rho_f(2,j)*v_star(2))/dx;
+        B_C(1) = (rho(1,j-1)-rho(1,j))/dt ...
+            + (rho_f(1,j)*v_star(1) - rho_f(2,j)*v_star(2))/dx;
         if strcmp(L_bound,'P_const')
             A_C(1,1) = 1;
             A_C(1,2) = 0;
@@ -821,7 +823,10 @@ for j=2:n_t
                      - drho_dP_f(n_f-1)*v_star(n_f-1)/dx... 
                      - A_C(n_n,n_n-1); % v_star(end) = 0
         
-        B_C(n_n) = (rho(n_n,j-1)-rho(n_n,j))/dt + (rho_f(n_f-1,j)*v_star(n_f-1) - rho_f(n_f,j)*v_star(n_f))/dx;
+        B_C(n_n) = (rho(n_n,j-1)-rho(n_n,j))/dt ...
+            + (rho_f(n_f-1,j)*v_star(n_f-1) - rho_f(n_f,j)*v_star(n_f))/dx;
+        
+        
         if strcmp(R_bound,'P_const')
             A_C(n_n,n_n-1) = 0;
             A_C(n_n,n_n) = 1;
