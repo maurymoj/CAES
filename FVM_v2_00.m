@@ -11,8 +11,8 @@ CP = py.importlib.import_module('CoolProp.CoolProp'); % Simplifies coolprop call
 % Parameters from Kiuchi (1994)
 % L = 5000;
 % D = ;
-L = 10000;
-D = 0.9;
+L = 5000;
+D = 0.5;
 % L = 70000; % Reference case 70 km length, 0.9 m diam
 % D = 0.9;
 % L = 213333; % Length for eq. vol with Huntorf
@@ -27,8 +27,8 @@ D = 0.9;
 % Dt = 3*3600; 
 % Dt = 3600;
 % Dt = 180; Charging time for 5 km pipeline
-Dt = 1800; % Charging L=10 km, d=0.9 m pipeline (360s = 3.44 MWh,1054 elapsed time)
-% Dt = 90; % Testing case
+% Dt = 1200; % Charging L=10 km, d=0.9 m pipeline (360s = 3.44 MWh,1054 elapsed time)
+Dt = 90; % Testing case
 
 eps = 0.04e-3; % Absolute roughness 0.04 mm
 
@@ -114,7 +114,7 @@ if strcmp(L_bound,'Inlet')
     m_L = 108; % Huntorf
     % v_A = ?
     P_L = P_0;
-    T_L = 273.15 + 60;
+    T_L = 273.15 + 25;
 
 elseif strcmp(L_bound,'Wall')
     m_L = 0;
@@ -161,7 +161,7 @@ theta = 0;
 
 if strcmp(simType,'CAESPipe')
     dx = L/(40-1); % CAESPipe
-    dt = 0.5;
+    dt = 0.3;
     if dx/400 < dt % 400 upper limit for the speed of sound
         warning('dt > time needed for pressure wave to cross a node')
     end
@@ -447,6 +447,9 @@ cp_f(1,1) = CP.PropsSI('C','P',P_f(1,1),'D',rho_f(1,1),'Air');
 h_f(1,1) = CP.PropsSI('H','P',P_f(1,1),'D',rho_f(1,1),'Air');
 s_f(1,1) = CP.PropsSI('S','P',P_f(1,1),'D',rho_f(1,1),'Air');
 
+cp_f(end,1) = CP.PropsSI('C','P',P_f(end,1),'D',rho_f(end,1),'Air');
+h_f(end,1) = CP.PropsSI('H','P',P_f(end,1),'D',rho_f(end,1),'Air');
+s_f(end,1) = CP.PropsSI('S','P',P_f(end,1),'D',rho_f(end,1),'Air');
 
 m(1) = sum(rho(:,1)*A_h*dx);
 E(1) = sum(rho(:,1)*A_h*dx.*u(:,1));
@@ -567,10 +570,10 @@ for j=2:n_t
             P_f(end,j) = P(end,j); % Zero gradient assumption
             T_f(end,j) = T(end,j);
             rho_f(end,j) = rho(end,j);
-            
-            % v_n(end,j) = v(end-1,j);
-            v_n(end,j) = (v(end-1,j) >= 0).*v(end-1,j) ...
-            +      (v(end-1,j) <  0).*v(end,j); 
+
+            % % v_n(end,j) = v(end-1,j);
+            % v_n(end,j) = (v(end-1,j) >= 0).*v(end-1,j) ...
+            % +      (v(end-1,j) <  0).*v(end,j); 
             % DOUBLE-CHECK !!!!!!
 
         elseif strcmp(R_bound,'P_const')
@@ -639,7 +642,8 @@ for j=2:n_t
             +            (v(2:end-1,j) <  0).*P(2:end,j);
         rho_f(2:end-1,j) = (v(2:end-1,j) >= 0).*rho(1:end-1,j) ...
             +            (v(2:end-1,j) <  0).*rho(2:end,j);
-        
+
+
         % Properties
         u_sonic_f = zeros(n_f,1);
         drho_dP_f = zeros(n_f,1);
@@ -1059,3 +1063,5 @@ legend('m','$m_o + \dot{m} dt$','Interpreter','latex')
 figure('color',[1 1 1]);plot(t,E./(1e6*3600))
 hold on; plot(t,E_bal(1:end)./(1e6*3600))
 legend('E [MWh]','$E_o + \dot{m} \Delta E [MWh]$','Interpreter','latex')
+
+figure;plot(x_n,P(:,end))

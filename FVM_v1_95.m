@@ -21,7 +21,7 @@ D = 0.5;
 
 % Dt = 3*3600; % Total simulation time
 % Dt = 3600;
-Dt = 180;
+Dt = 90;
 
 eps = 0.04e-3; % Absolute roughness 0.04 mm
 
@@ -31,7 +31,7 @@ T_amb = 273.15 + 25;
 
 % System operational limits
 P_max = 7e6;
-P_min = 4.3e6;
+P_min = 4e6;
 
 simType = 'CAESPipe';
 % simType = 'CAESCav';
@@ -44,7 +44,7 @@ Process = 'Charging_L';
 if strcmp(Process,'Charging_L')
     % Initial conditions
     % P_0 = 101325;
-    P_0 = 4.3e6; % Huntorf
+    P_0 = 4e6; % Huntorf
     T_0 = 273.15 + 25;
     v_0 = 0;
     % v_0 = v_in;
@@ -96,7 +96,7 @@ if strcmp(L_bound,'Inlet')
     m_L = 108; % Huntorf
     % v_A = ?
     P_L = P_0;
-    T_L = 273.15 + 25;
+    T_L = 273.15 + 60;
 
 elseif strcmp(L_bound,'Wall')
     m_L = 0;
