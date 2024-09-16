@@ -9,6 +9,8 @@ CP = py.importlib.import_module('CoolProp.CoolProp'); % Simplifies coolprop call
 %----------------------- PROBLEM PARAMETERS -------------------------%
 % Pipeline parameters
 % Parameters from Kiuchi (1994)
+% L = 5000;
+% D = ;
 L = 5000;
 D = 0.5;
 % L = 70000; % Reference case 70 km length, 0.9 m diam
@@ -25,7 +27,8 @@ D = 0.5;
 % Dt = 3*3600; 
 % Dt = 3600;
 % Dt = 180; Charging time for 5 km pipeline
-Dt = 90;
+% Dt = 1200; % Charging L=10 km, d=0.9 m pipeline (360s = 3.44 MWh,1054 elapsed time)
+Dt = 90; % Testing case
 
 eps = 0.04e-3; % Absolute roughness 0.04 mm
 
@@ -35,7 +38,8 @@ T_amb = 273.15 + 25;
 
 % System operational limits
 P_max = 7e6;
-P_min = 4.3e6;
+% P_min = 4.3e6; % Huntorf
+P_min = 4e6;
 
 % Type of simulation - Cavern or pipeline storage
 simType = 'CAESPipe';
@@ -49,7 +53,8 @@ Process = 'Charging_L';
 if strcmp(Process,'Charging_L')
     % Initial conditions
     % P_0 = 101325;
-    P_0 = 4.3e6; % Huntorf
+    P_0 = P_min;
+    % 4.3e6; % Huntorf
     T_0 = 273.15 + 25;
     v_0 = 0;
     % v_0 = v_in;
@@ -58,7 +63,7 @@ if strcmp(Process,'Charging_L')
     R_bound = 'Wall';
 elseif strcmp(Process,'Discharging_L')
     % Initial conditions
-    P_0 = 7e6;
+    P_0 = P_max;
     T_0 = 273.15 + 25;
     v_0 = 0;
     % v_0 = v_in;
@@ -68,7 +73,8 @@ elseif strcmp(Process,'Discharging_L')
 elseif strcmp(Process,'Charging_R')
     % Initial conditions
     % P_0 = 101325;
-    P_0 = 4.3e6; % Huntorf
+    P_0 = P_min;
+    % P_0 = 4.3e6; % Huntorf
     T_0 = 273.15 + 25;
     v_0 = 0;
     % v_0 = v_in;
@@ -78,13 +84,20 @@ elseif strcmp(Process,'Charging_R')
     
 elseif strcmp(Process,'Discharging_R')
     % Initial conditions
-    P_0 = 7e6;
+    P_0 = P_max;
     T_0 = 273.15 + 25;
     v_0 = 0;
     % v_0 = v_in;
 
     L_bound = 'Wall';
     R_bound = 'M_const';
+
+elseif strcmp(Process,'Cycle_L')
+elseif strcmp(Process,'Cycle_R')
+elseif strcmp(Process,'NCycles_L')
+elseif strcmp(Process,'NCycles_R')
+else
+    error('Process not identified !')
 end
 
 % A - Left side boundary condition
@@ -101,7 +114,7 @@ if strcmp(L_bound,'Inlet')
     m_L = 108; % Huntorf
     % v_A = ?
     P_L = P_0;
-    T_L = 273.15 + 60;
+    T_L = 273.15 + 25;
 
 elseif strcmp(L_bound,'Wall')
     m_L = 0;
@@ -109,7 +122,7 @@ elseif strcmp(L_bound,'Wall')
 elseif strcmp(L_bound,'Outlet')
     % m_A = m_R;
 elseif strcmp(L_bound,'P_const')
-    P_L = 4.3e6; % 4 MPa
+    P_L = P_min; % 4 MPa
 elseif strcmp(L_bound,'M_const')
     % m_A = -417; % Huntorf, sign indicates flow direction
     m_L = -100;
@@ -148,7 +161,7 @@ theta = 0;
 
 if strcmp(simType,'CAESPipe')
     dx = L/(40-1); % CAESPipe
-    dt = 0.1;
+    dt = 0.3;
     if dx/400 < dt % 400 upper limit for the speed of sound
         warning('dt > time needed for pressure wave to cross a node')
     end
@@ -434,6 +447,9 @@ cp_f(1,1) = CP.PropsSI('C','P',P_f(1,1),'D',rho_f(1,1),'Air');
 h_f(1,1) = CP.PropsSI('H','P',P_f(1,1),'D',rho_f(1,1),'Air');
 s_f(1,1) = CP.PropsSI('S','P',P_f(1,1),'D',rho_f(1,1),'Air');
 
+cp_f(end,1) = CP.PropsSI('C','P',P_f(end,1),'D',rho_f(end,1),'Air');
+h_f(end,1) = CP.PropsSI('H','P',P_f(end,1),'D',rho_f(end,1),'Air');
+s_f(end,1) = CP.PropsSI('S','P',P_f(end,1),'D',rho_f(end,1),'Air');
 
 m(1) = sum(rho(:,1)*A_h*dx);
 E(1) = sum(rho(:,1)*A_h*dx.*u(:,1));
@@ -474,9 +490,11 @@ for j=2:n_t
     while count(j) < 100 && max(abs(error_P)) > tol
         % Under-relaxed corrections
         P(:,j) = P(:,j) + alpha_P*P_corr;
-        rho(:,j) = alpha_rho*(rho(:,j) + rho_corr) + (1-alpha_rho)*rho(:,j);
+        rho(:,j) = alpha_rho*(rho(:,j) + rho_corr) ...
+            + (1-alpha_rho)*rho(:,j);
 
-        v(:,j) = alpha_v*(v_star + v_corr) + (1-alpha_v)*v_star;
+        v(:,j) = alpha_v*(v_star + v_corr) ...
+            + (1-alpha_v)*v_star;
         % v(1:end-1,j) = alpha_v*(v_star(1:end-1) + v_corr(1:end-1)) + (1-alpha_v)*v_star(1:end-1);
 
         % Boundary conditions
@@ -484,7 +502,8 @@ for j=2:n_t
             % P(1,:) = P_L;
             % T(1,:) = T_L;
             % rho(1,:) = rho_L;
-
+            
+            % SLIDING PRESSURE
             P_f(1,j) = P(1,j); % Assumption of constant pressure between 
                                % face and first node
             T_f(1,j) = T_L; 
@@ -554,10 +573,10 @@ for j=2:n_t
             P_f(end,j) = P(end,j); % Zero gradient assumption
             T_f(end,j) = T(end,j);
             rho_f(end,j) = rho(end,j);
-            
-            % v_n(end,j) = v(end-1,j);
-            v_n(end,j) = (v(end-1,j) >= 0).*v(end-1,j) ...
-            +      (v(end-1,j) <  0).*v(end,j); 
+
+            % % v_n(end,j) = v(end-1,j);
+            % v_n(end,j) = (v(end-1,j) >= 0).*v(end-1,j) ...
+            % +      (v(end-1,j) <  0).*v(end,j); 
             % DOUBLE-CHECK !!!!!!
 
         elseif strcmp(R_bound,'P_const')
@@ -626,7 +645,8 @@ for j=2:n_t
             +            (v(2:end-1,j) <  0).*P(2:end,j);
         rho_f(2:end-1,j) = (v(2:end-1,j) >= 0).*rho(1:end-1,j) ...
             +            (v(2:end-1,j) <  0).*rho(2:end,j);
-        
+
+
         % Properties
         u_sonic_f = zeros(n_f,1);
         drho_dP_f = zeros(n_f,1);
@@ -734,7 +754,7 @@ for j=2:n_t
             +(rho(n_n,j)*v_n(n_n,j) - rho(n_n-1,j)*v_n(n_n-1,j))/dx...
             - (a_M(n_f-1,n_f-2) - max(0, -rho(n_n,j)*v_n(n_n,j)/dx) );
         
-        a_M(n_f-1) = -1/dx;
+        d_M(n_f-1) = -1/dx;
         b_M(n_f-1) = rho_f(n_f-1,j-1)*v(n_f-1,j-1)/dt...
             -rho_f(n_f-1,j)*g*sind(theta)...
             + max(0, -rho(n_n,j)*v_n(n_n,j)/dx)*v_n(n_n,j);
@@ -777,11 +797,13 @@ for j=2:n_t
         % A(1,2) = - max(0, -drho_dP(2)*v_star(2)/dx); % A_2
         % A(1,1) = drho_dP_n(1)/dt - (rho_f(2,j)*d(1)/a(1,1))/dx ...
         %        + drho_dP(2)*v_star(2)/dx - A(1,2); % A_1
-        a_C(1,2) = (rho_f(2,j)*d_M(2)/a_M(2,2))/dx - max(0, -drho_dP_f(2)*v_star(2)/dx); % A_2
+        a_C(1,2) = (rho_f(2,j)*d_M(2)/a_M(2,2))/dx ...
+            - max(0, -drho_dP_f(2)*v_star(2)/dx); % A_2
         a_C(1,1) = drho_dP_n(1)/dt + drho_dP_f(2)*v_star(2)/dx ...
                - a_C(1,2); % A_1
         
-        B_C(1) = (rho(1,j-1)-rho(1,j))/dt + (rho_f(1,j)*v_star(1) - rho_f(2,j)*v_star(2))/dx;
+        B_C(1) = (rho(1,j-1)-rho(1,j))/dt ...
+            + (rho_f(1,j)*v_star(1) - rho_f(2,j)*v_star(2))/dx;
         
         if strcmp(L_bound,'P_const')
             a_C(1,1) = 1;
@@ -804,7 +826,8 @@ for j=2:n_t
                      - drho_dP_f(n_f-1)*v_star(n_f-1)/dx... 
                      - a_C(n_n,n_n-1); % v_star(end) = 0
         
-        B_C(n_n) = (rho(n_n,j-1)-rho(n_n,j))/dt + (rho_f(n_f-1,j)*v_star(n_f-1) - rho_f(n_f,j)*v_star(n_f))/dx;
+        B_C(n_n) = (rho(n_n,j-1)-rho(n_n,j))/dt ...
+            + (rho_f(n_f-1,j)*v_star(n_f-1) - rho_f(n_f,j)*v_star(n_f))/dx;
         
         
 
@@ -876,7 +899,7 @@ for j=2:n_t
 
     Q(j) = 0; % ADIABATIC ASSUMPTION
 
-        a_T(1,2) = -max(0, -rho_f(2,j)*v(2,j)*cp_f(2,j-1)/dx);    
+    a_T(1,2) = -max(0, -rho_f(2,j)*v(2,j)*cp_f(2,j-1)/dx);    
 
     a_T(1,1) = rho(1,j)*cp(1,j-1)/dt ...
         + (rho_f(2,j)*v(2,j)*cp_f(2,j-1) - rho_f(1,j)*v(1,j)*cp_f(1,j-1))/dx...
@@ -1041,11 +1064,16 @@ X_st = sum(X_net(:,end))
 figure('color',[1 1 1]);plot(t,m)
 hold on; plot(t,m_bal(1:end))
 legend('m','$m_o + \dot{m} dt$','Interpreter','latex')
-figure('color',[1 1 1]);plot(t,E)
-hold on; plot(t,E_bal(1:end))
-legend('E','$E_o + \dot{m} \Delta E$','Interpreter','latex')
+
+figure('color',[1 1 1]);plot(t,E./(1e6*3600))
+hold on; plot(t,E_bal(1:end)./(1e6*3600))
+legend('E [MWh]','$E_o + \dot{m} \Delta E [MWh]$','Interpreter','latex')
 
 figure('color',[1 1 1]);plot(t,(m_bal - m)./m)
 title('Difference in mass')
 figure('color',[1 1 1]);plot(t,(E_bal' - E)./E)
 title('Difference in energy')
+
+figure;plot(x_n,P(:,end))
+
+figure; plot(mean(error_hist))
