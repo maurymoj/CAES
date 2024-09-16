@@ -11,7 +11,7 @@ CP = py.importlib.import_module('CoolProp.CoolProp'); % Simplifies coolprop call
 % Parameters from Kiuchi (1994)
 % L = 5000;
 % D = ;
-L = 5000;
+L = 10000;
 D = 0.9;
 % L = 70000; % Reference case 70 km length, 0.9 m diam
 % D = 0.9;
@@ -167,7 +167,7 @@ if strcmp(simType,'CAESPipe')
     end
     
     if strcmp(Process,'Discharging_R') || strcmp(Process,'Discharging_L')
-        tol = 1e-3; % CAESPipe discharging
+        tol = 1e-7; % CAESPipe discharging
     elseif strcmp(Process,'Charging_R') || strcmp(Process,'Charging_L')
         tol = 1e-6; % CAESPipe Charging
     else
@@ -1081,4 +1081,4 @@ legend('E [MWh]','$E_o + \dot{m} \Delta E [MWh]$','Interpreter','latex')
 
 figure;plot(x_n,P(:,end))
 
-figure; plot(mean(error_hist))
+figure; plot(abs(mean(error_hist)))

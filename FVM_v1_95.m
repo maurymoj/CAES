@@ -8,8 +8,8 @@ CP = py.importlib.import_module('CoolProp.CoolProp');
 %----------------------- PROBLEM PARAMETERS -------------------------%
 % Pipeline parameters
 % Kiuchi
-L = 5000;
-D = 0.5;
+L = 10000;
+D = 0.9;
 % L = 70000;
 % D = 0.9;
 % L = 213333;
@@ -143,7 +143,7 @@ if strcmp(simType,'CAESPipe')
     dx = L/(40-1); % CAESPipe
     dt = 0.3;
     % tol = 1e-6; % CAESPipe Charging
-    tol = 1e-3; % CAESPipe discharging
+    tol = 1e-5; % CAESPipe discharging
 elseif strcmp(simType,'CAESCav')
     dx = L/(5-1); % CAESCav
     dt = 0.01;
