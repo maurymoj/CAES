@@ -50,6 +50,10 @@ simType = 'CAESPipe';
 Process = 'Discharging_L';
 % Process = 'Charging_R';
 % Process = 'Discharging_R';
+% Process = 'Cycle_L';
+% Process = 'Cycle_R';
+% Process = 'NCycles_L';
+% Process = 'NCycles_R';
 if strcmp(Process,'Charging_L')
     % Initial conditions
     % P_0 = 101325;
@@ -93,6 +97,18 @@ elseif strcmp(Process,'Discharging_R')
     R_bound = 'M_const';
 
 elseif strcmp(Process,'Cycle_L')
+    % Initial conditions
+    % P_0 = 101325;
+    P_0 = P_min;
+    % 4.3e6; % Huntorf
+    T_0 = 273.15 + 25;
+    v_0 = 0;
+    % v_0 = v_in;
+
+    L_bound = 'Inlet'; % OR M_CONST ??
+    R_bound = 'Wall';
+
+    stage = 'Charging';
 elseif strcmp(Process,'Cycle_R')
 elseif strcmp(Process,'NCycles_L')
 elseif strcmp(Process,'NCycles_R')
@@ -160,8 +176,8 @@ theta = 0;
 %--------------------- SIMULATION PARAMETERS ------------------------%
 
 if strcmp(simType,'CAESPipe')
-    dx = L/(40-1); % CAESPipe
-    dt = 1;
+    dx = L/(80-1); % CAESPipe
+    dt = 0.25;
     if dx/400 < dt % 400 upper limit for the speed of sound
         warning('dt > time needed for pressure wave to cross a node')
     end
@@ -215,7 +231,6 @@ h = zeros(n_n,n_t);
 s = zeros(n_n,n_t);
 u = zeros(n_n,n_t);
 cp = zeros(n_n,n_t);
-T_sol = zeros(n_n,n_t); % temporary var to store T as solved using energy 
 % equation and compare to using only mass and momentum eqs
 Q = zeros(1,n_t);
 
@@ -327,19 +342,35 @@ elseif strcmp(L_bound,'M_const')
     % Assumptions:
     % - Zero gradient for all properties except u-velocity
     % - Constant cross-sectional area
-    P(1,1) = P(2,1);
-    T(1,1) = T(2,1);
-    rho(1,1) = rho(2,1);
+    % P(1,1) = P(2,1);
+    % T(1,1) = T(2,1);
+    % rho(1,1) = rho(2,1);
 
-    v_n(1,1) = m_L/(rho(1,1)*A_h);
-
-    % Upwind scheme
-    v(1,1) = v_n(1,1);
+    % v_n(1,1) = m_L/(rho(1,1)*A_h);
+    % 
+    % % Upwind scheme
+    % v(1,1) = v_n(1,1);
+    % 
+    % P_f(1,1) = P(1,1);
+    % T_f(1,1) = T(1,1);
+    % rho_f(1,1) = rho(1,1);
     
+% TEST LINEAR APPROXIMATION FOR P, rho, AND T
+    P(1,1) = 2*P(2,1) - P(3,1);
+    T(1,1) = 2*T(2,1) - T(3,1);
+    rho(1,1) = 2*rho(2,1) - rho(3,1);
+
+    % P_f(1,1) = 2*P_f(2,1) - P_f(3,1);
+    % T_f(1,1) = 2*T_f(2,1) - T_f(3,1);
+    % rho_f(1,1) = 2*rho_f(2,1) - rho_f(3,1);
+
     P_f(1,1) = P(1,1);
     T_f(1,1) = T(1,1);
     rho_f(1,1) = rho(1,1);
+
+    v(1,1) = m_L/(rho_f(1,1)*A_h);
     
+    v_n(1,1) = m_L/(rho(1,1)*A_h);
 end
 
 
@@ -458,6 +489,17 @@ cp_f(end,1) = CP.PropsSI('C','P',P_f(end,1),'D',rho_f(end,1),'Air');
 h_f(end,1) = CP.PropsSI('H','P',P_f(end,1),'D',rho_f(end,1),'Air');
 s_f(end,1) = CP.PropsSI('S','P',P_f(end,1),'D',rho_f(end,1),'Air');
 
+for i = 1:n_n  % PROPERTIES FROM P AND RHO          
+    % T(i,j) = CP.PropsSI('T','P',P(i,j),'D',rho(i,j),'Air');
+    cp(i,1) = CP.PropsSI('C','P',P(i,1),'D',rho(i,1),'Air');
+    h(i,1) = CP.PropsSI('H','P',P(i,1),'D',rho(i,1),'Air');
+    s(i,1) = CP.PropsSI('S','P',P(i,1),'D',rho(i,1),'Air');
+    u(i,1) = CP.PropsSI('U','P',P(i,1),'D',rho(i,1),'Air');
+    cp_f(i,1) = CP.PropsSI('C','P',P_f(i,1),'D',rho_f(i,1),'Air');
+    h_f(i,1) = CP.PropsSI('H','P',P_f(i,1),'D',rho_f(i,1),'Air');
+    s_f(i,1) = CP.PropsSI('S','P',P_f(i,1),'D',rho_f(i,1),'Air');
+end
+
 m(1) = sum(rho(:,1)*A_h*dx);
 E(1) = sum(rho(:,1)*A_h*dx.*u(:,1));
 
@@ -547,18 +589,36 @@ for j=2:n_t
             % Assumptions:
             % - Zero gradient for all properties except u-velocity
             % - Constant cross-sectional area
-            P(1,j) = P(2,j);
-            T(1,j) = T(2,j);
-            rho(1,j) = rho(2,j);
+            % P(1,j) = P(2,j);
+            % T(1,j) = T(2,j);
+            % rho(1,j) = rho(2,j);
+            % 
+            % v_n(1,j) = m_L/(rho(1,j)*A_h);
+            % 
+            % % Upwind scheme
+            % v(1,j) = v_n(1,j); % zero gradient assumption
+            % 
+            % P_f(1,j) = P(1,j);
+            % T_f(1,j) = T(1,j);
+            % rho_f(1,j) = rho(1,j);
+
+            % TEST LINEAR APPROXIMATION FOR P, rho, AND T
+            % !!! ASSUMING FLOW ALWAYS TO THE LEFT !!!
+            P(1,j) = 2*P(2,j) - P(3,j);
+            T(1,j) = 2*T(2,j) - T(3,j);
+            rho(1,j) = 2*rho(2,j) - rho(3,j);
         
-            v_n(1,j) = m_L/(rho(1,j)*A_h);
-        
-            % Upwind scheme
-            v(1,j) = v_n(1,j); % zero gradient assumption
-            
             P_f(1,j) = P(1,j);
             T_f(1,j) = T(1,j);
             rho_f(1,j) = rho(1,j);
+
+            % P_f(1,j) = 2*P_f(2,j) - P_f(3,j);
+            % T_f(1,j) = 2*T_f(2,j) - T_f(3,j);
+            % rho_f(1,j) = 2*rho_f(2,j) - rho_f(3,j);
+            % 
+            v(1,j) = m_L/(rho_f(1,j)*A_h);
+
+            v_n(1,j) = m_L/(rho(1,j)*A_h);
         end
 
         % R boundary
@@ -951,7 +1011,7 @@ for j=2:n_t
 
         % a_T(i,i+1) = 
     end
-    % T_sol(:,j) = linsolve(a_T,b_T);
+    
     T(:,j) = linsolve(a_T,b_T);
 
     % THERMODYNAMIC PROPERTIES
@@ -981,6 +1041,54 @@ for j=2:n_t
     
     T_f(end,j) = T(end,j); % ASSUMING UPWIND SCHEME !!!!!!!!!!
                            % Implement other cases
+    
+
+    % CAES process
+    if strcmp(Process,'Charging_L')
+        if strcmp(L_bound,'Inlet') & P(ceil(n_n/2),j) >= P_max
+            % Charging from L boundary
+            % v(1,j+1:end) = 0;
+            L_bound = 'Wall';
+            t_shut_off = (j-1)*dt; 
+        end
+    elseif strcmp(Process,'Discharging_L')
+        if strcmp(L_bound,'M_const') & P(1,j) <= P_min
+            % Discharging from L boundary
+            L_bound = 'Wall';
+        end
+    elseif strcmp(Process,'Charging_R')
+        if strcmp(R_bound,'Inlet') & P(end-1,j) >= P_max
+            % Charging from R boundary
+            % v(1,j+1:end) = 0;
+            R_bound = 'Wall';
+            t_shut_off = (j-1)*dt;
+        end
+    elseif strcmp(Process,'Discharging_R')
+        if strcmp(R_bound,'M_const') & P(end,j) <= P_min
+            % Discharging from R boundary
+            R_bound = 'Wall';
+        end
+    elseif strcmp(Process,'Cycle_L')
+        if strcmp(stage,'Charging') & P(ceil(n_n/2),j) >= P_max
+            % Charging from L boundary
+            % v(1,j+1:end) = 0;
+            L_bound = 'Wall';
+            stage = 'idle_Ch';
+            % t_ch = (j-1)*dt;
+        elseif strcmp(stage,'idle_Ch') & std(P(:,j)./P(:,j)) <= 0.1
+            L_bound = 'M_const';
+            stage = 'Discharging';
+        elseif strcmp(stage,'Discharging') & P(ceil(n_n/2),j) <= P_min
+            
+% IMPLEMENT CHANGE FROM IDLE (L_WALL,R_WALL) TO DISCHARGING
+% IMPLEMENT CHANGE FROM DISCH TO IDLE
+        end
+    elseif strcmp(Process,'Cycle_R')
+    elseif strcmp(Process,'NCycle_L')
+    elseif strcmp(Process,'NCycle_R')
+    end
+
+
 
     if strcmp(L_bound,'Inlet') & P(ceil(n_n/2),j) >= P_max
         % Charging from L boundary
@@ -1035,8 +1143,8 @@ if strcmp(Process,'Charging_L')
     dX = rho_f(1,:)'.*v(1,:)'*A_h.*(h_f(1,:)' - h_o - T_o*(s_f(1,:)' - s_o))*dt; % Flow exergy - kinetic and potential term contributions assumed negligible
 elseif strcmp(Process,'Discharging_L')
     dm = rho_f(1,:)'.*v(1,:)'*A_h*dt;
-    dE = rho_f(1,:)'.*v(1,:)'*A_h.*cp_f(1,:)'.*T_f(1,:)'*dt;
-    dX = rho_f(1,:)'.*v(1,:)'*A_h.*(h(1,:)' - h_o - T_o*(s(1,:)' - s_o))*dt; % Flow exergy - kinetic and potential term contributions assumed negligible
+    dE = rho_f(1,:)'.*v(1,:)'.*A_h.*(h_f(1,:)' + v(1,:)'.^2/2 )*dt;
+    dX = rho_f(1,:)'.*v(1,:)'*A_h.*(h_f(1,:)' - h_o - T_o*(s_f(1,:)' - s_o))*dt; % Flow exergy - kinetic and potential term contributions assumed negligible
 elseif strcmp(Process,'Charging_R')
     dm = -rho_R*v(end,:)'*A_h*dt;
     dE = -rho_R*v(end,:)'*A_h*cp_R*T_R*dt;
@@ -1047,8 +1155,9 @@ elseif strcmp(Process,'Discharging_R')
     dX = -rho_f(end,:)'.*v(end,:)'*A_h.*(h(:,end)' - h_o - T_o*(s(:,end)' - s_o))*dt; % Flow exergy - kinetic and potential term contributions assumed negligible
 end
 
-m_bal = m(1) + cumsum(dm);
-E_bal = E(1) + cumsum(dE);
+m_bal = m(1) + cumsum([0;dm(1:end-1)]);
+E_bal = E(1) + cumsum([0;dE(1:end-1)]);
+% E_bal = E(1) + cumsum(dE);
 
 x = 0:dx:L;
 x_f = [0:dx:L]';
@@ -1064,8 +1173,15 @@ X = sum(m_n.*( u - u_o + P_o*R*(T./P - T_o/P_o) - T_o*(s - s_o) ) )./(1e6*3600);
 X_min = m(1)*(u_0 - u_o + P_o*R*(T_0./P_0 - T_o/P_o) - T_o*(s_0 - s_o) )/(1e6*3600);  % Exergy when discharged [MWh] 
 
 X_net = X - X_min;                                                   % Exergy between current state and discharged state (assuming whole pipeline at P_min)
-X_in = sum(dX)/(1e6*3600)
-X_st = sum(X_net(:,end))
+% DeltaX_flow = sum(dX)/(1e6*3600)
+DeltaX_flow = sum(dX(1:end-1))/(1e6*3600)
+DeltaX_st = sum(X_net(:,end))
+
+% if strcmp(Process,'Charging_L') || strcmp(Process,'Charging_R')
+% 
+% elseif strcmp(Process,'Discharging_L') || strcmp(Process,'Discharging_R')
+% 
+% end
 
 % Figures of mass and energy over time
 % figure('color',[1 1 1]);plot(m)
@@ -1073,7 +1189,7 @@ X_st = sum(X_net(:,end))
 % legend('m','\Delta m')
 
 figure('color',[1 1 1]);plot(t,m)
-hold on; plot(t,m_bal(1:end))
+hold on; plot(t,m_bal)
 legend('m','$m_o + \dot{m} dt$','Interpreter','latex')
 figure('color',[1 1 1]);plot(t,E./(1e6*3600))
 hold on; plot(t,E_bal(1:end)./(1e6*3600))

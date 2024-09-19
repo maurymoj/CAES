@@ -12,10 +12,14 @@ loops = 60;
 % y_max = max(max(rho_f));
 P_lower_bound = P_min./1e6 - 0.;
 P_upper_bound = max(max(P))./1e6 + 0.1;
+P_min = min(min(P./1e6)) - 0.1;
+P_max = max(max(P./1e6)) + 0.1;
 v_min = min(min(v)) - 0.1;
 v_max = max(max(v)) + 0.1;
 T_min = min(min(T)) - 0.1;
 T_max = max(max(T)) + 0.1;
+rho_min = min(min(rho)) - 0.1;
+rho_max = max(max(rho)) + 0.1;
 
 time = datetime("now");
 vid_titl = strcat(simType,'_',string(year(time)),'_',string(month(time)),'_',string(day(time)),'_',string(hour(time)),'h',string(minute(time)),'min.avi');
@@ -33,7 +37,7 @@ t_dec = zeros(1,floor((length(t)-1)/dec+1));
 
 plot_type = 'Single';
 % plot_type = 'Double';
-
+Property = 'v';
 for i=1:length(t_dec)
     t_dec(i) = t(1+dec*(i-1));
     
@@ -57,6 +61,49 @@ for i=1:length(t_dec)
         % plot(x_n,T(:,1+dec*(i-1)));
         % ylim([T_min T_max])
         % ylabel('T [K]')
+
+        if strcmp(Property,'P')
+            plot(x_n,P(:,1+dec*(i-1))./1e6);
+            xlabel('x [km]')
+            ylabel('P [MPa]')
+            % ylim([P_lower_bound-0.1 P_upper_bound+0.1])
+            % ylim([P_lower_bound max(P(:,1+dec*(i-1)))./1e6+0.001])
+            % ylim([min(P(:,1+dec*(i-1)))/1e6-0.001 max(P(:,1+dec*(i-1)))/1e6+0.001])
+            % plot(x_f,P_f(:,1+dec*(i-1))./1e6);
+            ylim([P_min P_max])
+        elseif strcmp(Property,'v')
+            plot(x_f,v(:,1+dec*(i-1)));
+            ylim([v_min v_max])
+            ylabel('v [m/s]')
+        elseif strcmp(Property,'T')
+            plot(x_n,T(:,1+dec*(i-1)));
+            ylim([T_min T_max])
+            ylabel('T [K]')
+        elseif strcmp(Property,'rho')
+            plot(x_f,rho_f(:,1+dec*(i-1)));
+            ylabel('Density [kg m-3]')
+            ylim([rho_min rho_max])
+        elseif strcmp(Property,'m_dot')
+            plot(x_f,rho_f(:,1+dec*(i-1)).*v(:,1+dec*(i-1)).*A_h);
+            ylabel('Mass flow rate [kg s-1]')
+        end
+
+        
+        % ylim([-200 400])
+        % plot(x_f,rho_f(:,1+dec*(i-1)));
+    
+        % double plot
+        % yyaxis left
+        % plot(x_f,P_f(:,1+dec*(i-1))./1e6);
+        % ylim([P_lower_bound-0.1 P_upper_bound+0.1])
+        % xlabel('x [km]')
+        % ylabel('P [MPa]')
+        % yyaxis right
+        % plot(x_f,v(:,1+dec*(i-1)));
+        % ylim([v_min v_max])
+        % ylabel('v [m/s]')
+
+
     elseif strcmp(plot_type,'Double')
 
         % plot(x_f,rho_f(:,1+dec*(i-1)));
