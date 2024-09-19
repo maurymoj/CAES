@@ -370,7 +370,10 @@ elseif strcmp(L_bound,'M_const')
 
     v(1,1) = m_L/(rho_f(1,1)*A_h);
     
-    v_n(1,1) = m_L/(rho(1,1)*A_h);
+    % v_n(1,1) = m_L/(rho(1,1)*A_h);
+
+    v_n(1,1) = (v(1,1) >= 0).*v(1,1) ...
+        +      (v(1,1) <  0).*v(2,1);
 end
 
 
@@ -618,7 +621,9 @@ for j=2:n_t
             % 
             v(1,j) = m_L/(rho_f(1,j)*A_h);
 
-            v_n(1,j) = m_L/(rho(1,j)*A_h);
+            % v_n(1,j) = m_L/(rho(1,j)*A_h);
+            v_n(1,j) = (v(1,j) >= 0).*v(1,j) ...
+            +      (v(1,j) <  0).*v(2,j);
         end
 
         % R boundary
