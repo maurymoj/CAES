@@ -177,8 +177,15 @@ theta = 0;
 %--------------------- SIMULATION PARAMETERS ------------------------%
 
 if strcmp(simType,'CAESPipe')
-    dx = L/(80-1); % CAESPipe
-    dt = 0.25;
+    % dx = L/(100-1); % CAESPipe n_n = 100 and dt = 0.25 provided low
+    % residual
+    % dx = L/(40-1); % CAESPipe
+    dx = L/(40-1); % CAESPipe
+    dt_max = dx/400; % 400 is representative of the sound speed, 
+                     % it is higher than the maximum sound speed reached in the pipeline 
+                     % to achieve a conservative value
+    dt = Dt/ceil(Dt/dt_max) % division of Dt in an integer number of intervals
+                            % with dt smaller than dt_max
     if dx/400 < dt % 400 upper limit for the speed of sound
         warning('dt > time needed for pressure wave to cross a node')
     end
@@ -942,7 +949,7 @@ for j=2:n_t
         P_corr = linsolve(a_C,B_C);
         
         if strcmp(L_bound,'M_const') %|| strcmp(L_bound,'Inlet')
-            P_corr(1) = 0;
+            % P_corr(1) = 0;
         elseif strcmp(R_bound,'M_const')
             P_corr(end) = 0;
         end
