@@ -30,14 +30,14 @@ open(vid)
 F(loops) = struct('cdata',[],'colormap',[]);
 figure('Color',[1 1 1])
 % dt_f = 0.1; % time between frames
-dt_f = 1;
+dt_f = dt;
 dec = dt_f/dt;
 t_dec = zeros(1,floor((length(t)-1)/dec+1));
 % decimation = 1000;
 
 plot_type = 'Single';
 % plot_type = 'Double';
-Property = 'v';
+Property = 'T';
 for i=1:length(t_dec)
     t_dec(i) = t(1+dec*(i-1));
     
@@ -77,6 +77,8 @@ for i=1:length(t_dec)
             ylabel('v [m/s]')
         elseif strcmp(Property,'T')
             plot(x_n,T(:,1+dec*(i-1)));
+            % hold on
+            % plot(x_f,T_f(:,1+dec*(i-1)))
             ylim([T_min T_max])
             ylabel('T [K]')
         elseif strcmp(Property,'rho')
@@ -110,18 +112,30 @@ for i=1:length(t_dec)
     
         % double plot
         yyaxis left
-        plot(x_f,P_f(:,1+dec*(i-1))./1e6);
-        % plot(x_n,P(:,1+dec*(i-1))./1e6);
-        ylim([P_lower_bound-0.1 P_upper_bound+0.1])
-        xlabel('x [km]')
-        ylabel('P [MPa]')
-        yyaxis right
-        % plot(x_n,T(:,1+dec*(i-1)));
-        % ylim([T_min T_max])
-        % ylabel('T [K]')
-        plot(x_f,v(:,1+dec*(i-1)));
-        ylim([v_min v_max])
-        ylabel('v [m/s]')
+        if strcmp(Property,'Pv')
+            plot(x_f,P_f(:,1+dec*(i-1))./1e6);
+            % plot(x_n,P(:,1+dec*(i-1))./1e6);
+            ylim([P_lower_bound-0.1 P_upper_bound+0.1])
+            xlabel('x [km]')
+            ylabel('P [MPa]')
+            yyaxis right
+            % plot(x_n,T(:,1+dec*(i-1)));
+            % ylim([T_min T_max])
+            % ylabel('T [K]')
+            plot(x_f,v(:,1+dec*(i-1)));
+            ylim([v_min v_max])
+            ylabel('v [m/s]')
+        elseif strcmp(Property,'TT')
+            plot(x_f,T_f(:,1+dec*(i-1)));
+            % plot(x_n,P(:,1+dec*(i-1))./1e6);
+            ylim([T_min T_max])
+            xlabel('x [km]')
+            ylabel('T [K]')
+            yyaxis right
+            plot(x_n,T(:,1+dec*(i-1)));
+            ylim([T_min T_max])
+            ylabel('T [K]')
+        end
     end
 
     ti = strcat('t = ',num2str(t_dec(i)),' s');
