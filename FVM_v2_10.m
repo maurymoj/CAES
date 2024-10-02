@@ -11,7 +11,7 @@ CP = py.importlib.import_module('CoolProp.CoolProp'); % Simplifies coolprop call
 % Parameters from Kiuchi (1994)
 % L = 5000;
 % D = ;
-L = 10000;
+L = 5000;
 D = 0.9;
 % L = 70000; % Reference case 70 km length, 0.9 m diam
 % D = 0.9;
@@ -26,9 +26,10 @@ D = 0.9;
 % Total simulation time
 % Dt = 3*3600; 
 % Dt = 3600;
-% Dt = 180; Charging time for 5 km pipeline
+% Dt = 360; % Charging time for 5 km pipeline
+% Dt = 120;
 % Dt = 1200; % Charging L=10 km, d=0.9 m pipeline (360s = 3.44 MWh,1054 elapsed time)
-Dt = 30; % Testing case
+Dt = 10; % Testing case
 
 eps = 0.04e-3; % Absolute roughness 0.04 mm
 
@@ -183,7 +184,7 @@ if strcmp(simType,'CAESPipe')
     end
     
     if strcmp(Process,'Discharging_R') || strcmp(Process,'Discharging_L')
-        tol = 1e-7; % CAESPipe discharging
+        tol = 1e-6; % CAESPipe discharging
     elseif strcmp(Process,'Charging_R') || strcmp(Process,'Charging_L')
         tol = 1e-6; % CAESPipe Charging
     else
@@ -368,12 +369,12 @@ elseif strcmp(L_bound,'M_const')
     T_f(1,1) = T(1,1);
     rho_f(1,1) = rho(1,1);
 
-    v(1,1) = m_L/(rho_f(1,1)*A_h);
+    % v(1,1) = m_L/(rho_f(1,1)*A_h);
+    v(1,1) = 0;
     
     % v_n(1,1) = m_L/(rho(1,1)*A_h);
-
-    v_n(1,1) = (v(1,1) >= 0).*v(1,1) ...
-        +      (v(1,1) <  0).*v(2,1);
+    % v_n(1,1) = (v(1,1) >= 0).*v(1,1) ...
+        % +      (v(1,1) <  0).*v(2,1);
 end
 
 
@@ -524,11 +525,14 @@ for j=2:n_t
     rho(:,j) = rho(:,j-1);
     T(:,j) = T(:,j-1);
 
-
-
     v(:,j) = v(:,j-1);
     % v(2:end-1,j) = v(2:end-1,j-1);
 
+    P_f(:,j) = P_f(:,j-1);
+    rho_f(:,j) = rho_f(:,j-1);
+    T_f(:,j) = T_f(:,j-1);
+
+    v_n(:,j) = v_n(:,j-1);
 
     P_corr = zeros(n_n,1);
     rho_corr = zeros(n_n,1);
@@ -607,6 +611,7 @@ for j=2:n_t
 
             % TEST LINEAR APPROXIMATION FOR P, rho, AND T
             % !!! ASSUMING FLOW ALWAYS TO THE LEFT !!!
+
             P(1,j) = 2*P(2,j) - P(3,j);
             T(1,j) = 2*T(2,j) - T(3,j);
             rho(1,j) = 2*rho(2,j) - rho(3,j);
@@ -618,12 +623,13 @@ for j=2:n_t
             % P_f(1,j) = 2*P_f(2,j) - P_f(3,j);
             % T_f(1,j) = 2*T_f(2,j) - T_f(3,j);
             % rho_f(1,j) = 2*rho_f(2,j) - rho_f(3,j);
-            % 
+ 
             v(1,j) = m_L/(rho_f(1,j)*A_h);
 
             % v_n(1,j) = m_L/(rho(1,j)*A_h);
-            v_n(1,j) = (v(1,j) >= 0).*v(1,j) ...
-            +      (v(1,j) <  0).*v(2,j);
+            % v_n(1,j) = (v(1,j) >= 0).*v(1,j) ...
+            % +      (v(1,j) <  0).*v(2,j);
+            v_n(1,j) = v(1,j);
         end
 
         % R boundary
@@ -1003,10 +1009,10 @@ for j=2:n_t
     % a_T(n_n) ??
 
     for i=2:n_n-1
-        a_T(i,i-1) = -max( rho_f(i,j)*v(i,j)*cp(i,j-1)/dx, 0);
-        a_T(i,i+1) = -max(   0, -rho_f(i+1,j)*v(i+1,j)*cp(i+1,j-1)/dx);
+        a_T(i,i-1) = -max( rho_f(i,j)*v(i,j)*cp_f(i,j-1)/dx, 0);
+        a_T(i,i+1) = -max(   0, -rho_f(i+1,j)*v(i+1,j)*cp_f(i+1,j-1)/dx);
         a_T(i,i) = rho(i,j)*cp(i,j-1)/dt ...
-            + (rho_f(i+1,j)*v(i+1,j)*cp(i+1,j-1) - rho_f(i,j)*v(i,j)*cp(i,j-1))/dx...
+            + (rho_f(i+1,j)*v(i+1,j)*cp_f(i+1,j-1) - rho_f(i,j)*v(i,j)*cp_f(i,j-1))/dx...
             - (a_T(i,i+1) + a_T(i,i-1));
         
         b_T(i) = Q(j) + (P(i,j)-P(i,j-1))/dt ...
@@ -1018,7 +1024,7 @@ for j=2:n_t
     end
     
     T(:,j) = linsolve(a_T,b_T);
-
+    
     % THERMODYNAMIC PROPERTIES
     % cp(i,j) = CP.PropsSI('C','P',P(floor(end/2),j),'D',rho(floor(end/2),j),'Air');
     % cp_f(j) = CP.PropsSI('C','P',P_f(1,j),'D',rho_f(1,j),'Air');
@@ -1123,8 +1129,9 @@ for j=2:n_t
     % E_n(:,j) = rho(:,j)*A_h*dx.*u(:,j);
     E_n(:,j) = rho(:,j)*A_h*dx.*( u(:,j) + v_n(:,j).^2/2 );
     
-
-
+    if rem(t(j),1)==0
+        disp(strcat('t = ',num2str(t(j)),'s'))
+    end
 
 end
 
@@ -1146,22 +1153,41 @@ if strcmp(Process,'Charging_L')
     % dE = rho_f(1,:)'.*v(1,:)'.*A_h.*h_f(1,:)'*dt;
     dE = rho_f(1,:)'.*v(1,:)'.*A_h.*( h_f(1,:)' + v(1,:)'.^2/2 )*dt;
     dX = rho_f(1,:)'.*v(1,:)'*A_h.*(h_f(1,:)' - h_o - T_o*(s_f(1,:)' - s_o))*dt; % Flow exergy - kinetic and potential term contributions assumed negligible
+
 elseif strcmp(Process,'Discharging_L')
     dm = rho_f(1,:)'.*v(1,:)'*A_h*dt;
     dE = rho_f(1,:)'.*v(1,:)'.*A_h.*(h_f(1,:)' + v(1,:)'.^2/2 )*dt;
     dX = rho_f(1,:)'.*v(1,:)'*A_h.*(h_f(1,:)' - h_o - T_o*(s_f(1,:)' - s_o))*dt; % Flow exergy - kinetic and potential term contributions assumed negligible
+
+    dX_m = rho_f(1,:)'.*v(1,:)'*A_h;
+    dX_h = h_f(1,:)' - h_o;
+    dX_s = T_o*(s_f(1,:)' - s_o);
 elseif strcmp(Process,'Charging_R')
     dm = -rho_R*v(end,:)'*A_h*dt;
     dE = -rho_R*v(end,:)'*A_h*cp_R*T_R*dt;
     dX = -rho_R*v(end,:)'*A_h*(h_R - h_o - T_o*(s_R - s_o))*dt; % Flow exergy - kinetic and potential term contributions assumed negligible
+
 elseif strcmp(Process,'Discharging_R')
     dm = -rho_f(end,:)'.*v(end,:)'*A_h*dt;
     dE = -rho_f(end,:)'.*v(end,:)'*A_h.*cp_f(end,:)'.*T_f(end,:)'*dt;
     dX = -rho_f(end,:)'.*v(end,:)'*A_h.*(h(:,end)' - h_o - T_o*(s(:,end)' - s_o))*dt; % Flow exergy - kinetic and potential term contributions assumed negligible
+
+elseif strcmp(Process,'Cycle_L')
+    error('Cycle_L process not implemented yet ')
+elseif strcmp(Process,'Cycle_R')
+    error('Cycle_R process not implemented yet ')
+elseif strcmp(Process,'NCycles_L')
+    error('NCycle_L process not implemented yet ')
+elseif strcmp(Process,'NCycles_R')
+    error('NCycle_R process not implemented yet ')
+else
+    error('Process not identified.')
 end
 
-m_bal = m(1) + cumsum([0;dm(1:end-1)]);
-E_bal = E(1) + cumsum([0;dE(1:end-1)]);
+% m_bal = m(1) + cumsum([0;dm(1:end-1)]);
+% E_bal = E(1) + cumsum([0;dE(1:end-1)]);
+m_bal = m(1) + cumsum(dm);
+E_bal = E(1) + cumsum(dE);
 % E_bal = E(1) + cumsum(dE);
 
 x = 0:dx:L;
@@ -1175,12 +1201,17 @@ x_n = [dx/2:dx:L]';
 % X_min = P_0*(A_h*dx).*(P_amb./P_0 - 1 + log(P_0./P_amb))/(1e6*3600);  % Exergy when discharged [MWh] 
 
 X = sum(m_n.*( u - u_o + P_o*R*(T./P - T_o/P_o) - T_o*(s - s_o) ) )./(1e6*3600);           % Pipeline Exergy [MWh]
-X_min = m(1)*(u_0 - u_o + P_o*R*(T_0./P_0 - T_o/P_o) - T_o*(s_0 - s_o) )/(1e6*3600);  % Exergy when discharged [MWh] 
+X_0 = m(1)*(u_0 - u_o + P_o*R*(T_0./P_0 - T_o/P_o) - T_o*(s_0 - s_o) )/(1e6*3600);  % Exergy at t = 0s [MWh] 
 
-X_net = X - X_min;                                                   % Exergy between current state and discharged state (assuming whole pipeline at P_min)
+
+X_net = X - X_0;                                                   % Exergy between current state and discharged state (assuming whole pipeline at P_min)
 % DeltaX_flow = sum(dX)/(1e6*3600)
-DeltaX_flow = sum(dX(1:end-1))/(1e6*3600)
+DeltaX_flow = sum(dX)/(1e6*3600)
 DeltaX_st = sum(X_net(:,end))
+
+figure('Color',[1 1 1])
+plot(t,X,t,X_0+cumsum(dX)./(1e6*3600))
+legend('X','X_0 + dX')
 
 % if strcmp(Process,'Charging_L') || strcmp(Process,'Charging_R')
 % 
@@ -1200,6 +1231,11 @@ figure('color',[1 1 1]);plot(t,E./(1e6*3600))
 hold on; plot(t,E_bal(1:end)./(1e6*3600))
 legend('E [MWh]','$E_o + \dot{m} \Delta E [MWh]$','Interpreter','latex')
 
-figure;plot(x_n,P(:,end))
+% figure('color',[1 1 1]);plot(t,(m_bal' - m)./m)
+% title('Difference in mass')
+% figure('color',[1 1 1]);plot(t,(E_bal' - E)./E)
+% title('Difference in energy')
+
+% figure;plot(x_n,P(:,end))
 
 figure; plot(abs(mean(error_hist)))
