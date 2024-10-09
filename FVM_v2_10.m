@@ -12,7 +12,7 @@ CP = py.importlib.import_module('CoolProp.CoolProp'); % Simplifies coolprop call
 % L = 5000;
 % D = ;
 L = 5000;
-D = 0.9;
+D = 0.5;
 % L = 70000; % Reference case 70 km length, 0.9 m diam
 % D = 0.9;
 % L = 213333; % Length for eq. vol with Huntorf
@@ -27,9 +27,9 @@ D = 0.9;
 % Dt = 3*3600; 
 % Dt = 3600;
 % Dt = 360; % Charging time for 5 km pipeline
-% Dt = 120;
+Dt = 10;
 % Dt = 1200; % Charging L=10 km, d=0.9 m pipeline (360s = 3.44 MWh,1054 elapsed time)
-Dt = 10; % Testing case
+% Dt = 10; % Testing case
 
 eps = 0.04e-3; % Absolute roughness 0.04 mm
 
@@ -128,7 +128,8 @@ if strcmp(L_bound,'Inlet')
     % Q_a = Q_st_in/3600;
     % m_in = rho_a*Q_a;
     % m_in = 100;
-    m_L = 108; % Huntorf
+    % m_L = 108; % Huntorf
+    m_L = 100;
     % v_A = ?
     P_L = P_0;
     T_L = 273.15 + 60;
@@ -177,14 +178,16 @@ theta = 0;
 %--------------------- SIMULATION PARAMETERS ------------------------%
 
 if strcmp(simType,'CAESPipe')
+    n_nodes = 80;
+    max_iter = 20;
     % dx = L/(100-1); % CAESPipe n_n = 100 and dt = 0.25 provided low
     % residual
     % dx = L/(40-1); % CAESPipe
-    dx = L/(40-1); % CAESPipe
+    dx = L/(n_nodes-1); % CAESPipe
     dt_max = dx/400; % 400 is representative of the sound speed, 
                      % it is higher than the maximum sound speed reached in the pipeline 
                      % to achieve a conservative value
-    dt = Dt/ceil(Dt/dt_max) % division of Dt in an integer number of intervals
+    dt = (Dt/ceil(4*Dt/dt_max)) % division of Dt in an integer number of intervals
                             % with dt smaller than dt_max
     if dx/400 < dt % 400 upper limit for the speed of sound
         warning('dt > time needed for pressure wave to cross a node')
@@ -550,7 +553,7 @@ for j=2:n_t
     error_P = 10;
 
     % Momentum and mass balance loop
-    while count(j) < 100 && max(abs(error_P)) > tol
+    while count(j) < max_iter && max(abs(error_P)) > tol
         % Under-relaxed corrections
         P(:,j) = P(:,j) + alpha_P*P_corr;
         rho(:,j) = alpha_rho*(rho(:,j) + rho_corr) ...
@@ -1138,6 +1141,8 @@ for j=2:n_t
     
     if rem(t(j),1)==0
         disp(strcat('t = ',num2str(t(j)),'s'))
+        % addpoint(error_hist(j))
+        % drawnow limitrate
     end
 
 end
