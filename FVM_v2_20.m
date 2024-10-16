@@ -27,7 +27,10 @@ D = 0.5;
 % Dt = 3*3600; 
 % Dt = 3600;
 % Dt = 360; % Charging time for 5 km pipeline
-Dt = 10;
+Dt = 720; % Charging + discharging time
+Dt_charg = 360;
+% Dt_disch = 360;
+% Dt = 10;
 % Dt = 1200; % Charging L=10 km, d=0.9 m pipeline (360s = 3.44 MWh,1054 elapsed time)
 % Dt = 10; % Testing case
 
@@ -48,10 +51,10 @@ simType = 'CAESPipe';
 
 % CAES process
 % Process = 'Charging_L';
-Process = 'Discharging_L';
+% Process = 'Discharging_L';
 % Process = 'Charging_R';
 % Process = 'Discharging_R';
-% Process = 'Cycle_L';
+Process = 'Cycle_L';
 % Process = 'Cycle_R';
 % Process = 'NCycles_L';
 % Process = 'NCycles_R';
@@ -110,6 +113,7 @@ elseif strcmp(Process,'Cycle_L')
     R_bound = 'Wall';
 
     stage = 'Charging';
+    stage_hist = stage;
 elseif strcmp(Process,'Cycle_R')
 elseif strcmp(Process,'NCycles_L')
 elseif strcmp(Process,'NCycles_R')
@@ -178,7 +182,7 @@ theta = 0;
 %--------------------- SIMULATION PARAMETERS ------------------------%
 
 if strcmp(simType,'CAESPipe')
-    n_nodes = 80;
+    n_nodes = 40;
     max_iter = 20;
     % dx = L/(100-1); % CAESPipe n_n = 100 and dt = 0.25 provided low
     % residual
@@ -194,9 +198,11 @@ if strcmp(simType,'CAESPipe')
     end
     
     if strcmp(Process,'Discharging_R') || strcmp(Process,'Discharging_L')
-        tol = 1e-6; % CAESPipe discharging
+        tol = 1e-5; % CAESPipe discharging
     elseif strcmp(Process,'Charging_R') || strcmp(Process,'Charging_L')
         tol = 1e-6; % CAESPipe Charging
+    elseif strcmp(Process,'Cycle_L')
+        tol = 1e-5;
     else
         error('Process not found.')
     end
@@ -637,11 +643,13 @@ for j=2:n_t
             v(1,j) = m_L/(rho_f(1,j)*A_h);
 
             % v_n(1,j) = m_L/(rho(1,j)*A_h);
-            % v_n(1,j) = (v(1,j) >= 0).*v(1,j) ...
-            % +      (v(1,j) <  0).*v(2,j);
+            % Zero-gradient assumption
             % v_n(1,j) = v(1,j);
-            v_n(1,j) = (v(1,j) >= 0).*v((1),j) ...
-                +      (v(1,j) <  0).*v((2),j);
+            % Upwind scheme
+            v_n(1,j) = (v(1,j) >= 0).*v(1,j) ...
+                +      (v(1,j) <  0).*v(2,j);
+            % Central scheme
+            % v_n(1,j) = (v(1,j) + v(2,j))/2;
         end
 
         % R boundary
@@ -751,7 +759,7 @@ for j=2:n_t
             % T(i,j) = CP.PropsSI('T','P',P(i,j),'D',rho(i,j),'Air');
 
             u_sonic_f(i) = CP.PropsSI('speed_of_sound','P',P_f(i,j),'D',rho_f(i,j),'Air');
-            nu = CP.PropsSI('viscosity','P',P_f(i,j),'D',rho_f(i,j),'Air');
+            % nu = CP.PropsSI('viscosity','P',P_f(i,j),'D',rho_f(i,j),'Air');
 
             drho_dP_f(i) = 1/(u_sonic_f(i)^2);
 
@@ -979,11 +987,11 @@ for j=2:n_t
         error_P = (P_corr./P(:,j));
         error_hist = [error_hist error_P];
         
-        if rem(count(j),2) == 0
-            figure(resFig)
-            plot(mean(abs(error_hist)))
-            drawnow limitrate
-        end
+        % if rem(count(j),2) == 0
+        %     figure(resFig)
+        %     plot(mean(abs(error_hist)))
+        %     drawnow limitrate
+        % end
 
         % error_rho = (rho_corr./rho(:,j));
         % error_v = (v_corr./v(:,j));
@@ -1075,67 +1083,77 @@ for j=2:n_t
     % CAES process
     if strcmp(Process,'Charging_L')
         if strcmp(L_bound,'Inlet') & P(ceil(n_n/2),j) >= P_max
+        % if strcmp(L_bound,'Inlet') & P(1,j) >= P_max
             % Charging from L boundary
             % v(1,j+1:end) = 0;
             L_bound = 'Wall';
             t_shut_off = (j-1)*dt; 
         end
     elseif strcmp(Process,'Discharging_L')
-        if strcmp(L_bound,'M_const') & P(1,j) <= P_min
+        % if strcmp(L_bound,'M_const') & P(1,j) <= P_min
+        if strcmp(L_bound,'M_const') & P(ceil(n_n/2),j) <= P_min
             % Discharging from L boundary
             L_bound = 'Wall';
         end
     elseif strcmp(Process,'Charging_R')
-        if strcmp(R_bound,'Inlet') & P(end-1,j) >= P_max
+        % if strcmp(R_bound,'Inlet') & P(end-1,j) >= P_max
+        if strcmp(R_bound,'Inlet') & P(ceil(n_n/2),j) >= P_max
             % Charging from R boundary
             % v(1,j+1:end) = 0;
             R_bound = 'Wall';
             t_shut_off = (j-1)*dt;
         end
     elseif strcmp(Process,'Discharging_R')
-        if strcmp(R_bound,'M_const') & P(end,j) <= P_min
+        % if strcmp(R_bound,'M_const') & P(end,j) <= P_min
+        if strcmp(R_bound,'M_const') & P(ceil(n_n/2),j) <= P_min
             % Discharging from R boundary
             R_bound = 'Wall';
+            t_shut_off = (j-1)*dt;
         end
     elseif strcmp(Process,'Cycle_L')
         if strcmp(stage,'Charging') & P(ceil(n_n/2),j) >= P_max
             % Charging from L boundary
             % v(1,j+1:end) = 0;
             L_bound = 'Wall';
-            stage = 'idle_Ch';
+            stage = 'idle_charg';
             % t_ch = (j-1)*dt;
-        elseif strcmp(stage,'idle_Ch') & std(P(:,j)./P(:,j)) <= 0.1
+        % elseif strcmp(stage,'idle_charg') & (std(P(:,j)./P(:,j)) <= 0.1 | t(j) >= Dt_charg)
+        elseif strcmp(stage,'idle_charg') & t(j) >= Dt_charg
             L_bound = 'M_const';
+            m_L = -100;
             stage = 'Discharging';
         elseif strcmp(stage,'Discharging') & P(ceil(n_n/2),j) <= P_min
+            L_bound = 'Wall';
+            stage = 'idle_disch';
             
 % IMPLEMENT CHANGE FROM IDLE (L_WALL,R_WALL) TO DISCHARGING
 % IMPLEMENT CHANGE FROM DISCH TO IDLE
         end
+        stage_hist = {stage_hist;stage};
     elseif strcmp(Process,'Cycle_R')
     elseif strcmp(Process,'NCycle_L')
     elseif strcmp(Process,'NCycle_R')
     end
 
 
-
-    if strcmp(L_bound,'Inlet') & P(ceil(n_n/2),j) >= P_max
-        % Charging from L boundary
-        % v(1,j+1:end) = 0;
-        L_bound = 'Wall';
-        t_shut_off = (j-1)*dt;
-    elseif strcmp(L_bound,'M_const') & P(1,j) <= P_min
-        % Discharging from L boundary
-        L_bound = 'Wall';
-    elseif strcmp(R_bound,'Inlet') & P(end-1,j) >= P_max
-        % Charging from R boundary
-        % v(1,j+1:end) = 0;
-        R_bound = 'Wall';
-        t_shut_off = (j-1)*dt;
-    elseif strcmp(R_bound,'M_const') & P(end,j) <= P_min
-        % Discharging from R boundary
-        R_bound = 'Wall';
-    end
+    % 
+    % if strcmp(L_bound,'Inlet') & P(ceil(n_n/2),j) >= P_max
+    %     % Charging from L boundary
+    %     % v(1,j+1:end) = 0;
+    %     L_bound = 'Wall';
+    %     t_shut_off = (j-1)*dt;
+    % elseif strcmp(L_bound,'M_const') & P(1,j) <= P_min
+    %     % Discharging from L boundary
+    %     L_bound = 'Wall';
+    % elseif strcmp(R_bound,'Inlet') & P(end-1,j) >= P_max
+    %     % Charging from R boundary
+    %     % v(1,j+1:end) = 0;
+    %     R_bound = 'Wall';
+    %     t_shut_off = (j-1)*dt;
+    % elseif strcmp(R_bound,'M_const') & P(end,j) <= P_min
+    %     % Discharging from R boundary
+    %     R_bound = 'Wall';
+    % end
 
     bound_hist = [bound_hist; string(L_bound) string(R_bound)];
     
@@ -1200,7 +1218,11 @@ elseif strcmp(Process,'Discharging_R')
     dX = -rho_f(end,:)'.*v(end,:)'*A_h.*(h(:,end)' - h_o - T_o*(s(:,end)' - s_o))*dt; % Flow exergy - kinetic and potential term contributions assumed negligible
 
 elseif strcmp(Process,'Cycle_L')
-    error('Cycle_L process not implemented yet ')
+    dm = rho_f(1,:)'.*v(1,:)'*A_h*dt;
+    % dE = rho_f(1,:)'.*v(1,:)'.*A_h.*h_f(1,:)'*dt;
+    dE = rho_f(1,:)'.*v(1,:)'.*A_h.*( h_f(1,:)' + v(1,:)'.^2/2 )*dt;
+    dX = rho_f(1,:)'.*v(1,:)'*A_h.*(h_f(1,:)' - h_o - T_o*(s_f(1,:)' - s_o))*dt;
+    % error('Cycle_L process not implemented yet ')
 elseif strcmp(Process,'Cycle_R')
     error('Cycle_R process not implemented yet ')
 elseif strcmp(Process,'NCycles_L')
