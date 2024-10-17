@@ -531,7 +531,7 @@ count = zeros(n_t,1);
 % Friction factor based on Nikuradse
 f_guess = (2*log10(1/epsD)+1.14)^(-2);
 
-resFig = figure;
+% resFig = figure;
 error_hist = [];
 bound_hist = [string(L_bound) string(R_bound)];
 
@@ -1111,7 +1111,7 @@ for j=2:n_t
             t_shut_off = (j-1)*dt;
         end
     elseif strcmp(Process,'Cycle_L')
-        if strcmp(stage,'Charging') & P(ceil(n_n/2),j) >= P_max
+        if strcmp(stage,'Charging') & P(1,j) >= P_max
             % Charging from L boundary
             % v(1,j+1:end) = 0;
             L_bound = 'Wall';
@@ -1120,9 +1120,10 @@ for j=2:n_t
         % elseif strcmp(stage,'idle_charg') & (std(P(:,j)./P(:,j)) <= 0.1 | t(j) >= Dt_charg)
         elseif strcmp(stage,'idle_charg') & t(j) >= Dt_charg
             L_bound = 'M_const';
+            j_disch = j; % index of start of discharge
             m_L = -100;
             stage = 'Discharging';
-        elseif strcmp(stage,'Discharging') & P(ceil(n_n/2),j) <= P_min
+        elseif strcmp(stage,'Discharging') & P(1,j) <= P_min
             L_bound = 'Wall';
             stage = 'idle_disch';
             
@@ -1250,16 +1251,23 @@ x_n = [dx/2:dx:L]';
 % X_min = P_0*(A_h*dx).*(P_amb./P_0 - 1 + log(P_0./P_amb))/(1e6*3600);  % Exergy when discharged [MWh] 
 
 X = sum(m_n.*( u - u_o + P_o*R*(T./P - T_o/P_o) - T_o*(s - s_o) ) )./(1e6*3600);           % Pipeline Exergy [MWh]
+X_0_disch = sum(m_n(:,j_disch).*(u(:,j_disch) - u_o + P_o*R*(T(:,j_disch)./P(:,j_disch) - T_o/P_o) - T_o*(s(:,j_disch) - s_o) ))/(1e6*3600);  % Exergy at t = 0s [MWh] 
+
 X_0 = m(1)*(u_0 - u_o + P_o*R*(T_0./P_0 - T_o/P_o) - T_o*(s_0 - s_o) )/(1e6*3600);  % Exergy at t = 0s [MWh] 
 
 
-X_net = X - X_0;                                                   % Exergy between current state and discharged state (assuming whole pipeline at P_min)
+X_net = X - X_0;                                                 % Exergy between current state and discharged state (assuming whole pipeline at P_min)
 % DeltaX_flow = sum(dX)/(1e6*3600)
 DeltaX_flow = sum(dX)/(1e6*3600)
 DeltaX_st = sum(X_net(:,end))
 
 figure('Color',[1 1 1])
-plot(t,X,t,X_0+cumsum(dX)./(1e6*3600))
+if strcmp(Process,'Cycle_L') | strcmp(Process,'Cycle_R')
+    plot(t,X,t,[X_0+cumsum(dX(t<Dt_charg))./(1e6*3600);X_0_disch+cumsum(dX(t>=Dt_charg))./(1e6*3600)])
+else
+    plot(t,X,t,X_0+cumsum(dX)./(1e6*3600))
+end
+
 legend('X','X_0 + dX')
 
 % if strcmp(Process,'Charging_L') || strcmp(Process,'Charging_R')
@@ -1273,12 +1281,27 @@ legend('X','X_0 + dX')
 % hold on; plot(mm)
 % legend('m','\Delta m')
 
-figure('color',[1 1 1]);plot(t,m)
-hold on; plot(t,m_bal)
-legend('m','$m_o + \dot{m} dt$','Interpreter','latex')
-figure('color',[1 1 1]);plot(t,E./(1e6*3600))
-hold on; plot(t,E_bal(1:end)./(1e6*3600))
-legend('E [MWh]','$E_o + \dot{m} \Delta E [MWh]$','Interpreter','latex')
+
+if strcmp(Process,'Cycle_L') | strcmp(Process,'Cycle_R')
+    m_bal(t>=Dt_charg) = m(j_disch) + cumsum(dm(t>=Dt_charg));
+    E_bal(t>=Dt_charg) = E(j_disch) + cumsum(dE(t>=Dt_charg));
+    
+    figure('color',[1 1 1]);plot(t,m)
+    hold on; plot(t,m_bal)
+    legend('m','$m_o + \dot{m} dt$','Interpreter','latex')
+    figure('color',[1 1 1]);plot(t,E./(1e6*3600))
+    hold on; plot(t,E_bal(1:end)./(1e6*3600))
+    legend('E [MWh]','$E_o + \dot{m} \Delta E [MWh]$','Interpreter','latex')
+else
+    figure('color',[1 1 1]);plot(t,m)
+    hold on; plot(t,m_bal)
+    legend('m','$m_o + \dot{m} dt$','Interpreter','latex')
+    figure('color',[1 1 1]);plot(t,E./(1e6*3600))
+    hold on; plot(t,E_bal(1:end)./(1e6*3600))
+    legend('E [MWh]','$E_o + \dot{m} \Delta E [MWh]$','Interpreter','latex')
+end
+
+
 
 % figure('color',[1 1 1]);plot(t,(m_bal' - m)./m)
 % title('Difference in mass')
