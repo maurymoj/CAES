@@ -11,11 +11,11 @@ CP = py.importlib.import_module('CoolProp.CoolProp'); % Simplifies coolprop call
 % Parameters from Kiuchi (1994)
 % L = 5000;
 % D = ;
-L = 5000;
-D = 0.5;
 % L = 70000; % Reference case 70 km length, 0.9 m diam
 % D = 0.9;
 % L = 213333; % Length for eq. vol with Huntorf
+L = 70000;
+D = 0.9;
 
 % Cavern parameters
 % L = 300; % Volume shape similar to Huntorf
@@ -24,15 +24,11 @@ D = 0.5;
 % D = 40;
 
 % Total simulation time
-% Dt = 3*3600; 
-% Dt = 3600;
 % Dt = 360; % Charging time for 5 km pipeline
-Dt = 720; % Charging + discharging time
-Dt_charg = 360;
-% Dt_disch = 360;
-% Dt = 10;
+% Dt = 720; % Charging + discharging time (5km 0.5m pipeline)
+% Dt_charg = 360;
 % Dt = 1200; % Charging L=10 km, d=0.9 m pipeline (360s = 3.44 MWh,1054 elapsed time)
-% Dt = 10; % Testing case
+Dt = 60; % Testing case
 
 eps = 0.04e-3; % Absolute roughness 0.04 mm
 
@@ -51,18 +47,16 @@ simType = 'CAESPipe';
 
 % CAES process
 % Process = 'Charging_L';
-% Process = 'Discharging_L';
+Process = 'Discharging_L';
 % Process = 'Charging_R';
 % Process = 'Discharging_R';
-Process = 'Cycle_L';
+% Process = 'Cycle_L';
 % Process = 'Cycle_R';
 % Process = 'NCycles_L';
 % Process = 'NCycles_R';
 if strcmp(Process,'Charging_L')
     % Initial conditions
-    % P_0 = 101325;
     P_0 = P_min;
-    % 4.3e6; % Huntorf
     T_0 = 273.15 + 25;
     v_0 = 0;
     % v_0 = v_in;
@@ -80,9 +74,7 @@ elseif strcmp(Process,'Discharging_L')
     R_bound = 'Wall';
 elseif strcmp(Process,'Charging_R')
     % Initial conditions
-    % P_0 = 101325;
     P_0 = P_min;
-    % P_0 = 4.3e6; % Huntorf
     T_0 = 273.15 + 25;
     v_0 = 0;
     % v_0 = v_in;
@@ -102,9 +94,7 @@ elseif strcmp(Process,'Discharging_R')
 
 elseif strcmp(Process,'Cycle_L')
     % Initial conditions
-    % P_0 = 101325;
     P_0 = P_min;
-    % 4.3e6; % Huntorf
     T_0 = 273.15 + 25;
     v_0 = 0;
     % v_0 = v_in;
@@ -136,7 +126,7 @@ if strcmp(L_bound,'Inlet')
     m_L = 100;
     % v_A = ?
     P_L = P_0;
-    T_L = 273.15 + 60;
+    T_L = 273.15 + 25;
 
 elseif strcmp(L_bound,'Wall')
     m_L = 0;
@@ -163,7 +153,6 @@ elseif(strcmp(R_bound,'Wall'))
     v_R = 0;
 elseif(strcmp(R_bound,'Inlet'))
     m_R = -108; % Huntorf  % Remember the sign to indicate the direction of flow (+ right , - left)
-    % P_R = 7e6;
     P_R = P_0; % Sliding pressure at pipeline inlet
     T_R = 273.15 + 60;
     % v_B = m_B/(rho_B*A_h);
@@ -184,14 +173,13 @@ theta = 0;
 if strcmp(simType,'CAESPipe')
     n_nodes = 40;
     max_iter = 20;
-    % dx = L/(100-1); % CAESPipe n_n = 100 and dt = 0.25 provided low
+    % dx = L/(100-1); % CAESPipe n_nodes = 100 and dt = 0.25 provided low
     % residual
-    % dx = L/(40-1); % CAESPipe
-    dx = L/(n_nodes-1); % CAESPipe
+    dx = L/(n_nodes-1); 
     dt_max = dx/400; % 400 is representative of the sound speed, 
                      % it is higher than the maximum sound speed reached in the pipeline 
                      % to achieve a conservative value
-    dt = (Dt/ceil(2*Dt/dt_max)) % division of Dt in an integer number of intervals
+    dt = (Dt/ceil(Dt/dt_max)) % division of Dt in an integer number of intervals
                             % with dt smaller than dt_max
     if dx/400 < dt % 400 upper limit for the speed of sound
         warning('dt > time needed for pressure wave to cross a node')
@@ -208,12 +196,20 @@ if strcmp(simType,'CAESPipe')
     end
 
 elseif strcmp(simType,'CAESCav')
-    dx = L/(5-1); % CAESCav
-    dt = 0.01;
-    tol = 1e-7; % CAEScav
+    n_nodes = 5;
+    max_iter = 20;
+    dx = L/(n_nodes-1);
+    dt_max = dx/400;
+    dt = (Dt/ceil(Dt/dt_max))
+    tol = 1e-7;
 else
     warning('Cant identify simulation type.')
 end
+
+% Friction calculation equation
+% friction_model = 'Colebrook'; % No significant difference and adds
+% calculation time
+friction_model = 'Nikuradse';
 
 % Tuning
 
@@ -234,10 +230,10 @@ v = zeros(n_f,n_t);
 P_f = zeros(n_f,n_t);
 T_f = zeros(n_f,n_t);
 rho_f = zeros(n_f,n_t);
-% h_f = zeros(n_f,n_t);
-% s_f = zeros(n_f,n_t);
-% u_f = zeros(n_f,n_t);
-% cp_f = zeros(n_f,n_t);
+cp_f = zeros(n_f,n_t);
+h_f = zeros(n_f,n_t);
+s_f = zeros(n_f,n_t);
+u_f = zeros(n_f,n_t);
 
 % Node initialization
 v_n = zeros(n_n,n_t);
@@ -250,12 +246,6 @@ u = zeros(n_n,n_t);
 cp = zeros(n_n,n_t);
 % equation and compare to using only mass and momentum eqs
 Q = zeros(1,n_t);
-
-% SHOULD THESE BE MATRICES OR VECTORS ???
-cp_f = zeros(n_f,n_t);
-h_f = zeros(n_f,n_t);
-s_f = zeros(n_f,n_t);
-u_f = zeros(n_f,n_t);
 
 % Sanity check
 m = zeros(1,n_t); % Total mass in pipeline
@@ -567,7 +557,8 @@ for j=2:n_t
 
         v(:,j) = alpha_v*(v_star + v_corr) ...
             + (1-alpha_v)*v_star;
-        % v(1:end-1,j) = alpha_v*(v_star(1:end-1) + v_corr(1:end-1)) + (1-alpha_v)*v_star(1:end-1);
+        % v(1:end-1,j) = alpha_v*(v_star(1:end-1) + v_corr(1:end-1)) ...
+        % + (1-alpha_v)*v_star(1:end-1);
 
         % Boundary conditions
         if strcmp(L_bound,'Inlet')
@@ -759,7 +750,9 @@ for j=2:n_t
             % T(i,j) = CP.PropsSI('T','P',P(i,j),'D',rho(i,j),'Air');
 
             u_sonic_f(i) = CP.PropsSI('speed_of_sound','P',P_f(i,j),'D',rho_f(i,j),'Air');
-            % nu = CP.PropsSI('viscosity','P',P_f(i,j),'D',rho_f(i,j),'Air');
+            if strcmp(friction_model,'Colebrook')
+                nu = CP.PropsSI('viscosity','P',P_f(i,j),'D',rho_f(i,j),'Air');
+            end
 
             drho_dP_f(i) = 1/(u_sonic_f(i)^2);
 
@@ -769,30 +762,35 @@ for j=2:n_t
 
         u_sonic_f(end) = CP.PropsSI('speed_of_sound','P',P_f(end,j),'D',rho_f(end,j),'Air');
         drho_dP_f(end) = 1/(u_sonic_f(end)^2);
-
+        if strcmp(friction_model,'Colebrook')
+            nu(end) = CP.PropsSI('viscosity','P',P_f(end,j),'D',rho_f(end,j),'Air');
+        end
 
 
         %---------- v* calculation - Momentum control volume ---------------------%
         
         % Friction factor based on Nikuradse - IMPLEMENT COLEBROOK EQUATION
-        f = (2*log10(1/epsD)+1.14)^(-2)*ones(n_n,1);
+        if strcmp(friction_model,'Nikuradse')
+            f = (2*log10(1/epsD)+1.14)^(-2)*ones(n_f,1);
+        elseif strcmp(friction_model,'Colebrook')
+            Re = rho_f(:,j).*abs(v(:,j))*D./nu(:);
+            f = zeros(n_f,1);
+    
+            for i=1:n_f
+                f_old = f_guess;
+                df = 10;
+                count_f = 0;
+                while (df > 0.0001 & count_f < 20) 
+                    f_new = (-2*log10(epsD/3.7 + 2.51/(Re(i)*f_old^0.5)))^(-2); % Original Colebrook-White equation
+                    % f_new = (-2*log10(epsD/3.7 + 2.825/(Re(i)*f_old^0.5)))^(-2); % Modified Colebrook-White equation - conservative (higher friction factors)
+                    df = abs((f_new - f_old)/f_old);
+                    f_old = f_new;
+                    count_f = count_f + 1; 
+                end
+                f(i) = f_old;
+            end
+        end
         
-        % Re = rho_f(:,j).*v(:,j)*D./nu(:);
-        % f = zeros(n,1);
-        % 
-        % for i=1:n_n
-        %     f_old = f_guess;
-        %     df = 10;
-        %     count_f = 0;
-        %     while (df > 0.0001 & count_f < 10) 
-        %         % f_n = (-2*log10(epsD/3.7 + 2.51/(Re*f^0.5)))^(-2); % Original Colebrook-White equation
-        %         f_new = (-2*log10(epsD/3.7 + 2.825/(Re(i)*f_old^0.5)))^(-2); % Modified Colebrook-White equation - conservative (higher friction factors)
-        %         df = abs((f_new - f_old)/f_old);
-        %         f_old = f_new;
-        %         count_f = count_f + 1; 
-        %     end
-        %     f(i) = f_old;
-        % end
         
 
         % Matrix/vector initialization (only need to solve for the inner faces -
@@ -841,14 +839,12 @@ for j=2:n_t
         % end
 
         % IMPLEMENT M_CONST BOUNDARY FOR R_bound
-        
-
 
 
 
 
         a_M(n_f-1,n_f-2) = -max(rho(n_n-1,j)*v_n(n_n-1,j)/dx, 0); % a_N-2
-        % WHAT TO DO REGARDING TO THE a INDICES ??
+
         a_M(n_f-1,n_f-1) = ...                                  % a_N-1
             rho_f(n_f-1,j)/dt + f(n_f-1)*rho_f(n_f-1,j)*abs(v(n_f-1,j))/(2*D)...
             +(rho(n_n,j)*v_n(n_n,j) - rho(n_n-1,j)*v_n(n_n-1,j))/dx...
@@ -888,15 +884,10 @@ for j=2:n_t
 
 
         %--------------- Pressure correction P' calculations ---------------------%
-        % The matrices/vectors in P' calculations have no shift, so index 1 means
-        % control volume 1 and so on
         a_C = zeros(n_n);
         B_C = zeros(n_n,1);
         
         % left node
-        % A(1,2) = - max(0, -drho_dP(2)*v_star(2)/dx); % A_2
-        % A(1,1) = drho_dP_n(1)/dt - (rho_f(2,j)*d(1)/a(1,1))/dx ...
-        %        + drho_dP(2)*v_star(2)/dx - A(1,2); % A_1
         a_C(1,2) = (rho_f(2,j)*d_M(2)/a_M(2,2))/dx ...
             - max(0, -drho_dP_f(2)*v_star(2)/dx); % A_2
         a_C(1,1) = drho_dP_n(1)/dt + drho_dP_f(2)*v_star(2)/dx ...
@@ -1045,17 +1036,11 @@ for j=2:n_t
                 + v_n(i,j)*(P_f(i+1,j) - P_f(i,j))/dx ...
                 + f(i)*rho(i,j)*abs(v_n(i,j))^3/(2*D) ...
                 + rho(i,j-1)*cp(i,j-1)*T(i,j-1)/dt;
-
-        % a_T(i,i+1) = 
     end
     
     T(:,j) = linsolve(a_T,b_T);
     
     % THERMODYNAMIC PROPERTIES
-    % cp(i,j) = CP.PropsSI('C','P',P(floor(end/2),j),'D',rho(floor(end/2),j),'Air');
-    % cp_f(j) = CP.PropsSI('C','P',P_f(1,j),'D',rho_f(1,j),'Air');
-    % h_f(j) = CP.PropsSI('H','P',P_f(1,j),'D',rho_f(1,j),'Air');
-    % s_f(j) = CP.PropsSI('S','P',P_f(1,j),'D',rho_f(1,j),'Air');
 
     for i = 1:n_n  % PROPERTIES FROM P AND RHO          
         % T(i,j) = CP.PropsSI('T','P',P(i,j),'D',rho(i,j),'Air');
@@ -1127,8 +1112,6 @@ for j=2:n_t
             L_bound = 'Wall';
             stage = 'idle_disch';
             
-% IMPLEMENT CHANGE FROM IDLE (L_WALL,R_WALL) TO DISCHARGING
-% IMPLEMENT CHANGE FROM DISCH TO IDLE
         end
         stage_hist = {stage_hist;stage};
     elseif strcmp(Process,'Cycle_R')
@@ -1136,25 +1119,6 @@ for j=2:n_t
     elseif strcmp(Process,'NCycle_R')
     end
 
-
-    % 
-    % if strcmp(L_bound,'Inlet') & P(ceil(n_n/2),j) >= P_max
-    %     % Charging from L boundary
-    %     % v(1,j+1:end) = 0;
-    %     L_bound = 'Wall';
-    %     t_shut_off = (j-1)*dt;
-    % elseif strcmp(L_bound,'M_const') & P(1,j) <= P_min
-    %     % Discharging from L boundary
-    %     L_bound = 'Wall';
-    % elseif strcmp(R_bound,'Inlet') & P(end-1,j) >= P_max
-    %     % Charging from R boundary
-    %     % v(1,j+1:end) = 0;
-    %     R_bound = 'Wall';
-    %     t_shut_off = (j-1)*dt;
-    % elseif strcmp(R_bound,'M_const') & P(end,j) <= P_min
-    %     % Discharging from R boundary
-    %     R_bound = 'Wall';
-    % end
 
     bound_hist = [bound_hist; string(L_bound) string(R_bound)];
     
@@ -1223,7 +1187,6 @@ elseif strcmp(Process,'Cycle_L')
     % dE = rho_f(1,:)'.*v(1,:)'.*A_h.*h_f(1,:)'*dt;
     dE = rho_f(1,:)'.*v(1,:)'.*A_h.*( h_f(1,:)' + v(1,:)'.^2/2 )*dt;
     dX = rho_f(1,:)'.*v(1,:)'*A_h.*(h_f(1,:)' - h_o - T_o*(s_f(1,:)' - s_o))*dt;
-    % error('Cycle_L process not implemented yet ')
 elseif strcmp(Process,'Cycle_R')
     error('Cycle_R process not implemented yet ')
 elseif strcmp(Process,'NCycles_L')
@@ -1238,7 +1201,6 @@ end
 % E_bal = E(1) + cumsum([0;dE(1:end-1)]);
 m_bal = m(1) + cumsum(dm);
 E_bal = E(1) + cumsum(dE);
-% E_bal = E(1) + cumsum(dE);
 
 x = 0:dx:L;
 x_f = [0:dx:L]';
@@ -1251,18 +1213,18 @@ x_n = [dx/2:dx:L]';
 % X_min = P_0*(A_h*dx).*(P_amb./P_0 - 1 + log(P_0./P_amb))/(1e6*3600);  % Exergy when discharged [MWh] 
 
 X = sum(m_n.*( u - u_o + P_o*R*(T./P - T_o/P_o) - T_o*(s - s_o) ) )./(1e6*3600);           % Pipeline Exergy [MWh]
-X_0_disch = sum(m_n(:,j_disch).*(u(:,j_disch) - u_o + P_o*R*(T(:,j_disch)./P(:,j_disch) - T_o/P_o) - T_o*(s(:,j_disch) - s_o) ))/(1e6*3600);  % Exergy at t = 0s [MWh] 
 
 X_0 = m(1)*(u_0 - u_o + P_o*R*(T_0./P_0 - T_o/P_o) - T_o*(s_0 - s_o) )/(1e6*3600);  % Exergy at t = 0s [MWh] 
 
 
 X_net = X - X_0;                                                 % Exergy between current state and discharged state (assuming whole pipeline at P_min)
-% DeltaX_flow = sum(dX)/(1e6*3600)
 DeltaX_flow = sum(dX)/(1e6*3600)
 DeltaX_st = sum(X_net(:,end))
+(DeltaX_st - DeltaX_flow)/DeltaX_st 
 
 figure('Color',[1 1 1])
 if strcmp(Process,'Cycle_L') | strcmp(Process,'Cycle_R')
+    X_0_disch = sum(m_n(:,j_disch).*(u(:,j_disch) - u_o + P_o*R*(T(:,j_disch)./P(:,j_disch) - T_o/P_o) - T_o*(s(:,j_disch) - s_o) ))/(1e6*3600);  % Exergy at t = 0s [MWh] 
     plot(t,X,t,[X_0+cumsum(dX(t<Dt_charg))./(1e6*3600);X_0_disch+cumsum(dX(t>=Dt_charg))./(1e6*3600)])
 else
     plot(t,X,t,X_0+cumsum(dX)./(1e6*3600))
@@ -1270,6 +1232,7 @@ end
 
 legend('X','X_0 + dX')
 
+% 
 % if strcmp(Process,'Charging_L') || strcmp(Process,'Charging_R')
 % 
 % elseif strcmp(Process,'Discharging_L') || strcmp(Process,'Discharging_R')
@@ -1292,6 +1255,26 @@ if strcmp(Process,'Cycle_L') | strcmp(Process,'Cycle_R')
     figure('color',[1 1 1]);plot(t,E./(1e6*3600))
     hold on; plot(t,E_bal(1:end)./(1e6*3600))
     legend('E [MWh]','$E_o + \dot{m} \Delta E [MWh]$','Interpreter','latex')
+
+    figure('color',[1 1 1]);
+    subplot(1,2,1)
+    t_charg = t(t<Dt_charg);
+    plot(t_charg,X(t<Dt_charg),t_charg,X(1)+cumsum(dX(t<Dt_charg))./(1e6*3600))
+    title('Charging')
+    ylim([2.9 5])
+    subplot(1,2,2)
+    t_disch = t(t>=Dt_charg) - t_charg(end);
+    plot(t_disch,X(t>=Dt_charg),t_disch,X(j_disch)+cumsum(dX(t>=Dt_charg))./(1e6*3600))
+    title('Discharging')
+    ylim([2.9 5])
+
+    % figure('color',[1 1 1]);
+    % subplot(1,2,1)
+    % title('Charging')
+    % plot(t(t<Dt_charg),X(t<Dt_charg),t(t<Dt_charg),X(1)+cumsum(dX(t<Dt_charg))./(1e6*3600))
+    % subplot(1,2,2)
+    % title('Discharging')
+    % plot(t(t>=Dt_charg),X(t>=Dt_charg),t(t>=Dt_charg),X(j_disch)+cumsum(dX(t>=Dt_charg))./(1e6*3600))
 else
     figure('color',[1 1 1]);plot(t,m)
     hold on; plot(t,m_bal)
@@ -1302,22 +1285,39 @@ else
 end
 
 
+% Analysing velocity profiles at first node (at each face and at the centre
+% of the node)
+% figure('Color',[1 1 1])
+% plot(t,v(1,:))
+% hold on
+% plot(t,v_n(1,:))
+% plot(t,v(2,:))
+% legend('v(1)','v_n(1)','v(2)')
+% xlabel('t')
+% ylabel('v')
+
+figure; plot(abs(mean(error_hist)))
+
+
+%% Previous tests
 
 % figure('color',[1 1 1]);plot(t,(m_bal' - m)./m)
 % title('Difference in mass')
 % figure('color',[1 1 1]);plot(t,(E_bal' - E)./E)
 % title('Difference in energy')
 
-% figure;plot(x_n,P(:,end))
-
+% Maximum temperature point variation
+x_maxT = zeros(length(t),1);
+Tmax = zeros(length(t),1);
+for i=1:length(t)
+    [Tmax(i), ind_max] = max(T(:,i));
+    x_maxT(i) = x(ind_max);
+end
 figure('Color',[1 1 1])
-plot(t,v(1,:))
-hold on
-plot(t,v_n(1,:))
-plot(t,v(2,:))
-legend('v(1)','v_n(1)','v(2)')
-xlabel('t')
-ylabel('v')
+yyaxis left
+plot(t,x_maxT./1e3)
+ylabel('Position [km]')
+yyaxis right
+plot(t,Tmax);
+ylabel('T_{max} [K]')
 
-
-figure; plot(abs(mean(error_hist)))
