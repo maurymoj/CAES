@@ -54,7 +54,23 @@ plot(t,res(4,:))
 legend('1','2','3','4')
 title('Mass residual for the four first nodes (dm_t - dm_x)')
 xlabel('t [s]')
+grid on
 
+figure('Color',[1 1 1])
+hold all
+ylim_min = min([dm_W;dm_E;dm_t;dm_x],[],"all");
+ylim_max = max([dm_W;dm_E;dm_t;dm_x],[],"all");
+yyaxis left
+plot(t,dm_W(1,:),t,dm_E(1,:))
+ylim([ylim_min-2 ylim_max+2])
+yyaxis right
+hold all
+plot(t,dm_t(1,:))
+plot(t,dm_x(1,:))
+grid on
+ylim([ylim_min-2 ylim_max+2])
+legend('dm_W','dm_E','dm_t','dm_x','Location','east')
+grid on
 % figure('Color',[1 1 1])
 % hold all
 % plot(t,res(end-2,:))
