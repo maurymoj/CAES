@@ -43,6 +43,13 @@ P_max = 7e6;
 % P_min = 4.3e6; % Huntorf
 P_min = 4e6;
 
+% Charging rate
+m_in = 100;
+T_in = 273.15+60;
+
+% Discharging rate
+m_out = 100;
+
 % Type of simulation 
 % 'CAESPipe'- Pipeline storage
 % 'CAESCav' - Cavern
@@ -83,7 +90,7 @@ elseif strcmp(Process,'Discharging_L')
 elseif strcmp(Process,'Charging_R')
     % Initial conditions
     P_0 = P_min;
-    T_0 = 273.15 + 25;
+    T_0 = T_ground;
     v_0 = 0;
     % v_0 = v_in;
 
@@ -93,7 +100,7 @@ elseif strcmp(Process,'Charging_R')
 elseif strcmp(Process,'Discharging_R')
     % Initial conditions
     P_0 = P_max;
-    T_0 = 273.15 + 25;
+    T_0 = T_ground;
     v_0 = 0;
     % v_0 = v_in;
 
@@ -103,7 +110,7 @@ elseif strcmp(Process,'Discharging_R')
 elseif strcmp(Process,'Cycle_L')
     % Initial conditions
     P_0 = P_min;
-    T_0 = 273.15 + 25;
+    T_0 = T_ground;
     v_0 = 0;
     % v_0 = v_in;
 
@@ -139,10 +146,10 @@ if strcmp(L_bound,'Inlet')
     % m_in = rho_a*Q_a;
     % m_in = 100;
     % m_L = 108; % Huntorf
-    m_L = 100;
+    m_L = m_in;
     % v_A = ?
     P_L = P_0;
-    T_L = 273.15 + 25;
+    T_L = T_in;
 
 elseif strcmp(L_bound,'Wall')
     m_L = 0;
@@ -153,7 +160,7 @@ elseif strcmp(L_bound,'P_const')
     P_L = P_min; % 4 MPa
 elseif strcmp(L_bound,'M_const')
     % m_A = -417; % Huntorf, sign indicates flow direction
-    m_L = -100;
+    m_L = m_out;
 end   
 
 % B - Right side boundary condition
@@ -164,21 +171,21 @@ end
 % R_bound = 'P_const';
 % R_bound = 'M_const';
 if strcmp(R_bound,'Outlet')
-    % m_out = m_A;
+    % m_R = m_out;
 elseif(strcmp(R_bound,'Wall'))
     m_R = 0;
     v_R = 0;
 elseif(strcmp(R_bound,'Inlet'))
-    m_R = -108; % Huntorf  % Remember the sign to indicate the direction of flow (+ right , - left)
+    m_R = -m_in; % Remember the sign to indicate the direction of flow (+ right , - left)
     P_R = P_0; % Sliding pressure at pipeline inlet
-    T_R = 273.15 + 60;
+    T_R = T_ground;
     % v_B = m_B/(rho_B*A_h);
 elseif strcmp(R_bound,'P_const')
     P_R = 4e6; 
     % P_B = 4.13e6; % 4.13 MPa = Huntorf https://www.sciencedirect.com/science/article/pii/S0196890420302004#s0010
 elseif strcmp(R_bound,'M_const')
     % m_B = 417; % Huntorf    
-    m_R = 100;
+    m_R = -m_out;
 end                     
 
 % heat_transfer_model 
@@ -1349,6 +1356,32 @@ end
 
 figure; plot(abs(mean(error_hist)))
 
+m2 = sum(rho(2:end,:)*A_h*dx);
+E2 = sum(rho(2:end,:)*A_h*dx.*( u(2:end,:) + v_n(2:end,:).^2/2 ) );
+
+dm2 = rho_f(2,:)'.*v(2,:)'*A_h*dt;
+    % dE = rho_f(1,:)'.*v(1,:)'.*A_h.*h_f(1,:)'*dt;
+dE2 = rho_f(2,:)'.*v(2,:)'.*A_h.*( h_f(2,:)' + v(2,:)'.^2/2 )*dt;
+
+m2_bal = m2(1) + cumsum(dm2);
+E2_bal = E2(1) + cumsum(dE2);
+figure;
+yyaxis left
+plot(t,m2,t,m2_bal)
+yyaxis right
+plot(t,E2,t,E2_bal)
+legend('m','m_{bal}','E','E_{bal}')
+
+figure
+plot((E2 - E2_bal')./E2)
+
+XX = sum(m_n(2:end,:).*( u(2:end,:) - u_o + P_o*R*(T(2:end,:)./P(2:end,:) - T_o/P_o) - T_o*(s(2:end,:) - s_o) ) )./(1e6*3600);
+
+dXX = rho_f(2,:)'.*v(2,:)'*A_h.*(h_f(2,:)' - h_o - T_o*(s_f(2,:)' - s_o))*dt./(1e6*3600);
+
+XX_bal = XX(1) + cumsum(dXX);
+
+eta_stor = XX(end)/XX_bal(end)
 
 %% Previous tests
 
