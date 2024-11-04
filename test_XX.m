@@ -2,7 +2,7 @@ XX = sum(m_n(2:end,:).*( u(2:end,:) - u_o + P_o*R*(T(2:end,:)./P(2:end,:) - T_o/
 
 dXX = rho_f(2,:)'.*v(2,:)'*A_h.*(h_f(2,:)' - h_o - T_o*(s_f(2,:)' - s_o))*dt;
 
-XX_bal = XX(1) + cumsum(dXX);
+XX_bal = XX(1) + cumsum(dXX)./(1e6*3600);
 
 XX(end);
 sum(dXX)/(1e6*3600);
@@ -12,7 +12,7 @@ plot(t,XX,t,XX(1)+cumsum(dXX)./(1e6*3600))
 legend('XX','XX_{bal}')
 
 figure
-plot((XX-XX_bal')./XX)
+plot(t,(XX-XX_bal')./XX)
 %%  Cycle analysis
 figure
 plot(t,XX,t,[XX(1)+cumsum(dXX(t<Dt_charg))./(1e6*3600);XX(j_disch)+cumsum(dXX(t>=Dt_charg))./(1e6*3600)])
