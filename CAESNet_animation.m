@@ -37,7 +37,7 @@ t_dec = zeros(1,floor((length(t)-1)/dec+1));
 
 plot_type = 'Single';
 % plot_type = 'Double';
-Property = 'T';
+Property = 'P';
 for i=1:length(t_dec)
     t_dec(i) = t(1+dec*(i-1));
     

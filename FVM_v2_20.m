@@ -1,7 +1,7 @@
 clear 
 % close all
 % clc
-
+datetime
 % profile on
 tic
 CP = py.importlib.import_module('CoolProp.CoolProp'); % Simplifies coolprop calls
@@ -28,7 +28,7 @@ D = 0.9;
 % Dt = 720; % Charging + discharging time (5km 0.5m pipeline)
 % Dt_charg = 360;
 % Dt = 1200; % Charging L=10 km, d=0.9 m pipeline (360s = 3.44 MWh,1054 elapsed time)
-Dt = 5*3600;
+Dt = 3*3600;
 
 eps = 0.04e-3; % Absolute roughness 0.04 mm
 
@@ -44,7 +44,7 @@ P_max = 7e6;
 P_min = 4e6;
 
 % Charging rate
-m_in = 100;
+m_in = 200;
 T_in = 273.15+60;
 
 % Discharging rate
@@ -204,6 +204,8 @@ thickness_ext_coating = 3e-3;
 R = 287;
 g = 9.81;
 theta = 0;
+
+Figures = 0;
 
 %--------------------- SIMULATION PARAMETERS ------------------------%
 
@@ -1018,7 +1020,7 @@ for j=2:n_t
         error_P = (P_corr./P(:,j));
         error_hist = [error_hist error_P];
         
-        % if rem(count(j),2) == 0
+        % if rem(count(j),2) == 0 & Figures
         %     figure(resFig)
         %     plot(mean(abs(error_hist)))
         %     drawnow limitrate
@@ -1280,15 +1282,19 @@ DeltaX_flow = sum(dX)/(1e6*3600)
 DeltaX_st = sum(X_net(:,end))
 (DeltaX_st - DeltaX_flow)/DeltaX_st 
 
-figure('Color',[1 1 1])
-if strcmp(Process,'Cycle_L') | strcmp(Process,'Cycle_R')
-    X_0_disch = sum(m_n(:,j_disch).*(u(:,j_disch) - u_o + P_o*R*(T(:,j_disch)./P(:,j_disch) - T_o/P_o) - T_o*(s(:,j_disch) - s_o) ))/(1e6*3600);  % Exergy at t = 0s [MWh] 
-    plot(t,X,t,[X_0+cumsum(dX(t<Dt_charg))./(1e6*3600);X_0_disch+cumsum(dX(t>=Dt_charg))./(1e6*3600)])
-else
-    plot(t,X,t,X_0+cumsum(dX)./(1e6*3600))
-end
-
-legend('X','X_0 + dX')
+% figure('Color',[1 1 1])
+% if strcmp(Process,'Cycle_L') | strcmp(Process,'Cycle_R')
+%     X_0_disch = sum(m_n(:,j_disch).*(u(:,j_disch) - u_o + P_o*R*(T(:,j_disch)./P(:,j_disch) - T_o/P_o) - T_o*(s(:,j_disch) - s_o) ))/(1e6*3600);  % Exergy at t = 0s [MWh] 
+%     if Figures
+%         plot(t,X,t,[X_0+cumsum(dX(t<Dt_charg))./(1e6*3600);X_0_disch+cumsum(dX(t>=Dt_charg))./(1e6*3600)])
+%         legend('X','X_0 + dX')
+%     end
+% else
+%     if Figures
+%         plot(t,X,t,X_0+cumsum(dX)./(1e6*3600))
+%         legend('X','X_0 + dX')
+%     end
+% end
 
 % 
 % if strcmp(Process,'Charging_L') || strcmp(Process,'Charging_R')
@@ -1298,48 +1304,54 @@ legend('X','X_0 + dX')
 % end
 
 % Figures of mass and energy over time
-% figure('color',[1 1 1]);plot(m)
-% hold on; plot(mm)
-% legend('m','\Delta m')
+% if legend('X','X_0 + dX')
+%     figure('color',[1 1 1]);plot(m)
+%     hold on; plot(mm)
+%     legend('m','\Delta m')
+% end
 
 
 if strcmp(Process,'Cycle_L') | strcmp(Process,'Cycle_R')
     m_bal(t>=Dt_charg) = m(j_disch) + cumsum(dm(t>=Dt_charg));
     E_bal(t>=Dt_charg) = E(j_disch) + cumsum(dE(t>=Dt_charg));
     
-    figure('color',[1 1 1]);plot(t,m)
-    hold on; plot(t,m_bal)
-    legend('m','$m_o + \dot{m} dt$','Interpreter','latex')
-    figure('color',[1 1 1]);plot(t,E./(1e6*3600))
-    hold on; plot(t,E_bal(1:end)./(1e6*3600))
-    legend('E [MWh]','$E_o + \dot{m} \Delta E [MWh]$','Interpreter','latex')
-
-    figure('color',[1 1 1]);
-    subplot(1,2,1)
-    t_charg = t(t<Dt_charg);
-    plot(t_charg,X(t<Dt_charg),t_charg,X(1)+cumsum(dX(t<Dt_charg))./(1e6*3600))
-    title('Charging')
-    ylim([2.9 5])
-    subplot(1,2,2)
-    t_disch = t(t>=Dt_charg) - t_charg(end);
-    plot(t_disch,X(t>=Dt_charg),t_disch,X(j_disch)+cumsum(dX(t>=Dt_charg))./(1e6*3600))
-    title('Discharging')
-    ylim([2.9 5])
-
-    % figure('color',[1 1 1]);
-    % subplot(1,2,1)
-    % title('Charging')
-    % plot(t(t<Dt_charg),X(t<Dt_charg),t(t<Dt_charg),X(1)+cumsum(dX(t<Dt_charg))./(1e6*3600))
-    % subplot(1,2,2)
-    % title('Discharging')
-    % plot(t(t>=Dt_charg),X(t>=Dt_charg),t(t>=Dt_charg),X(j_disch)+cumsum(dX(t>=Dt_charg))./(1e6*3600))
+    if Figures
+        figure('color',[1 1 1]);plot(t,m)
+        hold on; plot(t,m_bal)
+        legend('m','$m_o + \dot{m} dt$','Interpreter','latex')
+        figure('color',[1 1 1]);plot(t,E./(1e6*3600))
+        hold on; plot(t,E_bal(1:end)./(1e6*3600))
+        legend('E [MWh]','$E_o + \dot{m} \Delta E [MWh]$','Interpreter','latex')
+    
+        figure('color',[1 1 1]);
+        subplot(1,2,1)
+        t_charg = t(t<Dt_charg);
+        plot(t_charg,X(t<Dt_charg),t_charg,X(1)+cumsum(dX(t<Dt_charg))./(1e6*3600))
+        title('Charging')
+        ylim([2.9 5])
+        subplot(1,2,2)
+        t_disch = t(t>=Dt_charg) - t_charg(end);
+        plot(t_disch,X(t>=Dt_charg),t_disch,X(j_disch)+cumsum(dX(t>=Dt_charg))./(1e6*3600))
+        title('Discharging')
+        ylim([2.9 5])
+    
+        % figure('color',[1 1 1]);
+        % subplot(1,2,1)
+        % title('Charging')
+        % plot(t(t<Dt_charg),X(t<Dt_charg),t(t<Dt_charg),X(1)+cumsum(dX(t<Dt_charg))./(1e6*3600))
+        % subplot(1,2,2)
+        % title('Discharging')
+        % plot(t(t>=Dt_charg),X(t>=Dt_charg),t(t>=Dt_charg),X(j_disch)+cumsum(dX(t>=Dt_charg))./(1e6*3600))
+    end
 else
-    figure('color',[1 1 1]);plot(t,m)
-    hold on; plot(t,m_bal)
-    legend('m','$m_o + \dot{m} dt$','Interpreter','latex')
-    figure('color',[1 1 1]);plot(t,E./(1e6*3600))
-    hold on; plot(t,E_bal(1:end)./(1e6*3600))
-    legend('E [MWh]','$E_o + \dot{m} \Delta E [MWh]$','Interpreter','latex')
+    if Figures
+        figure('color',[1 1 1]);plot(t,m)
+        hold on; plot(t,m_bal)
+        legend('m','$m_o + \dot{m} dt$','Interpreter','latex')
+        figure('color',[1 1 1]);plot(t,E./(1e6*3600))
+        hold on; plot(t,E_bal(1:end)./(1e6*3600))
+        legend('E [MWh]','$E_o + \dot{m} \Delta E [MWh]$','Interpreter','latex')
+    end
 end
 
 
@@ -1354,7 +1366,10 @@ end
 % xlabel('t')
 % ylabel('v')
 
-figure; plot(abs(mean(error_hist)))
+if Figures
+    figure('Color',[1 1 1]);
+    plot(abs(mean(error_hist)))
+end
 
 m2 = sum(rho(2:end,:)*A_h*dx);
 E2 = sum(rho(2:end,:)*A_h*dx.*( u(2:end,:) + v_n(2:end,:).^2/2 ) );
@@ -1365,15 +1380,18 @@ dE2 = rho_f(2,:)'.*v(2,:)'.*A_h.*( h_f(2,:)' + v(2,:)'.^2/2 )*dt;
 
 m2_bal = m2(1) + cumsum(dm2);
 E2_bal = E2(1) + cumsum(dE2);
-figure;
-yyaxis left
-plot(t,m2,t,m2_bal)
-yyaxis right
-plot(t,E2,t,E2_bal)
-legend('m','m_{bal}','E','E_{bal}')
 
-figure
-plot((E2 - E2_bal')./E2)
+if Figures
+    figure;
+    yyaxis left
+    plot(t,m2,t,m2_bal)
+    yyaxis right
+    plot(t,E2,t,E2_bal)
+    legend('m','m_{bal}','E','E_{bal}')
+    
+    figure
+    plot((E2 - E2_bal')./E2)
+end
 
 XX = sum(m_n(2:end,:).*( u(2:end,:) - u_o + P_o*R*(T(2:end,:)./P(2:end,:) - T_o/P_o) - T_o*(s(2:end,:) - s_o) ) )./(1e6*3600);
 
@@ -1381,8 +1399,10 @@ dXX = rho_f(2,:)'.*v(2,:)'*A_h.*(h_f(2,:)' - h_o - T_o*(s_f(2,:)' - s_o))*dt./(1
 
 XX_bal = XX(1) + cumsum(dXX);
 
-eta_stor = XX(end)/XX_bal(end)
+etaX_stor = XX(end)/XX_bal(end)
 
+filename = strcat(simType,'_',Process,'_P_',num2str(P_max/1e6),'MPa_m_',num2str(m_in));
+save(filename)
 %% Previous tests
 
 % figure('color',[1 1 1]);plot(t,(m_bal' - m)./m)
