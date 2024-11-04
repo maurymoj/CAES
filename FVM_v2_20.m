@@ -14,7 +14,7 @@ CP = py.importlib.import_module('CoolProp.CoolProp'); % Simplifies coolprop call
 % L = 70000; % Reference case 70 km length, 0.9 m diam
 % D = 0.9;
 % L = 213333; % Length for eq. vol with Huntorf
-L = 70000;
+L = 100000;
 D = 0.9;
 
 % Cavern parameters
@@ -28,7 +28,7 @@ D = 0.9;
 % Dt = 720; % Charging + discharging time (5km 0.5m pipeline)
 % Dt_charg = 360;
 % Dt = 1200; % Charging L=10 km, d=0.9 m pipeline (360s = 3.44 MWh,1054 elapsed time)
-Dt = 60; % Testing case
+Dt = 5*3600;
 
 eps = 0.04e-3; % Absolute roughness 0.04 mm
 
@@ -36,28 +36,36 @@ eps = 0.04e-3; % Absolute roughness 0.04 mm
 P_amb = 101325;
 T_amb = 273.15 + 25;
 
+T_ground = 278;
+
 % System operational limits
 P_max = 7e6;
 % P_min = 4.3e6; % Huntorf
 P_min = 4e6;
 
-% Type of simulation - Cavern or pipeline storage
+% Type of simulation 
+% 'CAESPipe'- Pipeline storage
+% 'CAESCav' - Cavern
 simType = 'CAESPipe';
-% simType = 'CAESCav';
 
 % CAES process
-% Process = 'Charging_L';
-Process = 'Discharging_L';
-% Process = 'Charging_R';
-% Process = 'Discharging_R';
-% Process = 'Cycle_L';
-% Process = 'Cycle_R';
-% Process = 'NCycles_L';
-% Process = 'NCycles_R';
+% Options:
+% 'Charging_L';
+% 'Discharging_L';
+% 'Cycle_L';
+% 'Idle'
+% Not implemented yet:
+% 'NCycles_L';
+% 'Charging_R';
+% 'Discharging_R';
+% 'Cycle_R';
+% 'NCycles_R';
+Process = 'Charging_L';
+
 if strcmp(Process,'Charging_L')
     % Initial conditions
     P_0 = P_min;
-    T_0 = 273.15 + 25;
+    T_0 = T_ground;
     v_0 = 0;
     % v_0 = v_in;
 
@@ -107,16 +115,24 @@ elseif strcmp(Process,'Cycle_L')
 elseif strcmp(Process,'Cycle_R')
 elseif strcmp(Process,'NCycles_L')
 elseif strcmp(Process,'NCycles_R')
+elseif strcmp(Process,'Idle')
+    P_0 = P_min;
+    T_0 = T_amb;
+    v_0 = 0;
+
+    L_bound = 'Wall';
+    R_bound = 'Wall';
 else
     error('Process not identified !')
 end
 
 % A - Left side boundary condition
-% L_bound = 'Outlet';
 % L_bound = 'Wall';
 % L_bound = 'Inlet';
-% L_bound = 'P_const';
 % L_bound = 'M_const';
+% Not implemented yet:
+% L_bound = 'P_const';
+% L_bound = 'Outlet';
 if strcmp(L_bound,'Inlet')
     % Q_st_in = 3e5; % standard cubic meters per hour
     % Q_a = Q_st_in/3600;
@@ -141,10 +157,11 @@ elseif strcmp(L_bound,'M_const')
 end   
 
 % B - Right side boundary condition
+% R_bound = 'Wall';
+% Not implemented yet:
 % R_bound = 'Outlet';
 % R_bound = 'Inlet';
 % R_bound = 'P_const';
-% R_bound = 'Wall';
 % R_bound = 'M_const';
 if strcmp(R_bound,'Outlet')
     % m_out = m_A;
@@ -163,6 +180,19 @@ elseif strcmp(R_bound,'M_const')
     % m_B = 417; % Huntorf    
     m_R = 100;
 end                     
+
+% heat_transfer_model 
+% 'Adiabatic'
+% ' Steady_state'
+heat_transfer_model = 'Adiabatic';
+
+k_pipe = 45.3; % [W/mK] - Wen et al. (2023) "Heat Transfer Model of Natural Gas Pipeline Based on Data Feature Extraction and First Principle Models"
+k_int_coating = 0.52;
+k_ext_coating = 0.4;
+
+thickness_pipe = 15.9e-3; % Still based on Wen, but in accordance with the regulations in the UK
+thickness_int_coating = 0.5e-3;
+thickness_ext_coating = 3e-3;
 
 R = 287;
 g = 9.81;
@@ -191,6 +221,8 @@ if strcmp(simType,'CAESPipe')
         tol = 1e-6; % CAESPipe Charging
     elseif strcmp(Process,'Cycle_L')
         tol = 1e-5;
+    elseif strcmp(Process,'Idle')
+        tol = 1e-5;
     else
         error('Process not found.')
     end
@@ -207,8 +239,8 @@ else
 end
 
 % Friction calculation equation
-% friction_model = 'Colebrook'; % No significant difference and adds
-% calculation time
+% 'Nikuradse'
+% 'Colebrook'; % No significant difference and adds calculation time
 friction_model = 'Nikuradse';
 
 % Tuning
@@ -246,6 +278,7 @@ u = zeros(n_n,n_t);
 cp = zeros(n_n,n_t);
 % equation and compare to using only mass and momentum eqs
 Q = zeros(1,n_t);
+Q_n = zeros(n_n,n_t);
 
 % Sanity check
 m = zeros(1,n_t); % Total mass in pipeline
@@ -994,7 +1027,21 @@ for j=2:n_t
     a_T = zeros(n_n,n_n);
     b_T = zeros(n_n,1);
 
-    Q(j) = 0; % ADIABATIC ASSUMPTION
+    if strcmp(heat_transfer_model,'Adiabatic')
+        Q(j) = 0;
+    elseif strcmp(heat_transfer_model,'Sukhov')
+    elseif strcmp(heat_transfer_model,'Steady_state')
+        % neglecting effect of coating
+        D_ext = D + thickness_pipe; 
+        U = dx*k_pipe/(D*log(D_ext/D));
+        Q_n(:,j) = -4*U/D*(T(:,j-1) - T_ground);
+        Q(j) = sum(Q_n(:,j));
+    elseif strcmp(heat_transfer_model,'Transient')
+    else
+        error('Heat transfer model not identified')
+    end
+    
+
 
     a_T(1,2) = -max(0, -rho_f(2,j)*v(2,j)*cp_f(2,j-1)/dx);    
 
@@ -1193,6 +1240,10 @@ elseif strcmp(Process,'NCycles_L')
     error('NCycle_L process not implemented yet ')
 elseif strcmp(Process,'NCycles_R')
     error('NCycle_R process not implemented yet ')
+elseif strcmp(Process,'Idle')
+    dm = 0;
+    dE = Q;
+    dX = 0;
 else
     error('Process not identified.')
 end
