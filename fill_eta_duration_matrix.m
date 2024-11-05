@@ -2,8 +2,8 @@ clear
 
 Ps = 6:9;
 Pmins = Ps - 3;
-% ms = 50:50:200;
-ms = 200;
+ms = 50:50:200;
+% ms = 200;
 etaX_stor_M = zeros(length(Ps),length(ms));
 Duration = zeros(length(Ps),length(ms));
 

@@ -28,7 +28,7 @@ D = 0.9;
 % Dt = 720; % Charging + discharging time (5km 0.5m pipeline)
 % Dt_charg = 360;
 % Dt = 1200; % Charging L=10 km, d=0.9 m pipeline (360s = 3.44 MWh,1054 elapsed time)
-Dt = 4*3600;
+Dt = 10*3600;
 
 eps = 0.04e-3; % Absolute roughness 0.04 mm
 
@@ -45,7 +45,7 @@ P_max = 9e6;
 P_min = P_max - 3e6;
 
 % Charging rate
-m_in = 200;
+m_in = 50;
 T_in = 273.15+60;
 
 % Discharging rate
