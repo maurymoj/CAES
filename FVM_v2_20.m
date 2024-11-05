@@ -28,7 +28,7 @@ D = 0.9;
 % Dt = 720; % Charging + discharging time (5km 0.5m pipeline)
 % Dt_charg = 360;
 % Dt = 1200; % Charging L=10 km, d=0.9 m pipeline (360s = 3.44 MWh,1054 elapsed time)
-Dt = 3*3600;
+Dt = 4*3600;
 
 eps = 0.04e-3; % Absolute roughness 0.04 mm
 
@@ -39,16 +39,17 @@ T_amb = 273.15 + 25;
 T_ground = 278;
 
 % System operational limits
-P_max = 7e6;
+P_max = 9e6;
 % P_min = 4.3e6; % Huntorf
-P_min = 4e6;
+% P_min = 4e6;
+P_min = P_max - 3e6;
 
 % Charging rate
 m_in = 200;
 T_in = 273.15+60;
 
 % Discharging rate
-m_out = 100;
+m_out = 200;
 
 % Type of simulation 
 % 'CAESPipe'- Pipeline storage
@@ -1201,7 +1202,7 @@ for j=2:n_t
 
 end
 
-toc
+elapsedTime = toc
 
 dm = zeros(n_t,1);
 dE = zeros(n_t,1);
@@ -1278,9 +1279,9 @@ X_0 = m(1)*(u_0 - u_o + P_o*R*(T_0./P_0 - T_o/P_o) - T_o*(s_0 - s_o) )/(1e6*3600
 
 
 X_net = X - X_0;                                                 % Exergy between current state and discharged state (assuming whole pipeline at P_min)
-DeltaX_flow = sum(dX)/(1e6*3600)
-DeltaX_st = sum(X_net(:,end))
-(DeltaX_st - DeltaX_flow)/DeltaX_st 
+DeltaX_flow = sum(dX)/(1e6*3600);
+DeltaX_st = sum(X_net(:,end));
+% error_X = (DeltaX_st - DeltaX_flow)/DeltaX_st
 
 % figure('Color',[1 1 1])
 % if strcmp(Process,'Cycle_L') | strcmp(Process,'Cycle_R')
@@ -1401,8 +1402,12 @@ XX_bal = XX(1) + cumsum(dXX);
 
 etaX_stor = XX(end)/XX_bal(end)
 
-filename = strcat(simType,'_',Process,'_P_',num2str(P_max/1e6),'MPa_m_',num2str(m_in));
+
+% filename = strcat(simType,'_',Process,'_P_',num2str(P_max/1e6),'MPa_m_',num2str(m_in),'_',string(year(time)),'_',string(month(time)),'_',string(day(time)));
+filename = strcat(simType,'_',Process,'_P_',num2str(P_max/1e6),'-',num2str(P_min/1e6),'MPa_m_',num2str(m_in));
 save(filename)
+
+L_bound
 %% Previous tests
 
 % figure('color',[1 1 1]);plot(t,(m_bal' - m)./m)
