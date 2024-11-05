@@ -194,9 +194,10 @@ end
 % ' Steady_state'
 heat_transfer_model = 'Adiabatic';
 
-k_pipe = 45.3; % [W/mK] - Wen et al. (2023) "Heat Transfer Model of Natural Gas Pipeline Based on Data Feature Extraction and First Principle Models"
+k_pipe = 45.3; % [W/m K] - Wen et al. (2023) "Heat Transfer Model of Natural Gas Pipeline Based on Data Feature Extraction and First Principle Models"
 k_int_coating = 0.52;
 k_ext_coating = 0.4;
+cp_pipe = 500; % [J/kg K]
 
 thickness_pipe = 15.9e-3; % Still based on Wen, but in accordance with the regulations in the UK
 thickness_int_coating = 0.5e-3;

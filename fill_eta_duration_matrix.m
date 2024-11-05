@@ -1,13 +1,16 @@
 clear
 
 Ps = 6:9;
-ms = 50:50:200;
+Pmins = Ps - 3;
+% ms = 50:50:200;
+ms = 200;
 etaX_stor_M = zeros(length(Ps),length(ms));
 Duration = zeros(length(Ps),length(ms));
 
 for ii=1:length(Ps)
     for jj = 1:length(ms)
-        filename = strcat('CAESPipe_Charging_L_P_',num2str(Ps(ii)),'MPa_m_',num2str(ms(jj)));
+        % filename = strcat('CAESPipe_Charging_L_P_',num2str(Ps(ii)),'MPa_m_',num2str(ms(jj)));
+        filename = strcat('CAESPipe_Charging_L_P_',num2str(Ps(ii)),'-',num2str(Pmins(ii)),'MPa_m_',num2str(ms(jj)));
         load(filename)
         % Ps(ii)
         % ms(jj)
