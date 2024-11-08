@@ -5,12 +5,13 @@ datetime
 % profile on
 tic
 CP = py.importlib.import_module('CoolProp.CoolProp'); % Simplifies coolprop calls
+% Program requires Coolprop package: http://coolprop.org/coolprop/wrappers/MATLAB/index.html#matlab
 
 %----------------------- PROBLEM PARAMETERS -------------------------%
 % Pipeline parameters
 % Parameters from Kiuchi (1994)
 % L = 5000;
-% D = ;
+% D = 0.5;
 % L = 70000; % Reference case 70 km length, 0.9 m diam
 % D = 0.9;
 % L = 213333; % Length for eq. vol with Huntorf
@@ -28,28 +29,19 @@ D = 0.9;
 % Dt = 720; % Charging + discharging time (5km 0.5m pipeline)
 % Dt_charg = 360;
 % Dt = 1200; % Charging L=10 km, d=0.9 m pipeline (360s = 3.44 MWh,1054 elapsed time)
-Dt = 10*3600;
-
-eps = 0.04e-3; % Absolute roughness 0.04 mm
-
-% Ambient conditions
-P_amb = 101325;
-T_amb = 273.15 + 25;
-
-T_ground = 278;
+Dt = 4*3600;
 
 % System operational limits
-P_max = 9e6;
-% P_min = 4.3e6; % Huntorf
-% P_min = 4e6;
+P_max = 10e6;
 P_min = P_max - 3e6;
 
 % Charging rate
-m_in = 50;
+m_in = 200;
 T_in = 273.15+60;
 
 % Discharging rate
 m_out = 200;
+% m_A = 417; % Huntorf
 
 % Type of simulation 
 % 'CAESPipe'- Pipeline storage
@@ -69,6 +61,15 @@ simType = 'CAESPipe';
 % 'Cycle_R';
 % 'NCycles_R';
 Process = 'Charging_L';
+
+% Assumptions
+eps = 0.04e-3; % Absolute roughness 0.04 mm
+
+% Ambient conditions
+P_amb = 101325;
+T_amb = 273.15 + 25;
+
+T_ground = 273.15 + 5; % Kostowski, 2022
 
 if strcmp(Process,'Charging_L')
     % Initial conditions
@@ -160,8 +161,7 @@ elseif strcmp(L_bound,'Outlet')
 elseif strcmp(L_bound,'P_const')
     P_L = P_min; % 4 MPa
 elseif strcmp(L_bound,'M_const')
-    % m_A = -417; % Huntorf, sign indicates flow direction
-    m_L = m_out;
+    m_L = -m_out; % Sign indicates flow direction
 end   
 
 % B - Right side boundary condition
@@ -184,14 +184,14 @@ elseif(strcmp(R_bound,'Inlet'))
 elseif strcmp(R_bound,'P_const')
     P_R = 4e6; 
     % P_B = 4.13e6; % 4.13 MPa = Huntorf https://www.sciencedirect.com/science/article/pii/S0196890420302004#s0010
-elseif strcmp(R_bound,'M_const')
-    % m_B = 417; % Huntorf    
+elseif strcmp(R_bound,'M_const')   
     m_R = -m_out;
 end                     
 
 % heat_transfer_model 
 % 'Adiabatic'
-% ' Steady_state'
+% Not fully implemented yet:
+% 'Steady_state'
 heat_transfer_model = 'Adiabatic';
 
 k_pipe = 45.3; % [W/m K] - Wen et al. (2023) "Heat Transfer Model of Natural Gas Pipeline Based on Data Feature Extraction and First Principle Models"
@@ -207,7 +207,8 @@ R = 287;
 g = 9.81;
 theta = 0;
 
-Figures = 0;
+% Plot figures ? [0 -> no / 1 -> yes]
+Figures = 0; 
 
 %--------------------- SIMULATION PARAMETERS ------------------------%
 
@@ -484,7 +485,6 @@ elseif strcmp(R_bound,'M_const')
     T_f(end,1) = T(end,1);
     rho_f(end,1) = rho(end,1);    
 end
-
 
 
 
@@ -1282,7 +1282,7 @@ X_0 = m(1)*(u_0 - u_o + P_o*R*(T_0./P_0 - T_o/P_o) - T_o*(s_0 - s_o) )/(1e6*3600
 X_net = X - X_0;                                                 % Exergy between current state and discharged state (assuming whole pipeline at P_min)
 DeltaX_flow = sum(dX)/(1e6*3600);
 DeltaX_st = sum(X_net(:,end));
-% error_X = (DeltaX_st - DeltaX_flow)/DeltaX_st
+error_X = (DeltaX_st - DeltaX_flow)/DeltaX_st
 
 % figure('Color',[1 1 1])
 % if strcmp(Process,'Cycle_L') | strcmp(Process,'Cycle_R')
@@ -1401,7 +1401,7 @@ dXX = rho_f(2,:)'.*v(2,:)'*A_h.*(h_f(2,:)' - h_o - T_o*(s_f(2,:)' - s_o))*dt./(1
 
 XX_bal = XX(1) + cumsum(dXX);
 
-etaX_stor = XX(end)/XX_bal(end)
+etaX_stor = XX(end)/XX_bal(end);
 
 
 % filename = strcat(simType,'_',Process,'_P_',num2str(P_max/1e6),'MPa_m_',num2str(m_in),'_',string(year(time)),'_',string(month(time)),'_',string(day(time)));
