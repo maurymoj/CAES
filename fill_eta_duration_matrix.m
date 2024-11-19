@@ -3,6 +3,8 @@ clear
 Ps = 6:10;
 Pmins = Ps - 3;
 ms = 50:50:200;
+
+Process_type = 'Discharging_L';
 etaX_stor_M = zeros(length(Ps),length(ms));
 Duration = zeros(length(Ps),length(ms));
 elapsedTimes = zeros(length(Ps),length(ms));
@@ -10,7 +12,8 @@ elapsedTimes = zeros(length(Ps),length(ms));
 for ii=1:length(Ps)
     for jj = 1:length(ms)
         % filename = strcat('CAESPipe_Charging_L_P_',num2str(Ps(ii)),'MPa_m_',num2str(ms(jj)));
-        filename = strcat('CAESPipe_Charging_L_P_',num2str(Ps(ii)),'-',num2str(Pmins(ii)),'MPa_m_',num2str(ms(jj)));
+        % filename = strcat('CAESPipe_Charging_L_P_',num2str(Ps(ii)),'-',num2str(Pmins(ii)),'MPa_m_',num2str(ms(jj)));
+        filename = strcat('CAESPipe_',Process_type,'_P_',num2str(Ps(ii)),'-',num2str(Pmins(ii)),'MPa_m_',num2str(ms(jj)));
         load(filename)
         % Ps(ii)
         % ms(jj)
@@ -61,6 +64,6 @@ for ii = 1:length(Ps)
     plot(ms,Duration(ii,:)./3600)
 end
 grid on
-xlabel('m_{dot} [kg/s]')
+xlabel('$\dot{m}$ [kg/s]','Interpreter','latex')
 ylabel('Charging Duration [h]')
 legend(num2str(Ps'))

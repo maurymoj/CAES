@@ -1,7 +1,7 @@
 clear 
 % close all
 % clc
-datetime
+disp(strcat('start time = ',string(datetime)))
 % profile on
 tic
 CP = py.importlib.import_module('CoolProp.CoolProp'); % Simplifies coolprop calls
@@ -9,13 +9,8 @@ CP = py.importlib.import_module('CoolProp.CoolProp'); % Simplifies coolprop call
 
 %----------------------- PROBLEM PARAMETERS -------------------------%
 % Pipeline parameters
-% Parameters from Kiuchi (1994)
-% L = 5000;
-% D = 0.5;
-% L = 70000; % Reference case 70 km length, 0.9 m diam
-% D = 0.9;
 % L = 213333; % Length for eq. vol with Huntorf
-L = 100000;
+L = 100000; % Reference case
 D = 0.9;
 
 % Cavern parameters
@@ -29,7 +24,7 @@ D = 0.9;
 % Dt = 720; % Charging + discharging time (5km 0.5m pipeline)
 % Dt_charg = 360;
 % Dt = 1200; % Charging L=10 km, d=0.9 m pipeline (360s = 3.44 MWh,1054 elapsed time)
-Dt = 4*3600;
+Dt = 10*3600;
 
 % System operational limits
 P_max = 10e6;
@@ -40,7 +35,7 @@ m_in = 200;
 T_in = 273.15+60;
 
 % Discharging rate
-m_out = 200;
+m_out = 50;
 % m_A = 417; % Huntorf
 
 % Type of simulation 
@@ -60,7 +55,13 @@ simType = 'CAESPipe';
 % 'Discharging_R';
 % 'Cycle_R';
 % 'NCycles_R';
-Process = 'Charging_L';
+% 'Kiuchi'
+Process = 'Discharging_L';
+
+if strcmp(Process,'Kiuchi')
+    L = 5000;
+    D = 0.5;
+end
 
 % Assumptions
 eps = 0.04e-3; % Absolute roughness 0.04 mm
@@ -131,6 +132,13 @@ elseif strcmp(Process,'Idle')
 
     L_bound = 'Wall';
     R_bound = 'Wall';
+elseif strcmp(Process,'Kiuchi')
+    P_0 = 5e6; % 5 MPa
+    T_0 = 273.15 + 25; % 25 oC
+    v_0 = 0;
+
+    L_bound = 'Kiuchi';
+    R_bound = 'Kiuchi';
 else
     error('Process not identified !')
 end
@@ -162,6 +170,17 @@ elseif strcmp(L_bound,'P_const')
     P_L = P_min; % 4 MPa
 elseif strcmp(L_bound,'M_const')
     m_L = -m_out; % Sign indicates flow direction
+elseif strcmp(L_bound,'Kiuchi')
+    error('Kiuchi left boundary not implemented yet')
+    P_L = 5e6; % Constant inlet pressure 5 MPa
+    T_L = 273.15 + 25; % T = 25 oC
+    Q_in = 3e5/3600; % Constant volumetric flow rate - 3e5 m3/h
+    % m_L = 0;
+    rho_in = CP.PropsSI('D','P',P_L,'T',T_L,'Methane')
+    % m_L = rho_in*Q_in;
+    m_L = 0;
+else 
+    error('Left boundary type not identified')
 end   
 
 % B - Right side boundary condition
@@ -186,6 +205,11 @@ elseif strcmp(R_bound,'P_const')
     % P_B = 4.13e6; % 4.13 MPa = Huntorf https://www.sciencedirect.com/science/article/pii/S0196890420302004#s0010
 elseif strcmp(R_bound,'M_const')   
     m_R = -m_out;
+elseif strcmp(R_bound,'Kiuchi')
+    error('Kiuchi right boundary not implemented yet')
+    m_R = 0;
+else 
+    error('Right boundary type not identified')
 end                     
 
 % heat_transfer_model 
@@ -203,11 +227,18 @@ thickness_pipe = 15.9e-3; % Still based on Wen, but in accordance with the regul
 thickness_int_coating = 0.5e-3;
 thickness_ext_coating = 3e-3;
 
+if strcmp(Process,'Kiuchi')
+    fluid = 'Methane'; % Kiuchi
+else
+    fluid = 'Air';
+end
+
 R = 287;
 g = 9.81;
 theta = 0;
 
 % Plot figures ? [0 -> no / 1 -> yes]
+Save_data = 1;
 Figures = 0; 
 
 %--------------------- SIMULATION PARAMETERS ------------------------%
@@ -221,7 +252,7 @@ if strcmp(simType,'CAESPipe')
     dt_max = dx/400; % 400 is representative of the sound speed, 
                      % it is higher than the maximum sound speed reached in the pipeline 
                      % to achieve a conservative value
-    dt = (Dt/ceil(Dt/dt_max)) % division of Dt in an integer number of intervals
+    dt = (Dt/ceil(Dt/dt_max)); % division of Dt in an integer number of intervals
                             % with dt smaller than dt_max
     if dx/400 < dt % 400 upper limit for the speed of sound
         warning('dt > time needed for pressure wave to cross a node')
@@ -235,6 +266,8 @@ if strcmp(simType,'CAESPipe')
         tol = 1e-5;
     elseif strcmp(Process,'Idle')
         tol = 1e-5;
+    elseif strcmp(Process,'Kiuchi')
+        tol = 1e-5;
     else
         error('Process not found.')
     end
@@ -244,16 +277,21 @@ elseif strcmp(simType,'CAESCav')
     max_iter = 20;
     dx = L/(n_nodes-1);
     dt_max = dx/400;
-    dt = (Dt/ceil(Dt/dt_max))
+    dt = (Dt/ceil(Dt/dt_max));
     tol = 1e-7;
 else
     warning('Cant identify simulation type.')
 end
 
+% disp(strcat('time step:',num2str(dt),' s'))
+
 % Friction calculation equation
 % 'Nikuradse'
 % 'Colebrook'; % No significant difference and adds calculation time
 friction_model = 'Nikuradse';
+if strcmp(Process,'Kiuchi')
+    friction_model = 'Kiuchi';
+end
 
 % Tuning
 
@@ -307,22 +345,22 @@ A_h = pi*D^2/4; % Cross-section area
 % Dead state parameters
 P_o = P_amb;
 T_o = T_amb;
-h_o = CP.PropsSI('H','P',P_o,'T',T_o,'Air');
-u_o = CP.PropsSI('U','P',P_o,'T',T_o,'Air');
-s_o = CP.PropsSI('S','P',P_o,'T',T_o,'Air');
+h_o = CP.PropsSI('H','P',P_o,'T',T_o,fluid);
+u_o = CP.PropsSI('U','P',P_o,'T',T_o,fluid);
+s_o = CP.PropsSI('S','P',P_o,'T',T_o,fluid);
 
 % Initial conditions at nodes (i -> x, j -> t)
-u_0 = CP.PropsSI('U','P',P_0,'T',T_0,'Air');
-s_0 = CP.PropsSI('S','P',P_0,'T',T_0,'Air');
+u_0 = CP.PropsSI('U','P',P_0,'T',T_0,fluid);
+s_0 = CP.PropsSI('S','P',P_0,'T',T_0,fluid);
 
 % Thermodynamic properties over all solution space
 P(:,1) = P_0*ones(n_n,1);
 T(:,1) = T_0*ones(n_n,1);
-rho(:,1) = CP.PropsSI('D','P',P(1,1),'T',T(1,1),'Air');
-cp(:,1) = CP.PropsSI('C','P',P(1,1),'T',T(1,1),'Air'); 
-h(:,1) = CP.PropsSI('H','P',P(1,1),'T',T(1,1),'Air'); 
-s(:,1) = CP.PropsSI('S','P',P(1,1),'T',T(1,1),'Air'); 
-u(:,1) = CP.PropsSI('U','P',P(1,1),'T',T(1,1),'Air'); 
+rho(:,1) = CP.PropsSI('D','P',P(1,1),'T',T(1,1),fluid);
+cp(:,1) = CP.PropsSI('C','P',P(1,1),'T',T(1,1),fluid); 
+h(:,1) = CP.PropsSI('H','P',P(1,1),'T',T(1,1),fluid); 
+s(:,1) = CP.PropsSI('S','P',P(1,1),'T',T(1,1),fluid); 
+u(:,1) = CP.PropsSI('U','P',P(1,1),'T',T(1,1),fluid); 
 
 % Initial conditions at faces (i -> x, j -> t)
 v(:,1) = v_0; % V profile at t=0
@@ -353,10 +391,10 @@ rho_f(2:end-1,1) = (v(2:end-1,1) >= 0).*rho(1:end-1,1) ...
 % L boundary conditions
 if strcmp(L_bound,'Inlet')
     % At "outside" node
-    rho_L = CP.PropsSI('D','P',P_L,'T',T_L,'Air');
-    cp_L = CP.PropsSI('C','P',P_L,'T',T_L,'Air');
-    h_L = CP.PropsSI('H','P',P_L,'T',T_L,'Air');
-    s_L = CP.PropsSI('S','P',P_L,'T',T_L,'Air');
+    rho_L = CP.PropsSI('D','P',P_L,'T',T_L,fluid);
+    cp_L = CP.PropsSI('C','P',P_L,'T',T_L,fluid);
+    h_L = CP.PropsSI('H','P',P_L,'T',T_L,fluid);
+    s_L = CP.PropsSI('S','P',P_L,'T',T_L,fluid);
 
     % P(1,:) = P_L;
     % T(1,:) = T_A;
@@ -426,15 +464,33 @@ elseif strcmp(L_bound,'M_const')
     % v_n(1,1) = m_L/(rho(1,1)*A_h);
     % v_n(1,1) = (v(1,1) >= 0).*v(1,1) ...
         % +      (v(1,1) <  0).*v(2,1);
+elseif strcmp(L_bound,'Kiuchi')
+    error('Left boundary for Kiuchi not implemented yet.')
+    % At "outside" node
+    rho_L = CP.PropsSI('D','P',P_L,'T',T_L,fluid);
+    cp_L = CP.PropsSI('C','P',P_L,'T',T_L,fluid);
+    h_L = CP.PropsSI('H','P',P_L,'T',T_L,fluid);
+    s_L = CP.PropsSI('S','P',P_L,'T',T_L,fluid);
+
+    P_f(1,1) = P_L;
+    T_f(1,:) = T_L;
+    rho_f(1,1) = rho_L;
+    
+    % v_L = m_L/(rho_f(1,1)*A_h);
+    % v(1,1) = m_L/(rho_f(1,1)*A_h);
+elseif strcmp(L_bound,'Outlet')
+    % actual implementation happens later
+else
+    error('Left boundary type not identified.')
 end
 
 
 % R boundary conditions
 if strcmp(R_bound,'Inlet')
-    rho_R = CP.PropsSI('D','P',P_R,'T',T_R,'Air');
-    cp_R = CP.PropsSI('C','P',P_R,'T',T_R,'Air');
-    h_R = CP.PropsSI('H','P',P_R,'T',T_R,'Air');
-    s_R = CP.PropsSI('S','P',P_R,'T',T_R,'Air');
+    rho_R = CP.PropsSI('D','P',P_R,'T',T_R,fluid);
+    cp_R = CP.PropsSI('C','P',P_R,'T',T_R,fluid);
+    h_R = CP.PropsSI('H','P',P_R,'T',T_R,fluid);
+    s_R = CP.PropsSI('S','P',P_R,'T',T_R,fluid);
 
     % P(end,:) = P_R;
     % T(end,:) = T_R;
@@ -484,6 +540,20 @@ elseif strcmp(R_bound,'M_const')
     P_f(end,1) = P(end,1);
     T_f(end,1) = T(end,1);
     rho_f(end,1) = rho(end,1);    
+elseif strcmp(R_bound,'Kiuchi')
+    error('Right boundary for Kiuchi not implemented yet.')
+    
+    % Wall
+    v(end,:) = 0;
+
+    P_f(end,1) = P(end,1); % Zero gradient assumption
+    T_f(end,1) = T(end,1);
+    rho_f(end,1) = rho(end,1);
+
+elseif strcmp(R_bound,'Outlet')
+    % actual implementation happens later
+else
+    error('Right boundary type not identified.')
 end
 
 
@@ -535,23 +605,23 @@ if strcmp(R_bound,'Outlet')
 end 
 
 % Thermodynamic properties
-cp_f(1,1) = CP.PropsSI('C','P',P_f(1,1),'D',rho_f(1,1),'Air');
-h_f(1,1) = CP.PropsSI('H','P',P_f(1,1),'D',rho_f(1,1),'Air');
-s_f(1,1) = CP.PropsSI('S','P',P_f(1,1),'D',rho_f(1,1),'Air');
+cp_f(1,1) = CP.PropsSI('C','P',P_f(1,1),'D',rho_f(1,1),fluid);
+h_f(1,1) = CP.PropsSI('H','P',P_f(1,1),'D',rho_f(1,1),fluid);
+s_f(1,1) = CP.PropsSI('S','P',P_f(1,1),'D',rho_f(1,1),fluid);
 
-cp_f(end,1) = CP.PropsSI('C','P',P_f(end,1),'D',rho_f(end,1),'Air');
-h_f(end,1) = CP.PropsSI('H','P',P_f(end,1),'D',rho_f(end,1),'Air');
-s_f(end,1) = CP.PropsSI('S','P',P_f(end,1),'D',rho_f(end,1),'Air');
+cp_f(end,1) = CP.PropsSI('C','P',P_f(end,1),'D',rho_f(end,1),fluid);
+h_f(end,1) = CP.PropsSI('H','P',P_f(end,1),'D',rho_f(end,1),fluid);
+s_f(end,1) = CP.PropsSI('S','P',P_f(end,1),'D',rho_f(end,1),fluid);
 
 for i = 1:n_n  % PROPERTIES FROM P AND RHO          
-    % T(i,j) = CP.PropsSI('T','P',P(i,j),'D',rho(i,j),'Air');
-    cp(i,1) = CP.PropsSI('C','P',P(i,1),'D',rho(i,1),'Air');
-    h(i,1) = CP.PropsSI('H','P',P(i,1),'D',rho(i,1),'Air');
-    s(i,1) = CP.PropsSI('S','P',P(i,1),'D',rho(i,1),'Air');
-    u(i,1) = CP.PropsSI('U','P',P(i,1),'D',rho(i,1),'Air');
-    cp_f(i,1) = CP.PropsSI('C','P',P_f(i,1),'D',rho_f(i,1),'Air');
-    h_f(i,1) = CP.PropsSI('H','P',P_f(i,1),'D',rho_f(i,1),'Air');
-    s_f(i,1) = CP.PropsSI('S','P',P_f(i,1),'D',rho_f(i,1),'Air');
+    % T(i,j) = CP.PropsSI('T','P',P(i,j),'D',rho(i,j),fluid);
+    cp(i,1) = CP.PropsSI('C','P',P(i,1),'D',rho(i,1),fluid);
+    h(i,1) = CP.PropsSI('H','P',P(i,1),'D',rho(i,1),fluid);
+    s(i,1) = CP.PropsSI('S','P',P(i,1),'D',rho(i,1),fluid);
+    u(i,1) = CP.PropsSI('U','P',P(i,1),'D',rho(i,1),fluid);
+    cp_f(i,1) = CP.PropsSI('C','P',P_f(i,1),'D',rho_f(i,1),fluid);
+    h_f(i,1) = CP.PropsSI('H','P',P_f(i,1),'D',rho_f(i,1),fluid);
+    s_f(i,1) = CP.PropsSI('S','P',P_f(i,1),'D',rho_f(i,1),fluid);
 end
 
 m(1) = sum(rho(:,1)*A_h*dx);
@@ -615,7 +685,7 @@ for j=2:n_t
                                % face and first node
             T_f(1,j) = T_L; 
             % T_f(1,j) = T(1,j); 
-            rho_f(1,j) = CP.PropsSI('D','P',P_f(1,j),'T',T_f(1,j),'Air');
+            rho_f(1,j) = CP.PropsSI('D','P',P_f(1,j),'T',T_f(1,j),fluid);
             v(1,j) = m_L/(rho_f(1,j)*A_h); % Sliding pressure
             
             v_n(1,j) = m_L/(rho(1,j)*A_h);
@@ -685,6 +755,35 @@ for j=2:n_t
                 +      (v(1,j) <  0).*v(2,j);
             % Central scheme
             % v_n(1,j) = (v(1,j) + v(2,j))/2;
+        elseif strcmp(L_bound, 'Kiuchi')
+            error('Kiuchi left boundary not implemented yet.')
+            if t(j-1) < 10*60 && t(j) >= 10*60
+                v(1,j) = 0;
+                P_f(1,j) = P(1,j);
+                T_f(1,j) = T(1,j);
+                rho_f(1,j) = rho(1,j);
+    
+                v_n(1,j) = (v(1,j) >= 0).*v(1,j) ...
+                +      (v(1,j) <  0).*v(2,j);
+            elseif t(j-1) < 30*60 && t(j) >= 30*60
+
+            elseif t(j) > 30*60
+
+            end
+
+            % P(1,:) = P_L;
+            % T(1,:) = T_L;
+            % rho(1,:) = rho_L;
+            
+            % SLIDING PRESSURE
+            P_f(1,j) = P(1,j); % Assumption of constant pressure between 
+                               % face and first node
+            T_f(1,j) = T_L; 
+            % T_f(1,j) = T(1,j); 
+            rho_f(1,j) = CP.PropsSI('D','P',P_f(1,j),'T',T_f(1,j),fluid);
+            v(1,j) = m_L/(rho_f(1,j)*A_h); % Sliding pressure
+            
+            v_n(1,j) = m_L/(rho(1,j)*A_h);
         end
 
         % R boundary
@@ -697,7 +796,7 @@ for j=2:n_t
                                % face and first node
             T_f(end,j) = T_R; 
             % T_f(end,j) = T(end,j); 
-            rho_f(end,j) = CP.PropsSI('D','P',P_f(end,j),'T',T_f(end,j),'Air');
+            rho_f(end,j) = CP.PropsSI('D','P',P_f(end,j),'T',T_f(end,j),fluid);
             v(end,j) = m_R/(rho_f(end,j)*A_h); % Sliding pressure test
             
             v_n(end,j) = m_R/(rho(end,j)*A_h);
@@ -743,6 +842,14 @@ for j=2:n_t
             P_f(end,j) = P(end,j);
             T_f(end,j) = T(end,j);
             rho_f(end,j) = rho(end,j); 
+        elseif strcmp(R_bound, 'Kiuchi')
+            error('Kiuchi left boundary not implemented yet.')
+            v(end,j) = 0;
+
+            P_f(end,j) = P(end,j); % Zero gradient assumption
+            T_f(end,j) = T(end,j);
+            rho_f(end,j) = rho(end,j);
+
         end 
 
         if strcmp(L_bound,'Outlet')
@@ -791,23 +898,23 @@ for j=2:n_t
         drho_dP_n = zeros(n_n,1);
 
         for i = 1:n_n  % PROPERTIES FROM P AND RHO
-            % T(i,j) = CP.PropsSI('T','P',P(i,j),'D',rho(i,j),'Air');
+            % T(i,j) = CP.PropsSI('T','P',P(i,j),'D',rho(i,j),fluid);
 
-            u_sonic_f(i) = CP.PropsSI('speed_of_sound','P',P_f(i,j),'D',rho_f(i,j),'Air');
+            u_sonic_f(i) = CP.PropsSI('speed_of_sound','P',P_f(i,j),'D',rho_f(i,j),fluid);
             if strcmp(friction_model,'Colebrook')
-                nu = CP.PropsSI('viscosity','P',P_f(i,j),'D',rho_f(i,j),'Air');
+                nu = CP.PropsSI('viscosity','P',P_f(i,j),'D',rho_f(i,j),fluid);
             end
 
             drho_dP_f(i) = 1/(u_sonic_f(i)^2);
 
-            u_sonic_n(i) = CP.PropsSI('speed_of_sound','P',P(i,j),'D',rho(i,j),'Air');
+            u_sonic_n(i) = CP.PropsSI('speed_of_sound','P',P(i,j),'D',rho(i,j),fluid);
             drho_dP_n(i) = 1/(u_sonic_n(i)^2);
         end
 
-        u_sonic_f(end) = CP.PropsSI('speed_of_sound','P',P_f(end,j),'D',rho_f(end,j),'Air');
+        u_sonic_f(end) = CP.PropsSI('speed_of_sound','P',P_f(end,j),'D',rho_f(end,j),fluid);
         drho_dP_f(end) = 1/(u_sonic_f(end)^2);
         if strcmp(friction_model,'Colebrook')
-            nu(end) = CP.PropsSI('viscosity','P',P_f(end,j),'D',rho_f(end,j),'Air');
+            nu(end) = CP.PropsSI('viscosity','P',P_f(end,j),'D',rho_f(end,j),fluid);
         end
 
 
@@ -833,6 +940,10 @@ for j=2:n_t
                 end
                 f(i) = f_old;
             end
+        elseif strcmp(friction_model,'Kiuchi')
+            f = 0.008;
+        else
+            error('Friction model not identified')
         end
         
         
@@ -1048,72 +1159,81 @@ for j=2:n_t
         Q_n(:,j) = -4*U/D*(T(:,j-1) - T_ground);
         Q(j) = sum(Q_n(:,j));
     elseif strcmp(heat_transfer_model,'Transient')
+    elseif strcmp(Process, 'Kiuchi')
+        % U = 2.84; % Chaczykowski, 2010
+        U = 0; % Adiabatic
+        Q_n(:,j) = -4*U/D*(T(:,j-1) - T_ground);
+        Q(j) = sum(Q_n(:,j));
     else
         error('Heat transfer model not identified')
     end
     
-
-
-    a_T(1,2) = -max(0, -rho_f(2,j)*v(2,j)*cp_f(2,j-1)/dx);    
-
-    a_T(1,1) = rho(1,j)*cp(1,j-1)/dt ...
-        + (rho_f(2,j)*v(2,j)*cp_f(2,j-1) - rho_f(1,j)*v(1,j)*cp_f(1,j-1))/dx...
-        - (a_T(1,2) - max(rho_f(1,j)*v(1,j)*cp_f(1,j-1)/dx, 0));
     
-    b_T(1) = Q(j) + (P(1,j)-P(1,j-1))/dt ...
-            + v_n(1,j)*(P_f(2,j) - P_f(1,j))/dx ...
-            + f(1)*rho(1,j)*abs(v_n(1,j))^3/(2*D) ...
-            + rho(1,j-1)*cp(1,j-1)*T(1,j-1)/dt...
-            + max(rho_f(1,j)*v(1,j)*cp_f(1,j-1)/dx, 0)*T_f(1,j);
-
-
-    a_T(n_n,n_n-1) = -max(rho_f(n_f-1,j)*v(n_f-1,j)*cp_f(n_f-1,j-1)/dx, 0);
-
-    a_T(n_n,n_n) = rho(n_n,j)*cp(n_n,j-1)/dt ...
-        + (rho_f(n_f,j)*v(n_f,j)*cp_f(n_f,j-1) - rho_f(n_f-1,j)*v(n_f-1,j)*cp_f(n_f-1,j-1))/dx...
-        - (a_T(n_n,n_n-1) - max(0, -rho_f(n_f,j)*v(n_f,j)*cp_f(n_f,j-1)/dx));
+    if strcmp(Process,'Kiuchi')
+        error('Isothermal assumption for Kiuchi not implemented yet')
+        T(:,j) = T_ground;
+    else
+        a_T(1,2) = -max(0, -rho_f(2,j)*v(2,j)*cp_f(2,j-1)/dx);    
     
-    b_T(n_n) = Q(j) + (P(n_n,j)-P(n_n,j-1))/dt ...
-            + v_n(n_n,j)*(P_f(n_f,j) - P_f(n_f-1,j))/dx ...
-            + f(n_n)*rho(n_n,j)*abs(v_n(n_n,j))^3/(2*D) ...
-            + rho(n_n,j-1)*cp(n_n,j-1)*T(n_n,j-1)/dt...
-            + max(0, rho_f(n_f,j)*v(n_f,j)*cp_f(n_f,j-1)/dx)*T_f(n_f,j);
-
-
-
-    % a_T(n_n) ??
-
-    for i=2:n_n-1
-        a_T(i,i-1) = -max( rho_f(i,j)*v(i,j)*cp_f(i,j-1)/dx, 0);
-        a_T(i,i+1) = -max(   0, -rho_f(i+1,j)*v(i+1,j)*cp_f(i+1,j-1)/dx);
-        a_T(i,i) = rho(i,j)*cp(i,j-1)/dt ...
-            + (rho_f(i+1,j)*v(i+1,j)*cp_f(i+1,j-1) - rho_f(i,j)*v(i,j)*cp_f(i,j-1))/dx...
-            - (a_T(i,i+1) + a_T(i,i-1));
+        a_T(1,1) = rho(1,j)*cp(1,j-1)/dt ...
+            + (rho_f(2,j)*v(2,j)*cp_f(2,j-1) - rho_f(1,j)*v(1,j)*cp_f(1,j-1))/dx...
+            - (a_T(1,2) - max(rho_f(1,j)*v(1,j)*cp_f(1,j-1)/dx, 0));
         
-        b_T(i) = Q(j) + (P(i,j)-P(i,j-1))/dt ...
-                + v_n(i,j)*(P_f(i+1,j) - P_f(i,j))/dx ...
-                + f(i)*rho(i,j)*abs(v_n(i,j))^3/(2*D) ...
-                + rho(i,j-1)*cp(i,j-1)*T(i,j-1)/dt;
+        b_T(1) = Q(j) + (P(1,j)-P(1,j-1))/dt ...
+                + v_n(1,j)*(P_f(2,j) - P_f(1,j))/dx ...
+                + f(1)*rho(1,j)*abs(v_n(1,j))^3/(2*D) ...
+                + rho(1,j-1)*cp(1,j-1)*T(1,j-1)/dt...
+                + max(rho_f(1,j)*v(1,j)*cp_f(1,j-1)/dx, 0)*T_f(1,j);
+    
+    
+        a_T(n_n,n_n-1) = -max(rho_f(n_f-1,j)*v(n_f-1,j)*cp_f(n_f-1,j-1)/dx, 0);
+    
+        a_T(n_n,n_n) = rho(n_n,j)*cp(n_n,j-1)/dt ...
+            + (rho_f(n_f,j)*v(n_f,j)*cp_f(n_f,j-1) - rho_f(n_f-1,j)*v(n_f-1,j)*cp_f(n_f-1,j-1))/dx...
+            - (a_T(n_n,n_n-1) - max(0, -rho_f(n_f,j)*v(n_f,j)*cp_f(n_f,j-1)/dx));
+        
+        b_T(n_n) = Q(j) + (P(n_n,j)-P(n_n,j-1))/dt ...
+                + v_n(n_n,j)*(P_f(n_f,j) - P_f(n_f-1,j))/dx ...
+                + f(n_n)*rho(n_n,j)*abs(v_n(n_n,j))^3/(2*D) ...
+                + rho(n_n,j-1)*cp(n_n,j-1)*T(n_n,j-1)/dt...
+                + max(0, rho_f(n_f,j)*v(n_f,j)*cp_f(n_f,j-1)/dx)*T_f(n_f,j);
+        
+    
+    
+        % a_T(n_n) ??
+    
+        for i=2:n_n-1
+            a_T(i,i-1) = -max( rho_f(i,j)*v(i,j)*cp_f(i,j-1)/dx, 0);
+            a_T(i,i+1) = -max(   0, -rho_f(i+1,j)*v(i+1,j)*cp_f(i+1,j-1)/dx);
+            a_T(i,i) = rho(i,j)*cp(i,j-1)/dt ...
+                + (rho_f(i+1,j)*v(i+1,j)*cp_f(i+1,j-1) - rho_f(i,j)*v(i,j)*cp_f(i,j-1))/dx...
+                - (a_T(i,i+1) + a_T(i,i-1));
+            
+            b_T(i) = Q(j) + (P(i,j)-P(i,j-1))/dt ...
+                    + v_n(i,j)*(P_f(i+1,j) - P_f(i,j))/dx ...
+                    + f(i)*rho(i,j)*abs(v_n(i,j))^3/(2*D) ...
+                    + rho(i,j-1)*cp(i,j-1)*T(i,j-1)/dt;
+        end
+        
+        T(:,j) = linsolve(a_T,b_T);
+    
     end
-    
-    T(:,j) = linsolve(a_T,b_T);
-    
     % THERMODYNAMIC PROPERTIES
 
     for i = 1:n_n  % PROPERTIES FROM P AND RHO          
-        % T(i,j) = CP.PropsSI('T','P',P(i,j),'D',rho(i,j),'Air');
-        cp(i,j) = CP.PropsSI('C','P',P(i,j),'D',rho(i,j),'Air');
-        h(i,j) = CP.PropsSI('H','P',P(i,j),'D',rho(i,j),'Air');
-        s(i,j) = CP.PropsSI('S','P',P(i,j),'D',rho(i,j),'Air');
-        u(i,j) = CP.PropsSI('U','P',P(i,j),'D',rho(i,j),'Air');
-        cp_f(i,j) = CP.PropsSI('C','P',P_f(i,j),'D',rho_f(i,j),'Air');
-        h_f(i,j) = CP.PropsSI('H','P',P_f(i,j),'D',rho_f(i,j),'Air');
-        s_f(i,j) = CP.PropsSI('S','P',P_f(i,j),'D',rho_f(i,j),'Air');
+        % T(i,j) = CP.PropsSI('T','P',P(i,j),'D',rho(i,j),fluid);
+        cp(i,j) = CP.PropsSI('C','P',P(i,j),'D',rho(i,j),fluid);
+        h(i,j) = CP.PropsSI('H','P',P(i,j),'D',rho(i,j),fluid);
+        s(i,j) = CP.PropsSI('S','P',P(i,j),'D',rho(i,j),fluid);
+        u(i,j) = CP.PropsSI('U','P',P(i,j),'D',rho(i,j),fluid);
+        cp_f(i,j) = CP.PropsSI('C','P',P_f(i,j),'D',rho_f(i,j),fluid);
+        h_f(i,j) = CP.PropsSI('H','P',P_f(i,j),'D',rho_f(i,j),fluid);
+        s_f(i,j) = CP.PropsSI('S','P',P_f(i,j),'D',rho_f(i,j),fluid);
     end
     
-    cp_f(n_f,j) = CP.PropsSI('C','P',P_f(n_f,j),'D',rho_f(n_f,j),'Air');
-    h_f(n_f,j) = CP.PropsSI('H','P',P_f(n_f,j),'D',rho_f(n_f,j),'Air');
-    s_f(n_f,j) = CP.PropsSI('S','P',P_f(n_f,j),'D',rho_f(n_f,j),'Air');
+    cp_f(n_f,j) = CP.PropsSI('C','P',P_f(n_f,j),'D',rho_f(n_f,j),fluid);
+    h_f(n_f,j) = CP.PropsSI('H','P',P_f(n_f,j),'D',rho_f(n_f,j),fluid);
+    s_f(n_f,j) = CP.PropsSI('S','P',P_f(n_f,j),'D',rho_f(n_f,j),fluid);
 
     % Upwind scheme
     T_f(2:end-1,j) = (v(1:end-2,j) >= 0).*T(1:end-1,j) ...
@@ -1137,6 +1257,7 @@ for j=2:n_t
         if strcmp(L_bound,'M_const') & P(ceil(n_n/2),j) <= P_min
             % Discharging from L boundary
             L_bound = 'Wall';
+            t_shut_off = (j-1)*dt;
         end
     elseif strcmp(Process,'Charging_R')
         % if strcmp(R_bound,'Inlet') & P(end-1,j) >= P_max
@@ -1175,6 +1296,10 @@ for j=2:n_t
     elseif strcmp(Process,'Cycle_R')
     elseif strcmp(Process,'NCycle_L')
     elseif strcmp(Process,'NCycle_R')
+    elseif strcmp(Process,'Kiuchi')
+        error('Kiuchi boundary update procedure not implemented yet')
+    else
+        error('Process not identified.')
     end
 
 
@@ -1203,7 +1328,8 @@ for j=2:n_t
 
 end
 
-elapsedTime = toc
+elapsedTime = toc;
+disp(strcat('Elapsed time: ',num2str(floor(elapsedTime/60)),' min'));
 
 dm = zeros(n_t,1);
 dE = zeros(n_t,1);
@@ -1255,6 +1381,8 @@ elseif strcmp(Process,'Idle')
     dm = 0;
     dE = Q;
     dX = 0;
+elseif strcmp(Process,'Kiuchi')
+    error('Kiuchi energy, mass and exergy variation not implemented yet.')
 else
     error('Process not identified.')
 end
@@ -1397,18 +1525,31 @@ end
 
 XX = sum(m_n(2:end,:).*( u(2:end,:) - u_o + P_o*R*(T(2:end,:)./P(2:end,:) - T_o/P_o) - T_o*(s(2:end,:) - s_o) ) )./(1e6*3600);
 
-dXX = rho_f(2,:)'.*v(2,:)'*A_h.*(h_f(2,:)' - h_o - T_o*(s_f(2,:)' - s_o))*dt./(1e6*3600);
+dXX = rho_f(2,:)'.*v(2,:)'*A_h.*(h_f(2,:)' - h_o - T_o*(s_f(2,:)' - s_o))*dt./(1e6*3600); % [MWh]
 
 XX_bal = XX(1) + cumsum(dXX);
 
-etaX_stor = XX(end)/XX_bal(end);
+if strcmp(Process,'Charging_L')
+    etaX_stor = ( XX(end) - XX(1) ) / sum(dXX);
+elseif strcmp(Process,'Discharging_L')
+    etaX_stor = sum(dXX) / ( XX(end) - XX(1) );
+else
+    error('Process not found or eta not implemented for the process.')
+end
 
+if Save_data
+    if strcmp(Process,'Charging_L')
+        filename = strcat(simType,'_',Process,'_P_',num2str(P_max/1e6),'-',num2str(P_min/1e6),'MPa_m_',num2str(m_in));
+    elseif strcmp(Process,'Discharging_L')
+        filename = strcat(simType,'_',Process,'_P_',num2str(P_max/1e6),'-',num2str(P_min/1e6),'MPa_m_',num2str(m_out));
+    else
+        error(strcat('Save data for process ',Process,' not implemented'))
+    end
+    % filename = strcat(simType,'_',Process,'_P_',num2str(P_max/1e6),'MPa_m_',num2str(m_in),'_',string(year(time)),'_',string(month(time)),'_',string(day(time)));
+    save(filename)
+end
 
-% filename = strcat(simType,'_',Process,'_P_',num2str(P_max/1e6),'MPa_m_',num2str(m_in),'_',string(year(time)),'_',string(month(time)),'_',string(day(time)));
-filename = strcat(simType,'_',Process,'_P_',num2str(P_max/1e6),'-',num2str(P_min/1e6),'MPa_m_',num2str(m_in));
-save(filename)
-
-L_bound
+disp(strcat('Boundary condition: ',L_bound))
 %% Previous tests
 
 % figure('color',[1 1 1]);plot(t,(m_bal' - m)./m)
