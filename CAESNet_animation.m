@@ -30,7 +30,7 @@ open(vid)
 F(loops) = struct('cdata',[],'colormap',[]);
 figure('Color',[1 1 1])
 % dt_f = 0.1; % time between frames
-dt_f = dt;
+dt_f = 10*dt;
 dec = dt_f/dt;
 t_dec = zeros(1,floor((length(t)-1)/dec+1));
 % decimation = 1000;
@@ -79,7 +79,7 @@ for i=1:length(t_dec)
             plot(x_n,T(:,1+dec*(i-1)));
             % hold on
             % plot(x_f,T_f(:,1+dec*(i-1)))
-            % ylim([T_min T_max])
+            ylim([T_min T_max])
             ylabel('T [K]')
         elseif strcmp(Property,'rho')
             plot(x_f,rho_f(:,1+dec*(i-1)));

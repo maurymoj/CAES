@@ -10,28 +10,28 @@ CP = py.importlib.import_module('CoolProp.CoolProp'); % Simplifies coolprop call
 %----------------------- PROBLEM PARAMETERS -------------------------%
 % Pipeline parameters
 % L = 213333; % Length for eq. vol with Huntorf
-L = 100000; % Reference case
-D = 0.9;
+% L = 100000; % Reference case
+% D = 0.9;
 
 % Cavern parameters
 % L = 300; % Volume shape similar to Huntorf
 % D = 24;
-% L = 35; % Roughly same volume as 70 km, 0.9 D pipeline
-% D = 40;
+L = 50.625; % Roughly same volume as 100 km, 0.9 D pipeline
+D = 40;
 
 % Total simulation time
 % Dt = 360; % Charging time for 5 km pipeline
 % Dt = 720; % Charging + discharging time (5km 0.5m pipeline)
 % Dt_charg = 360;
 % Dt = 1200; % Charging L=10 km, d=0.9 m pipeline (360s = 3.44 MWh,1054 elapsed time)
-Dt = 10*3600;
+Dt = 1200;
 
 % System operational limits
-P_max = 10e6;
+P_max = 7e6;
 P_min = P_max - 3e6;
 
 % Charging rate
-m_in = 200;
+m_in = 100;
 T_in = 273.15+60;
 
 % Discharging rate
@@ -41,7 +41,7 @@ m_out = 50;
 % Type of simulation 
 % 'CAESPipe'- Pipeline storage
 % 'CAESCav' - Cavern
-simType = 'CAESPipe';
+simType = 'CAESCav';
 
 % CAES process
 % Options:
@@ -56,7 +56,7 @@ simType = 'CAESPipe';
 % 'Cycle_R';
 % 'NCycles_R';
 % 'Kiuchi'
-Process = 'Discharging_L';
+Process = 'Charging_L';
 
 if strcmp(Process,'Kiuchi')
     L = 5000;
@@ -216,6 +216,7 @@ end
 % 'Adiabatic'
 % Not fully implemented yet:
 % 'Steady_state'
+% 'Isothermal'
 heat_transfer_model = 'Adiabatic';
 
 k_pipe = 45.3; % [W/m K] - Wen et al. (2023) "Heat Transfer Model of Natural Gas Pipeline Based on Data Feature Extraction and First Principle Models"
@@ -238,8 +239,9 @@ g = 9.81;
 theta = 0;
 
 % Plot figures ? [0 -> no / 1 -> yes]
-Save_data = 1;
+Save_data = 0;
 Figures = 0; 
+P_Corr_fig = 0;
 
 %--------------------- SIMULATION PARAMETERS ------------------------%
 
@@ -273,17 +275,19 @@ if strcmp(simType,'CAESPipe')
     end
 
 elseif strcmp(simType,'CAESCav')
-    n_nodes = 5;
+    n_nodes = 4;
     max_iter = 20;
     dx = L/(n_nodes-1);
     dt_max = dx/400;
     dt = (Dt/ceil(Dt/dt_max));
-    tol = 1e-7;
+    tol = 1e-8;
 else
     warning('Cant identify simulation type.')
 end
 
 % disp(strcat('time step:',num2str(dt),' s'))
+
+
 
 % Friction calculation equation
 % 'Nikuradse'
@@ -635,7 +639,9 @@ count = zeros(n_t,1);
 % Friction factor based on Nikuradse
 f_guess = (2*log10(1/epsD)+1.14)^(-2);
 
-% resFig = figure;
+if P_Corr_fig    
+    resFig = figure;
+end
 error_hist = [];
 bound_hist = [string(L_bound) string(R_bound)];
 
@@ -1133,11 +1139,12 @@ for j=2:n_t
         error_P = (P_corr./P(:,j));
         error_hist = [error_hist error_P];
         
-        % if rem(count(j),2) == 0 & Figures
-        %     figure(resFig)
-        %     plot(mean(abs(error_hist)))
-        %     drawnow limitrate
-        % end
+        if rem(count(j),5) == 0 && P_Corr_fig
+            figure(resFig)
+            plot(mean(abs(error_hist)))
+            % ylim([0,1e-4])
+            drawnow % limitrate
+        end
 
         % error_rho = (rho_corr./rho(:,j));
         % error_v = (v_corr./v(:,j));
@@ -1245,16 +1252,16 @@ for j=2:n_t
 
     % CAES process
     if strcmp(Process,'Charging_L')
-        if strcmp(L_bound,'Inlet') & P(ceil(n_n/2),j) >= P_max
-        % if strcmp(L_bound,'Inlet') & P(1,j) >= P_max
+        % if strcmp(L_bound,'Inlet') & P(ceil(n_n/2),j) >= P_max
+        if strcmp(L_bound,'Inlet') & P(1,j) >= P_max
             % Charging from L boundary
             % v(1,j+1:end) = 0;
             L_bound = 'Wall';
             t_shut_off = (j-1)*dt; 
         end
     elseif strcmp(Process,'Discharging_L')
-        % if strcmp(L_bound,'M_const') & P(1,j) <= P_min
-        if strcmp(L_bound,'M_const') & P(ceil(n_n/2),j) <= P_min
+        if strcmp(L_bound,'M_const') & P(1,j) <= P_min
+        % if strcmp(L_bound,'M_const') & P(ceil(n_n/2),j) <= P_min
             % Discharging from L boundary
             L_bound = 'Wall';
             t_shut_off = (j-1)*dt;
@@ -1329,7 +1336,11 @@ for j=2:n_t
 end
 
 elapsedTime = toc;
-disp(strcat('Elapsed time: ',num2str(floor(elapsedTime/60)),' min'));
+if elapsedTime/60 > 10
+    disp(strcat('Elapsed time: ',num2str(floor(elapsedTime/60)),' min'));
+else
+    disp(strcat('Elapsed time: ',num2str(floor(elapsedTime)),' s'));
+end
 
 dm = zeros(n_t,1);
 dE = zeros(n_t,1);
@@ -1540,8 +1551,10 @@ end
 if Save_data
     if strcmp(Process,'Charging_L')
         filename = strcat(simType,'_',Process,'_P_',num2str(P_max/1e6),'-',num2str(P_min/1e6),'MPa_m_',num2str(m_in));
+        % filename = strcat(simType,'_',Process,'_P_',num2str(P_max/1e6),'-',num2str(P_min/1e6),'MPa_m_',num2str(m_in),'_',string(year(time)),'_',string(month(time)),'_',string(day(time)));
     elseif strcmp(Process,'Discharging_L')
         filename = strcat(simType,'_',Process,'_P_',num2str(P_max/1e6),'-',num2str(P_min/1e6),'MPa_m_',num2str(m_out));
+        % filename = strcat(simType,'_',Process,'_P_',num2str(P_max/1e6),'-',num2str(P_min/1e6),'MPa_m_',num2str(m_out),'_',string(year(time)),'_',string(month(time)),'_',string(day(time)));
     else
         error(strcat('Save data for process ',Process,' not implemented'))
     end
@@ -1551,24 +1564,24 @@ end
 
 disp(strcat('Boundary condition: ',L_bound))
 %% Previous tests
-
-% figure('color',[1 1 1]);plot(t,(m_bal' - m)./m)
-% title('Difference in mass')
-% figure('color',[1 1 1]);plot(t,(E_bal' - E)./E)
-% title('Difference in energy')
-
-% Maximum temperature point variation
-x_maxT = zeros(length(t),1);
-Tmax = zeros(length(t),1);
-for i=1:length(t)
-    [Tmax(i), ind_max] = max(T(:,i));
-    x_maxT(i) = x(ind_max);
+if Figures
+    % figure('color',[1 1 1]);plot(t,(m_bal' - m)./m)
+    % title('Difference in mass')
+    % figure('color',[1 1 1]);plot(t,(E_bal' - E)./E)
+    % title('Difference in energy')
+    
+    % Maximum temperature point variation
+    x_maxT = zeros(length(t),1);
+    Tmax = zeros(length(t),1);
+    for i=1:length(t)
+        [Tmax(i), ind_max] = max(T(:,i));
+        x_maxT(i) = x(ind_max);
+    end
+    figure('Color',[1 1 1])
+    yyaxis left
+    plot(t,x_maxT./1e3)
+    ylabel('Position [km]')
+    yyaxis right
+    plot(t,Tmax);
+    ylabel('T_{max} [K]')
 end
-figure('Color',[1 1 1])
-yyaxis left
-plot(t,x_maxT./1e3)
-ylabel('Position [km]')
-yyaxis right
-plot(t,Tmax);
-ylabel('T_{max} [K]')
-

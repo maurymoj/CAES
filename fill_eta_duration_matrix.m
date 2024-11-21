@@ -4,7 +4,7 @@ Ps = 6:10;
 Pmins = Ps - 3;
 ms = 50:50:200;
 
-Process_type = 'Discharging_L';
+Process_type = 'Charging_L';
 etaX_stor_M = zeros(length(Ps),length(ms));
 Duration = zeros(length(Ps),length(ms));
 elapsedTimes = zeros(length(Ps),length(ms));
@@ -13,7 +13,7 @@ for ii=1:length(Ps)
     for jj = 1:length(ms)
         % filename = strcat('CAESPipe_Charging_L_P_',num2str(Ps(ii)),'MPa_m_',num2str(ms(jj)));
         % filename = strcat('CAESPipe_Charging_L_P_',num2str(Ps(ii)),'-',num2str(Pmins(ii)),'MPa_m_',num2str(ms(jj)));
-        filename = strcat('CAESPipe_',Process_type,'_P_',num2str(Ps(ii)),'-',num2str(Pmins(ii)),'MPa_m_',num2str(ms(jj)));
+        filename = strcat('CAESPipe_',Process_type,'_P_',num2str(Ps(ii)),'-',num2str(Pmins(ii)),'MPa_m_',num2str(ms(jj)))
         load(filename)
         % Ps(ii)
         % ms(jj)
@@ -40,6 +40,7 @@ surf(ms,Ps,etaX_stor_M)
 xlabel('$\dot{m}$ [kg/s]','Interpreter','latex')
 ylabel('$P_{max}$ [MPa]','Interpreter','latex')
 zlabel('$\eta_{Ch}$','Interpreter','latex')
+title(strcat(Process,' efficiency [-]'))
 
 figure('Color',[1 1 1])
 hold all
@@ -50,13 +51,14 @@ grid on
 xlabel('$\dot{m}$ [kg/s]','Interpreter','latex')
 ylabel('$\eta_{Ch}$','Interpreter','latex')
 legend(num2str(Ps'))
+title(strcat(Process,' efficiency [-]'))
 
 
 figure('Color',[1 1 1])
 surf(ms,Ps,Duration./3600)
 xlabel('m_{dot}')
 ylabel('P_{max}')
-zlabel('Charging Duration [h]')
+zlabel(strcat(Process,' Duration [h]'))
 
 figure('Color',[1 1 1])
 hold all
@@ -65,5 +67,5 @@ for ii = 1:length(Ps)
 end
 grid on
 xlabel('$\dot{m}$ [kg/s]','Interpreter','latex')
-ylabel('Charging Duration [h]')
+ylabel(strcat(Process,' Duration [h]'))
 legend(num2str(Ps'))
