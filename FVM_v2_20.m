@@ -8,23 +8,12 @@ CP = py.importlib.import_module('CoolProp.CoolProp'); % Simplifies coolprop call
 % Program requires Coolprop package: http://coolprop.org/coolprop/wrappers/MATLAB/index.html#matlab
 
 %----------------------- PROBLEM PARAMETERS -------------------------%
-% Pipeline parameters
-% L = 213333; % Length for eq. vol with Huntorf
-L = 100000; % Reference case
-D = 0.9;
-
-% Cavern parameters
-% L = 300; % Volume shape similar to Huntorf
-% D = 24;
-% L = 50.625; % Roughly same volume as 100 km, 0.9 D pipeline
-% D = 40;
-
 % Total simulation time
 % Dt = 360; % Charging time for 5 km pipeline
 % Dt = 720; % Charging + discharging time (5km 0.5m pipeline)
 % Dt_charg = 360;
 % Dt = 1200; % Charging L=10 km, d=0.9 m pipeline (360s = 3.44 MWh,1054 elapsed time)
-Dt = 5*3600;
+Dt = 10*3600;
 
 % System operational limits
 P_max = 7e6;
@@ -35,13 +24,24 @@ m_in = 100;
 T_in = 273.15+60;
 
 % Discharging rate
-m_out = 50;
+m_out = 100;
 % m_A = 417; % Huntorf
 
 % Type of simulation 
 % 'CAESPipe'- Pipeline storage
 % 'CAESCav' - Cavern
 simType = 'CAESPipe';
+
+if strcmp(simType,'CAESPipe')
+    % L = 213333; % Length for eq. vol with Huntorf
+    L = 100000; % Reference case
+    D = 0.9;
+elseif strcmp(simType,'CAESCav')
+    % L = 300; % Volume shape similar to Huntorf
+    % D = 24;
+    L = 50.625; % Roughly same volume as 100 km, 0.9 D pipeline
+    D = 40;
+end
 
 % CAES process
 % Options:
@@ -240,7 +240,7 @@ theta = 0;
 
 % Plot figures ? [0 -> no / 1 -> yes]
 Save_data = 0;
-Figures = 0; 
+Figures = 1; 
 P_Corr_fig = 0;
 
 %--------------------- SIMULATION PARAMETERS ------------------------%
@@ -1181,6 +1181,7 @@ for j=2:n_t
 
     if strcmp(heat_transfer_model,'Adiabatic')
         Q(j) = 0;
+    elseif strcmp(heat_transfer_model,'Isothermal')
     elseif strcmp(heat_transfer_model,'Sukhov')
     elseif strcmp(heat_transfer_model,'Steady_state')
         % neglecting effect of coating
@@ -1201,6 +1202,8 @@ for j=2:n_t
     
     if strcmp(Process,'Kiuchi')
         error('Isothermal assumption for Kiuchi not implemented yet')
+        T(:,j) = T_ground;
+    elseif strcmp(heat_transfer_model,'Isothermal')
         T(:,j) = T_ground;
     else
         a_T(1,2) = -max(0, -rho_f(2,j)*v(2,j)*cp_f(2,j-1)/dx);    
@@ -1284,6 +1287,7 @@ for j=2:n_t
             % v(1,j+1:end) = 0;
             L_bound = 'Wall';
             t_shut_off = (j-1)*dt; 
+            tol = 1e-8;
         end
     elseif strcmp(Process,'Discharging_L')
         if strcmp(L_bound,'M_const') & P(1,j) <= P_min
