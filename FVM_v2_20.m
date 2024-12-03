@@ -10,21 +10,21 @@ CP = py.importlib.import_module('CoolProp.CoolProp'); % Simplifies coolprop call
 %----------------------- PROBLEM PARAMETERS -------------------------%
 % Pipeline parameters
 % L = 213333; % Length for eq. vol with Huntorf
-% L = 100000; % Reference case
-% D = 0.9;
+L = 100000; % Reference case
+D = 0.9;
 
 % Cavern parameters
 % L = 300; % Volume shape similar to Huntorf
 % D = 24;
-L = 50.625; % Roughly same volume as 100 km, 0.9 D pipeline
-D = 40;
+% L = 50.625; % Roughly same volume as 100 km, 0.9 D pipeline
+% D = 40;
 
 % Total simulation time
 % Dt = 360; % Charging time for 5 km pipeline
 % Dt = 720; % Charging + discharging time (5km 0.5m pipeline)
 % Dt_charg = 360;
 % Dt = 1200; % Charging L=10 km, d=0.9 m pipeline (360s = 3.44 MWh,1054 elapsed time)
-Dt = 1200;
+Dt = 5*3600;
 
 % System operational limits
 P_max = 7e6;
@@ -41,7 +41,7 @@ m_out = 50;
 % Type of simulation 
 % 'CAESPipe'- Pipeline storage
 % 'CAESCav' - Cavern
-simType = 'CAESCav';
+simType = 'CAESPipe';
 
 % CAES process
 % Options:
@@ -278,7 +278,7 @@ elseif strcmp(simType,'CAESCav')
     n_nodes = 4;
     max_iter = 20;
     dx = L/(n_nodes-1);
-    dt_max = dx/400;
+    dt_max = dx/350;
     dt = (Dt/ceil(Dt/dt_max));
     tol = 1e-8;
 else
@@ -321,6 +321,12 @@ h_f = zeros(n_f,n_t);
 s_f = zeros(n_f,n_t);
 u_f = zeros(n_f,n_t);
 
+
+u_sonic_f = zeros(n_f,n_t);
+% drho_dP_f = zeros(n_f,n_t);
+nu = zeros(n_f,n_t);
+
+
 % Node initialization
 v_n = zeros(n_n,n_t);
 P = zeros(n_n,n_t);
@@ -330,6 +336,9 @@ h = zeros(n_n,n_t);
 s = zeros(n_n,n_t);
 u = zeros(n_n,n_t);
 cp = zeros(n_n,n_t);
+u_sonic_n = zeros(n_n,n_t);
+% drho_dP_n = zeros(n_n,n_t);
+
 % equation and compare to using only mass and momentum eqs
 Q = zeros(1,n_t);
 Q_n = zeros(n_n,n_t);
@@ -364,12 +373,11 @@ rho(:,1) = CP.PropsSI('D','P',P(1,1),'T',T(1,1),fluid);
 cp(:,1) = CP.PropsSI('C','P',P(1,1),'T',T(1,1),fluid); 
 h(:,1) = CP.PropsSI('H','P',P(1,1),'T',T(1,1),fluid); 
 s(:,1) = CP.PropsSI('S','P',P(1,1),'T',T(1,1),fluid); 
-u(:,1) = CP.PropsSI('U','P',P(1,1),'T',T(1,1),fluid); 
+u(:,1) = CP.PropsSI('U','P',P(1,1),'T',T(1,1),fluid);
+u_sonic_n(:,1) = CP.PropsSI('speed_of_sound','P',P(1,1),'T',T(1,1),fluid);
 
 % Initial conditions at faces (i -> x, j -> t)
 v(:,1) = v_0; % V profile at t=0
-
-
 
 % UPWIND SCHEME
 % velocity in faces to the nodes
@@ -612,10 +620,12 @@ end
 cp_f(1,1) = CP.PropsSI('C','P',P_f(1,1),'D',rho_f(1,1),fluid);
 h_f(1,1) = CP.PropsSI('H','P',P_f(1,1),'D',rho_f(1,1),fluid);
 s_f(1,1) = CP.PropsSI('S','P',P_f(1,1),'D',rho_f(1,1),fluid);
+u_sonic_f(1,1) = CP.PropsSI('speed_of_sound','P',P_f(1,1),'D',rho_f(1,1),fluid);
 
 cp_f(end,1) = CP.PropsSI('C','P',P_f(end,1),'D',rho_f(end,1),fluid);
 h_f(end,1) = CP.PropsSI('H','P',P_f(end,1),'D',rho_f(end,1),fluid);
 s_f(end,1) = CP.PropsSI('S','P',P_f(end,1),'D',rho_f(end,1),fluid);
+u_sonic_f(end,1) = CP.PropsSI('speed_of_sound','P',P_f(end,1),'D',rho_f(end,1),fluid);
 
 for i = 1:n_n  % PROPERTIES FROM P AND RHO          
     % T(i,j) = CP.PropsSI('T','P',P(i,j),'D',rho(i,j),fluid);
@@ -626,6 +636,7 @@ for i = 1:n_n  % PROPERTIES FROM P AND RHO
     cp_f(i,1) = CP.PropsSI('C','P',P_f(i,1),'D',rho_f(i,1),fluid);
     h_f(i,1) = CP.PropsSI('H','P',P_f(i,1),'D',rho_f(i,1),fluid);
     s_f(i,1) = CP.PropsSI('S','P',P_f(i,1),'D',rho_f(i,1),fluid);
+    u_sonic_f(i,1) = CP.PropsSI('speed_of_sound','P',P_f(i,1),'D',rho_f(i,1),fluid);
 end
 
 m(1) = sum(rho(:,1)*A_h*dx);
@@ -643,6 +654,7 @@ if P_Corr_fig
     resFig = figure;
 end
 error_hist = [];
+error_hist2 = zeros(n_n,n_t,max_iter);
 bound_hist = [string(L_bound) string(R_bound)];
 
 for j=2:n_t
@@ -896,29 +908,39 @@ for j=2:n_t
 
 
         % Properties
-        u_sonic_f = zeros(n_f,1);
+        % u_sonic_f = zeros(n_f,1);
         drho_dP_f = zeros(n_f,1);
         nu = zeros(n_f,1);
 
-        u_sonic_n = zeros(n_n,1);
+        % u_sonic_n = zeros(n_n,1);
         drho_dP_n = zeros(n_n,1);
 
         for i = 1:n_n  % PROPERTIES FROM P AND RHO
             % T(i,j) = CP.PropsSI('T','P',P(i,j),'D',rho(i,j),fluid);
 
-            u_sonic_f(i) = CP.PropsSI('speed_of_sound','P',P_f(i,j),'D',rho_f(i,j),fluid);
+            % u_sonic_f(i) = CP.PropsSI('speed_of_sound','P',P_f(i,j),'D',rho_f(i,j),fluid);
+            % if strcmp(friction_model,'Colebrook')
+            %     nu = CP.PropsSI('viscosity','P',P_f(i,j),'D',rho_f(i,j),fluid);
+            % end
+            % 
+            % drho_dP_f(i) = 1/(u_sonic_f(i)^2);
+            % 
+            % u_sonic_n(i) = CP.PropsSI('speed_of_sound','P',P(i,j),'D',rho(i,j),fluid);
+            % drho_dP_n(i) = 1/(u_sonic_n(i)^2);
+
+            % u_sonic_f(i,j) = CP.PropsSI('speed_of_sound','P',P_f(i,j),'D',rho_f(i,j),fluid);
             if strcmp(friction_model,'Colebrook')
-                nu = CP.PropsSI('viscosity','P',P_f(i,j),'D',rho_f(i,j),fluid);
+                nu(i) = CP.PropsSI('viscosity','P',P_f(i,j),'D',rho_f(i,j),fluid);
             end
 
-            drho_dP_f(i) = 1/(u_sonic_f(i)^2);
+            drho_dP_f(i) = 1/(u_sonic_f(i,j-1)^2);
 
-            u_sonic_n(i) = CP.PropsSI('speed_of_sound','P',P(i,j),'D',rho(i,j),fluid);
-            drho_dP_n(i) = 1/(u_sonic_n(i)^2);
+            % u_sonic_n(i,j) = CP.PropsSI('speed_of_sound','P',P(i,j),'D',rho(i,j),fluid);
+            drho_dP_n(i) = 1/(u_sonic_n(i,j-1)^2);
         end
 
-        u_sonic_f(end) = CP.PropsSI('speed_of_sound','P',P_f(end,j),'D',rho_f(end,j),fluid);
-        drho_dP_f(end) = 1/(u_sonic_f(end)^2);
+        % u_sonic_f(end,j) = CP.PropsSI('speed_of_sound','P',P_f(end,j),'D',rho_f(end,j),fluid);
+        drho_dP_f(end) = 1/(u_sonic_f(end,j-1)^2);
         if strcmp(friction_model,'Colebrook')
             nu(end) = CP.PropsSI('viscosity','P',P_f(end,j),'D',rho_f(end,j),fluid);
         end
@@ -1138,6 +1160,7 @@ for j=2:n_t
         % m_out)
         error_P = (P_corr./P(:,j));
         error_hist = [error_hist error_P];
+        error_hist2(:,j,count(j)+1) = error_P;
         
         if rem(count(j),5) == 0 && P_Corr_fig
             figure(resFig)
@@ -1233,14 +1256,17 @@ for j=2:n_t
         h(i,j) = CP.PropsSI('H','P',P(i,j),'D',rho(i,j),fluid);
         s(i,j) = CP.PropsSI('S','P',P(i,j),'D',rho(i,j),fluid);
         u(i,j) = CP.PropsSI('U','P',P(i,j),'D',rho(i,j),fluid);
+        u_sonic_n(i,j) = CP.PropsSI('speed_of_sound','P',P(i,j),'D',rho(i,j),fluid);
         cp_f(i,j) = CP.PropsSI('C','P',P_f(i,j),'D',rho_f(i,j),fluid);
         h_f(i,j) = CP.PropsSI('H','P',P_f(i,j),'D',rho_f(i,j),fluid);
         s_f(i,j) = CP.PropsSI('S','P',P_f(i,j),'D',rho_f(i,j),fluid);
+        u_sonic_f(i,j) = CP.PropsSI('speed_of_sound','P',P_f(i,j),'D',rho_f(i,j),fluid);
     end
     
     cp_f(n_f,j) = CP.PropsSI('C','P',P_f(n_f,j),'D',rho_f(n_f,j),fluid);
     h_f(n_f,j) = CP.PropsSI('H','P',P_f(n_f,j),'D',rho_f(n_f,j),fluid);
     s_f(n_f,j) = CP.PropsSI('S','P',P_f(n_f,j),'D',rho_f(n_f,j),fluid);
+    u_sonic_f(n_f,j) = CP.PropsSI('speed_of_sound','P',P_f(n_f,j),'D',rho_f(n_f,j),fluid);
 
     % Upwind scheme
     T_f(2:end-1,j) = (v(1:end-2,j) >= 0).*T(1:end-1,j) ...
