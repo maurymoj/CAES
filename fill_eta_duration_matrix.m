@@ -4,7 +4,10 @@ Ps = 6:10;
 Pmins = Ps - 3;
 ms = 50:50:200;
 
-Process_type = 'Charging_L';
+% Process types:
+% Charging_L
+% Discharging_L
+Process_type = 'Discharging_L';
 etaX_stor_M = zeros(length(Ps),length(ms));
 Duration = zeros(length(Ps),length(ms));
 elapsedTimes = zeros(length(Ps),length(ms));

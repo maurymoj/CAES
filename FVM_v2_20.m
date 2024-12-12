@@ -24,7 +24,7 @@ m_in = 100;
 T_in = 273.15+60;
 
 % Discharging rate
-m_out = 100;
+m_out = 50;
 % m_A = 417; % Huntorf
 
 % Type of simulation 
@@ -56,7 +56,7 @@ end
 % 'Cycle_R';
 % 'NCycles_R';
 % 'Kiuchi'
-Process = 'Charging_L';
+Process = 'Discharging_L';
 
 if strcmp(Process,'Kiuchi')
     L = 5000;
@@ -239,10 +239,11 @@ g = 9.81;
 theta = 0;
 
 % Plot figures ? [0 -> no / 1 -> yes]
-Save_data = 0;
+Save_data = 1;
 Figures = 1; 
 P_Corr_fig = 0;
 
+disp(strcat('Process = ',Process,'; Pressure = ',num2str(P_max./1e6),' MPa.'))
 %--------------------- SIMULATION PARAMETERS ------------------------%
 
 if strcmp(simType,'CAESPipe')
