@@ -70,7 +70,7 @@ for i=1:length(t_dec)
             % ylim([P_lower_bound max(P(:,1+dec*(i-1)))./1e6+0.001])
             % ylim([min(P(:,1+dec*(i-1)))/1e6-0.001 max(P(:,1+dec*(i-1)))/1e6+0.001])
             % plot(x_f,P_f(:,1+dec*(i-1))./1e6);
-            % ylim([P_min P_max])
+            ylim([P_min P_max])
         elseif strcmp(Property,'v')
             plot(x_f,v(:,1+dec*(i-1)));
             ylim([v_min v_max])

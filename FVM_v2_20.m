@@ -13,18 +13,18 @@ CP = py.importlib.import_module('CoolProp.CoolProp'); % Simplifies coolprop call
 % Dt = 720; % Charging + discharging time (5km 0.5m pipeline)
 % Dt_charg = 360;
 % Dt = 1200; % Charging L=10 km, d=0.9 m pipeline (360s = 3.44 MWh,1054 elapsed time)
-Dt = 10*3600;
+Dt = 8*3600;
 
 % System operational limits
 P_max = 7e6;
-P_min = P_max - 3e6;
+P_min = P_max - 5e6;
 
 % Charging rate
 m_in = 100;
 T_in = 273.15+60;
 
 % Discharging rate
-m_out = 50;
+m_out = 100;
 % m_A = 417; % Huntorf
 
 % Type of simulation 
@@ -56,7 +56,7 @@ end
 % 'Cycle_R';
 % 'NCycles_R';
 % 'Kiuchi'
-Process = 'Discharging_L';
+Process = 'Charging_L';
 
 if strcmp(Process,'Kiuchi')
     L = 5000;
@@ -243,7 +243,7 @@ Save_data = 1;
 Figures = 1; 
 P_Corr_fig = 0;
 
-disp(strcat('Process = ',Process,'; Pressure = ',num2str(P_max./1e6),' MPa.'))
+disp(strcat('Process = ',Process,'; Pressure = ',num2str(P_min./1e6),'-',num2str(P_max./1e6),' MPa.'))
 %--------------------- SIMULATION PARAMETERS ------------------------%
 
 if strcmp(simType,'CAESPipe')
@@ -1296,6 +1296,7 @@ for j=2:n_t
             % Discharging from L boundary
             L_bound = 'Wall';
             t_shut_off = (j-1)*dt;
+            tol = 1e-8;
         end
     elseif strcmp(Process,'Charging_R')
         % if strcmp(R_bound,'Inlet') & P(end-1,j) >= P_max
@@ -1572,9 +1573,9 @@ dXX = rho_f(2,:)'.*v(2,:)'*A_h.*(h_f(2,:)' - h_o - T_o*(s_f(2,:)' - s_o))*dt./(1
 XX_bal = XX(1) + cumsum(dXX);
 
 if strcmp(Process,'Charging_L')
-    etaX_stor = ( XX(end) - XX(1) ) / sum(dXX);
+    etaX_stor = ( XX(end) - XX(1) ) / sum(dXX)
 elseif strcmp(Process,'Discharging_L')
-    etaX_stor = sum(dXX) / ( XX(end) - XX(1) );
+    etaX_stor = sum(dXX) / ( XX(end) - XX(1) )
 else
     error('Process not found or eta not implemented for the process.')
 end
