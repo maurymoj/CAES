@@ -1,5 +1,5 @@
 % File path
-filePath = 'GT AR 2023 Part H.csv';
+filePath = 'GT AR 2023 Part H.csv'; % Part H - MILES OF TRANSMISSION PIPE BY NOMINAL PIPE SIZE (NPS)
 
 % Read the CSV file
 data = readtable(filePath);
@@ -100,3 +100,18 @@ average_diameter = weighted_sum / total_mileage;
 
 % Display the result
 fprintf('The average diameter of the pipelines is %.2f inches.\n', average_diameter);
+
+D_mm = diameter_values*25.4;
+L_km = 1.6093*mileage_values;
+
+% Step 1: Calculate the total km
+total_km = sum(L_km);
+
+% Step 2: Calculate the weighted sum of diameters
+weighted_sum_mm = sum(L_km.*D_mm);
+
+% Step 3: Calculate the average diameter
+average_D_mm = weighted_sum_mm / total_km;
+
+fprintf('The average diameter of the pipelines is %.2f mm.\n', average_D_mm);
+
