@@ -7,41 +7,12 @@ tic
 CP = py.importlib.import_module('CoolProp.CoolProp'); % Simplifies coolprop calls
 % Program requires Coolprop package: http://coolprop.org/coolprop/wrappers/MATLAB/index.html#matlab
 
-%----------------------- PROBLEM PARAMETERS -------------------------%
-% Total simulation time
-% Dt = 360; % Charging time for 5 km pipeline
-% Dt = 720; % Charging + discharging time (5km 0.5m pipeline)
-% Dt_charg = 360;
-% Dt = 1200; % Charging L=10 km, d=0.9 m pipeline (360s = 3.44 MWh,1054 elapsed time)
-Dt = 8*3600;
-
-% System operational limits
-P_max = 7e6;
-P_min = P_max - 5e6;
-
-% Charging rate
-m_in = 100;
-T_in = 273.15+60;
-
-% Discharging rate
-m_out = 100;
-% m_A = 417; % Huntorf
+%--------------------------- Setup ---------------------------------
 
 % Type of simulation 
 % 'CAESPipe'- Pipeline storage
 % 'CAESCav' - Cavern
 simType = 'CAESPipe';
-
-if strcmp(simType,'CAESPipe')
-    % L = 213333; % Length for eq. vol with Huntorf
-    L = 100000; % Reference case
-    D = 0.9;
-elseif strcmp(simType,'CAESCav')
-    % L = 300; % Volume shape similar to Huntorf
-    % D = 24;
-    L = 50.625; % Roughly same volume as 100 km, 0.9 D pipeline
-    D = 40;
-end
 
 % CAES process
 % Options:
@@ -57,6 +28,80 @@ end
 % 'NCycles_R';
 % 'Kiuchi'
 Process = 'Charging_L';
+
+% heat_transfer_model 
+% 'Adiabatic'
+% Not fully implemented yet:
+% 'Steady_state'
+% 'Isothermal'
+heat_transfer_model = 'Adiabatic';
+
+if strcmp(simType,'CAESPipe')
+    n_nodes = 40;
+    max_iter = 20;
+    
+    % Setting tolerance
+    if strcmp(Process,'Discharging_R') || strcmp(Process,'Discharging_L')
+        tol = 1e-5; % CAESPipe discharging
+    elseif strcmp(Process,'Charging_R') || strcmp(Process,'Charging_L')
+        tol = 1e-6; % CAESPipe Charging
+    elseif strcmp(Process,'Cycle_L')
+        tol = 1e-5;
+    elseif strcmp(Process,'Idle')
+        tol = 1e-5;
+    elseif strcmp(Process,'Kiuchi')
+        tol = 1e-5;
+    else
+        error('Process not found.')
+    end
+
+elseif strcmp(simType,'CAESCav')
+    n_nodes = 4;
+    max_iter = 20;
+    tol = 1e-8;
+else
+    warning('Cant identify simulation type.')
+end
+
+
+% Plot figures ? [0 -> no / 1 -> yes]
+Save_data = 0;
+Figures = 0; 
+P_Corr_fig = 0;
+
+%----------------------- PROBLEM PARAMETERS -------------------------%
+
+% Total simulation time
+% Dt = 360; % Charging time for 5 km pipeline
+% Dt = 720; % Charging + discharging time (5km 0.5m pipeline)
+% Dt_charg = 360;
+% Dt = 1200; % Charging L=10 km, d=0.9 m pipeline (360s = 3.44 MWh,1054 elapsed time)
+Dt = 9*3600;
+
+% System operational limits
+P_max = 7e6;
+DoD = 3e6; % Depth of discharge in terms of pressure
+P_min = P_max - DoD;
+
+% Charging rate
+m_in = 50;
+T_in = 273.15+60;
+
+% Discharging rate
+% m_A = 417; % Huntorf
+m_out = 100;
+
+
+if strcmp(simType,'CAESPipe')
+    % L = 213333; % Length for eq. vol with Huntorf
+    L = 100000; % Reference case
+    D = 0.9;
+elseif strcmp(simType,'CAESCav')
+    % L = 300; % Volume shape similar to Huntorf
+    % D = 24;
+    L = 50.625; % Roughly same volume as 100 km, 0.9 D pipeline
+    D = 40;
+end
 
 if strcmp(Process,'Kiuchi')
     L = 5000;
@@ -212,13 +257,6 @@ else
     error('Right boundary type not identified')
 end                     
 
-% heat_transfer_model 
-% 'Adiabatic'
-% Not fully implemented yet:
-% 'Steady_state'
-% 'Isothermal'
-heat_transfer_model = 'Adiabatic';
-
 k_pipe = 45.3; % [W/m K] - Wen et al. (2023) "Heat Transfer Model of Natural Gas Pipeline Based on Data Feature Extraction and First Principle Models"
 k_int_coating = 0.52;
 k_ext_coating = 0.4;
@@ -238,17 +276,10 @@ R = 287;
 g = 9.81;
 theta = 0;
 
-% Plot figures ? [0 -> no / 1 -> yes]
-Save_data = 1;
-Figures = 1; 
-P_Corr_fig = 0;
-
 disp(strcat('Process = ',Process,'; Pressure = ',num2str(P_min./1e6),'-',num2str(P_max./1e6),' MPa.'))
 %--------------------- SIMULATION PARAMETERS ------------------------%
 
 if strcmp(simType,'CAESPipe')
-    n_nodes = 40;
-    max_iter = 20;
     % dx = L/(100-1); % CAESPipe n_nodes = 100 and dt = 0.25 provided low
     % residual
     dx = L/(n_nodes-1); 
@@ -276,12 +307,9 @@ if strcmp(simType,'CAESPipe')
     end
 
 elseif strcmp(simType,'CAESCav')
-    n_nodes = 4;
-    max_iter = 20;
     dx = L/(n_nodes-1);
     dt_max = dx/350;
     dt = (Dt/ceil(Dt/dt_max));
-    tol = 1e-8;
 else
     warning('Cant identify simulation type.')
 end
@@ -1559,7 +1587,7 @@ if Figures
     yyaxis left
     plot(t,m2,t,m2_bal)
     yyaxis right
-    plot(t,E2,t,E2_bal)
+    plot(t,E2./(1e6*3600),t,E2_bal./(1e6*3600))
     legend('m','m_{bal}','E','E_{bal}')
     
     figure

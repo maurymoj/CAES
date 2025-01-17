@@ -37,7 +37,7 @@ t_dec = zeros(1,floor((length(t)-1)/dec+1));
 
 plot_type = 'Single';
 % plot_type = 'Double';
-Property = 'P';
+Property = 'v';
 for i=1:length(t_dec)
     t_dec(i) = t(1+dec*(i-1));
     
@@ -137,8 +137,15 @@ for i=1:length(t_dec)
             ylabel('T [K]')
         end
     end
+    
+    if t_dec(i) < 300
+        ti = strcat('t = ',num2str(t_dec(i),3),' s');
+    elseif t_dec(i) < 3600
+        ti = strcat('t = ',num2str(floor(t_dec(i)/60)),' min');
+    elseif t_dec(i) > 3600
+        ti = strcat('t = ',num2str(floor(t_dec(i)/3600)),' h, ',num2str(floor(rem(t_dec(i),3600)/60)),' min ');
+    end
 
-    ti = strcat('t = ',num2str(t_dec(i)),' s');
     title(ti);
 
     grid on
