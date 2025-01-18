@@ -27,7 +27,7 @@ simType = 'CAESPipe';
 % 'Cycle_R';
 % 'NCycles_R';
 % 'Kiuchi'
-Process = 'Charging_L';
+Process = 'Discharging_L';
 
 % heat_transfer_model 
 % 'Adiabatic'
@@ -65,7 +65,7 @@ end
 
 
 % Plot figures ? [0 -> no / 1 -> yes]
-Save_data = 0;
+Save_data = 1;
 Figures = 0; 
 P_Corr_fig = 0;
 
@@ -76,20 +76,20 @@ P_Corr_fig = 0;
 % Dt = 720; % Charging + discharging time (5km 0.5m pipeline)
 % Dt_charg = 360;
 % Dt = 1200; % Charging L=10 km, d=0.9 m pipeline (360s = 3.44 MWh,1054 elapsed time)
-Dt = 9*3600;
+Dt = 6*3600;
 
 % System operational limits
-P_max = 7e6;
+P_max = 10e6;
 DoD = 3e6; % Depth of discharge in terms of pressure
 P_min = P_max - DoD;
 
 % Charging rate
-m_in = 50;
+m_in = 100;
 T_in = 273.15+60;
 
 % Discharging rate
 % m_A = 417; % Huntorf
-m_out = 100;
+m_out = 150;
 
 
 if strcmp(simType,'CAESPipe')
@@ -106,6 +106,8 @@ end
 if strcmp(Process,'Kiuchi')
     L = 5000;
     D = 0.5;
+    P_max = 5e6;
+    P_min = 5e6;
 end
 
 % Assumptions
@@ -216,10 +218,9 @@ elseif strcmp(L_bound,'P_const')
 elseif strcmp(L_bound,'M_const')
     m_L = -m_out; % Sign indicates flow direction
 elseif strcmp(L_bound,'Kiuchi')
-    error('Kiuchi left boundary not implemented yet')
     P_L = 5e6; % Constant inlet pressure 5 MPa
     T_L = 273.15 + 25; % T = 25 oC
-    Q_in = 3e5/3600; % Constant volumetric flow rate - 3e5 m3/h
+    Q_in = 3e5/3600; % Constant volumetric flow rate - 3e5 sm3/h (standard cubic meters per hour)
     % m_L = 0;
     rho_in = CP.PropsSI('D','P',P_L,'T',T_L,'Methane')
     % m_L = rho_in*Q_in;
@@ -251,7 +252,6 @@ elseif strcmp(R_bound,'P_const')
 elseif strcmp(R_bound,'M_const')   
     m_R = -m_out;
 elseif strcmp(R_bound,'Kiuchi')
-    error('Kiuchi right boundary not implemented yet')
     m_R = 0;
 else 
     error('Right boundary type not identified')
@@ -506,7 +506,6 @@ elseif strcmp(L_bound,'M_const')
     % v_n(1,1) = (v(1,1) >= 0).*v(1,1) ...
         % +      (v(1,1) <  0).*v(2,1);
 elseif strcmp(L_bound,'Kiuchi')
-    error('Left boundary for Kiuchi not implemented yet.')
     % At "outside" node
     rho_L = CP.PropsSI('D','P',P_L,'T',T_L,fluid);
     cp_L = CP.PropsSI('C','P',P_L,'T',T_L,fluid);
@@ -581,9 +580,7 @@ elseif strcmp(R_bound,'M_const')
     P_f(end,1) = P(end,1);
     T_f(end,1) = T(end,1);
     rho_f(end,1) = rho(end,1);    
-elseif strcmp(R_bound,'Kiuchi')
-    error('Right boundary for Kiuchi not implemented yet.')
-    
+elseif strcmp(R_bound,'Kiuchi')    
     % Wall
     v(end,:) = 0;
 
@@ -804,7 +801,18 @@ for j=2:n_t
             % v_n(1,j) = (v(1,j) + v(2,j))/2;
         elseif strcmp(L_bound, 'Kiuchi')
             error('Kiuchi left boundary not implemented yet.')
-            if t(j-1) < 10*60 && t(j) >= 10*60
+            if t(j) < 10*60 % t < 10 min
+                % Wall
+                v(1,j) = 0;
+
+                P_f(1,j) = P(1,j);
+                T_f(1,j) = T(1,j);
+                rho_f(1,j) = rho(1,j);
+    
+                v_n(1,j) = (v(1,j) >= 0).*v(1,j) ...
+                +      (v(1,j) <  0).*v(2,j);
+            elseif t(j) >= 10*60 && t(j) < 30*60 % 10 <= t < 30 min
+                % Inlet
                 v(1,j) = 0;
                 P_f(1,j) = P(1,j);
                 T_f(1,j) = T(1,j);
@@ -812,7 +820,8 @@ for j=2:n_t
     
                 v_n(1,j) = (v(1,j) >= 0).*v(1,j) ...
                 +      (v(1,j) <  0).*v(2,j);
-            elseif t(j-1) < 30*60 && t(j) >= 30*60
+            elseif t(j) >= 30*60 % t >= 30 min
+                % Wall
 
             elseif t(j) > 30*60
 

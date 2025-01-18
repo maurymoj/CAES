@@ -2,21 +2,21 @@ clear
 
 Ps = 6:10;
 Pmins = Ps - 3;
-ms = 50:50:200;
+m_dots = 150:25:200;
 
 % Process types:
 % Charging_L
 % Discharging_L
-Process_type = 'Charging_L';
-etaX_stor_M = zeros(length(Ps),length(ms));
-Duration = zeros(length(Ps),length(ms));
-elapsedTimes = zeros(length(Ps),length(ms));
+Process_type = 'Discharging_L';
+etaX_stor_M = zeros(length(Ps),length(m_dots));
+Duration = zeros(length(Ps),length(m_dots));
+elapsedTimes = zeros(length(Ps),length(m_dots));
 
 for ii=1:length(Ps)
-    for jj = 1:length(ms)
+    for jj = 1:length(m_dots)
         % filename = strcat('CAESPipe_Charging_L_P_',num2str(Ps(ii)),'MPa_m_',num2str(ms(jj)));
         % filename = strcat('CAESPipe_Charging_L_P_',num2str(Ps(ii)),'-',num2str(Pmins(ii)),'MPa_m_',num2str(ms(jj)));
-        filename = strcat('CAESPipe_',Process_type,'_P_',num2str(Ps(ii)),'-',num2str(Pmins(ii)),'MPa_m_',num2str(ms(jj)))
+        filename = strcat('CAESPipe_',Process_type,'_P_',num2str(Ps(ii)),'-',num2str(Pmins(ii)),'MPa_m_',num2str(m_dots(jj)))
         load(filename)
         % Ps(ii)
         % ms(jj)
@@ -39,7 +39,7 @@ end
 
 %%
 figure('Color',[1 1 1])
-surf(ms,Ps,etaX_stor_M)
+surf(m_dots,Ps,etaX_stor_M)
 xlabel('$\dot{m}$ [kg/s]','Interpreter','latex')
 ylabel('$P_{max}$ [MPa]','Interpreter','latex')
 zlabel('$\eta_{Ch}$','Interpreter','latex')
@@ -48,7 +48,7 @@ title(strcat(Process,' efficiency [-]'))
 figure('Color',[1 1 1])
 hold all
 for ii = 1:length(Ps)
-    plot(ms,etaX_stor_M(ii,:))
+    plot(m_dots,etaX_stor_M(ii,:))
 end
 grid on
 xlabel('$\dot{m}$ [kg/s]','Interpreter','latex')
@@ -58,7 +58,7 @@ title(strcat(Process,' efficiency [-]'))
 
 
 figure('Color',[1 1 1])
-surf(ms,Ps,Duration./3600)
+surf(m_dots,Ps,Duration./3600)
 xlabel('m_{dot}')
 ylabel('P_{max}')
 zlabel(strcat(Process,' Duration [h]'))
@@ -66,7 +66,7 @@ zlabel(strcat(Process,' Duration [h]'))
 figure('Color',[1 1 1])
 hold all
 for ii = 1:length(Ps)
-    plot(ms,Duration(ii,:)./3600)
+    plot(m_dots,Duration(ii,:)./3600)
 end
 grid on
 xlabel('$\dot{m}$ [kg/s]','Interpreter','latex')
