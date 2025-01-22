@@ -2,7 +2,7 @@ clear
 
 Ps = 6:10;
 Pmins = Ps - 3;
-m_dots = 150:25:200;
+m_dots = 50:25:200;
 
 % Process types:
 % Charging_L

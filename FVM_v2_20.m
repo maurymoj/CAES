@@ -27,7 +27,7 @@ simType = 'CAESPipe';
 % 'Cycle_R';
 % 'NCycles_R';
 % 'Kiuchi'
-Process = 'Discharging_L';
+Process = 'Kiuchi';
 
 % heat_transfer_model 
 % 'Adiabatic'
@@ -51,6 +51,9 @@ if strcmp(simType,'CAESPipe')
         tol = 1e-5;
     elseif strcmp(Process,'Kiuchi')
         tol = 1e-5;
+
+        n_nodes = 50;
+        Delta_t = 0.01*60;
     else
         error('Process not found.')
     end
@@ -65,7 +68,7 @@ end
 
 
 % Plot figures ? [0 -> no / 1 -> yes]
-Save_data = 1;
+Save_data = 0;
 Figures = 0; 
 P_Corr_fig = 0;
 
@@ -76,7 +79,7 @@ P_Corr_fig = 0;
 % Dt = 720; % Charging + discharging time (5km 0.5m pipeline)
 % Dt_charg = 360;
 % Dt = 1200; % Charging L=10 km, d=0.9 m pipeline (360s = 3.44 MWh,1054 elapsed time)
-Dt = 6*3600;
+Dt = 10*3600;
 
 % System operational limits
 P_max = 10e6;
@@ -89,7 +92,7 @@ T_in = 273.15+60;
 
 % Discharging rate
 % m_A = 417; % Huntorf
-m_out = 150;
+m_out = 50;
 
 
 if strcmp(simType,'CAESPipe')
@@ -108,6 +111,10 @@ if strcmp(Process,'Kiuchi')
     D = 0.5;
     P_max = 5e6;
     P_min = 5e6;
+    P_L = 5e6;
+    T_in = 273.15+25;
+    Dt = 60*60; % 60 min duration
+    warning('Kiuchi: left boundary; right boundary; boundary matrix; and boundary update under development.')
 end
 
 % Assumptions
@@ -184,8 +191,17 @@ elseif strcmp(Process,'Kiuchi')
     T_0 = 273.15 + 25; % 25 oC
     v_0 = 0;
 
-    L_bound = 'Kiuchi';
-    R_bound = 'Kiuchi';
+    T_ground = 298;
+
+    % For Kiuchi the standard state is at 0oC and 1 atm
+    rho_st = CP.PropsSI('D','T',273.15,'P',101325,'Methane');
+    vol_st = 3e5/3600; % convert 300,000 sm3/h to sm3/s
+    m_dot_st = rho_st*vol_st;
+    L_bound = 'Wall';
+    R_bound = 'Wall';
+
+    stage = 'Idle_Kiuchi';
+    stage_hist = stage;
 else
     error('Process not identified !')
 end
@@ -217,14 +233,6 @@ elseif strcmp(L_bound,'P_const')
     P_L = P_min; % 4 MPa
 elseif strcmp(L_bound,'M_const')
     m_L = -m_out; % Sign indicates flow direction
-elseif strcmp(L_bound,'Kiuchi')
-    P_L = 5e6; % Constant inlet pressure 5 MPa
-    T_L = 273.15 + 25; % T = 25 oC
-    Q_in = 3e5/3600; % Constant volumetric flow rate - 3e5 sm3/h (standard cubic meters per hour)
-    % m_L = 0;
-    rho_in = CP.PropsSI('D','P',P_L,'T',T_L,'Methane')
-    % m_L = rho_in*Q_in;
-    m_L = 0;
 else 
     error('Left boundary type not identified')
 end   
@@ -251,8 +259,6 @@ elseif strcmp(R_bound,'P_const')
     % P_B = 4.13e6; % 4.13 MPa = Huntorf https://www.sciencedirect.com/science/article/pii/S0196890420302004#s0010
 elseif strcmp(R_bound,'M_const')   
     m_R = -m_out;
-elseif strcmp(R_bound,'Kiuchi')
-    m_R = 0;
 else 
     error('Right boundary type not identified')
 end                     
@@ -288,22 +294,12 @@ if strcmp(simType,'CAESPipe')
                      % to achieve a conservative value
     dt = (Dt/ceil(Dt/dt_max)); % division of Dt in an integer number of intervals
                             % with dt smaller than dt_max
+    if strcmp(Process,'Kiuchi')
+        dt = Delta_t;
+    end
+
     if dx/400 < dt % 400 upper limit for the speed of sound
         warning('dt > time needed for pressure wave to cross a node')
-    end
-    
-    if strcmp(Process,'Discharging_R') || strcmp(Process,'Discharging_L')
-        tol = 1e-5; % CAESPipe discharging
-    elseif strcmp(Process,'Charging_R') || strcmp(Process,'Charging_L')
-        tol = 1e-6; % CAESPipe Charging
-    elseif strcmp(Process,'Cycle_L')
-        tol = 1e-5;
-    elseif strcmp(Process,'Idle')
-        tol = 1e-5;
-    elseif strcmp(Process,'Kiuchi')
-        tol = 1e-5;
-    else
-        error('Process not found.')
     end
 
 elseif strcmp(simType,'CAESCav')
@@ -337,6 +333,7 @@ alpha_rho = alpha ;  % Density under-relaxation factor
 t = 0:dt:Dt;
 
 n_n = L/dx;       % number of nodes
+% n_n = n_nodes;
 n_f = n_n + 1;      % number of faces
 n_t = Dt/dt+1;  % n of time steps
 
@@ -505,19 +502,19 @@ elseif strcmp(L_bound,'M_const')
     % v_n(1,1) = m_L/(rho(1,1)*A_h);
     % v_n(1,1) = (v(1,1) >= 0).*v(1,1) ...
         % +      (v(1,1) <  0).*v(2,1);
-elseif strcmp(L_bound,'Kiuchi')
-    % At "outside" node
-    rho_L = CP.PropsSI('D','P',P_L,'T',T_L,fluid);
-    cp_L = CP.PropsSI('C','P',P_L,'T',T_L,fluid);
-    h_L = CP.PropsSI('H','P',P_L,'T',T_L,fluid);
-    s_L = CP.PropsSI('S','P',P_L,'T',T_L,fluid);
-
-    P_f(1,1) = P_L;
-    T_f(1,:) = T_L;
-    rho_f(1,1) = rho_L;
-    
-    % v_L = m_L/(rho_f(1,1)*A_h);
-    % v(1,1) = m_L/(rho_f(1,1)*A_h);
+% elseif strcmp(L_bound,'Kiuchi')
+%     % At "outside" node
+%     rho_L = CP.PropsSI('D','P',P_L,'T',T_L,fluid);
+%     cp_L = CP.PropsSI('C','P',P_L,'T',T_L,fluid);
+%     h_L = CP.PropsSI('H','P',P_L,'T',T_L,fluid);
+%     s_L = CP.PropsSI('S','P',P_L,'T',T_L,fluid);
+% 
+%     P_f(1,1) = P_L;
+%     T_f(1,:) = T_L;
+%     rho_f(1,1) = rho_L;
+% 
+%     % v_L = m_L/(rho_f(1,1)*A_h);
+%     % v(1,1) = m_L/(rho_f(1,1)*A_h);
 elseif strcmp(L_bound,'Outlet')
     % actual implementation happens later
 else
@@ -743,6 +740,13 @@ for j=2:n_t
             v_n(1,j) = (v(1,j) >= 0).*v(1,j) ...
             +      (v(1,j) <  0).*v(2,j);
         elseif strcmp(L_bound,'P_const')
+            
+            
+            % warning('Kiuchi boundary conditions under implementation.')
+            
+            
+            
+            
             % P(1,:) = P_L;
             P(1,j) = P_L;
             T(1,j) = T(2,j);
@@ -799,47 +803,6 @@ for j=2:n_t
                 +      (v(1,j) <  0).*v(2,j);
             % Central scheme
             % v_n(1,j) = (v(1,j) + v(2,j))/2;
-        elseif strcmp(L_bound, 'Kiuchi')
-            error('Kiuchi left boundary not implemented yet.')
-            if t(j) < 10*60 % t < 10 min
-                % Wall
-                v(1,j) = 0;
-
-                P_f(1,j) = P(1,j);
-                T_f(1,j) = T(1,j);
-                rho_f(1,j) = rho(1,j);
-    
-                v_n(1,j) = (v(1,j) >= 0).*v(1,j) ...
-                +      (v(1,j) <  0).*v(2,j);
-            elseif t(j) >= 10*60 && t(j) < 30*60 % 10 <= t < 30 min
-                % Inlet
-                v(1,j) = 0;
-                P_f(1,j) = P(1,j);
-                T_f(1,j) = T(1,j);
-                rho_f(1,j) = rho(1,j);
-    
-                v_n(1,j) = (v(1,j) >= 0).*v(1,j) ...
-                +      (v(1,j) <  0).*v(2,j);
-            elseif t(j) >= 30*60 % t >= 30 min
-                % Wall
-
-            elseif t(j) > 30*60
-
-            end
-
-            % P(1,:) = P_L;
-            % T(1,:) = T_L;
-            % rho(1,:) = rho_L;
-            
-            % SLIDING PRESSURE
-            P_f(1,j) = P(1,j); % Assumption of constant pressure between 
-                               % face and first node
-            T_f(1,j) = T_L; 
-            % T_f(1,j) = T(1,j); 
-            rho_f(1,j) = CP.PropsSI('D','P',P_f(1,j),'T',T_f(1,j),fluid);
-            v(1,j) = m_L/(rho_f(1,j)*A_h); % Sliding pressure
-            
-            v_n(1,j) = m_L/(rho(1,j)*A_h);
         end
 
         % R boundary
@@ -898,13 +861,27 @@ for j=2:n_t
             P_f(end,j) = P(end,j);
             T_f(end,j) = T(end,j);
             rho_f(end,j) = rho(end,j); 
-        elseif strcmp(R_bound, 'Kiuchi')
-            error('Kiuchi left boundary not implemented yet.')
-            v(end,j) = 0;
+        elseif strcmp(R_bound, 'Vol_const')
 
-            P_f(end,j) = P(end,j); % Zero gradient assumption
+
+            % warning('Kiuchi right boundary under implementation.')
+            
+
+            % Zero gradient assumption
+            P(end,j) = P(end-1,j);
+            T(end,j) = T(end-1,j);
+            rho(end,j) = rho(end-1,j);
+        
+            P_f(end,j) = P(end,j);
             T_f(end,j) = T(end,j);
             rho_f(end,j) = rho(end,j);
+
+            % Calculation of mass flow rate
+            % m_dot_st = rho_st*vol_st; % Standard mass flow rate
+            v(end,j) = m_dot_st/(rho_f(end,j)*A_h);
+            
+            v_n(end,j) = v(end,j);
+            % v_n(end,j) = (rho(1,j)*v_n(1,j))/rho(end,j); % Velocity correction            
 
         end 
 
@@ -983,10 +960,9 @@ for j=2:n_t
             nu(end) = CP.PropsSI('viscosity','P',P_f(end,j),'D',rho_f(end,j),fluid);
         end
 
-
         %---------- v* calculation - Momentum control volume ---------------------%
         
-        % Friction factor based on Nikuradse - IMPLEMENT COLEBROOK EQUATION
+        % Friction factor based on Nikuradse
         if strcmp(friction_model,'Nikuradse')
             f = (2*log10(1/epsD)+1.14)^(-2)*ones(n_f,1);
         elseif strcmp(friction_model,'Colebrook')
@@ -1007,7 +983,7 @@ for j=2:n_t
                 f(i) = f_old;
             end
         elseif strcmp(friction_model,'Kiuchi')
-            f = 0.008;
+            f = 0.008*ones(n_f,1);
         else
             error('Friction model not identified')
         end
@@ -1022,12 +998,18 @@ for j=2:n_t
         B_M = zeros(n_f,1);
         
         a_M(1,1) = 1; % Value for v at the first momentum volume is 
-                    % known from boundary conditions
+                      % known from boundary conditions
         B_M(1) = v(1,j);
-        
-        a_M(n_f,n_f) = 1;
+        %!!!!!!!!!!!!!!!!!!! IN DEVELOPMENT !!!!!!!!!!!!!!!!!!!!!!!!!
+        % if strcmp(L_bound,'P_const') 
+        %     a_M(1,1) = 1; % Value for v at the first momentum volume is 
+        %               % known from boundary conditions
+        %     B_M(1) = v(1,j);
+        % end
+        %!!!!!!!!!!!!!!!!!!! IN DEVELOPMENT !!!!!!!!!!!!!!!!!!!!!!!!!
+
+        a_M(n_f,n_f) = 1; % Value for v at the last momentum volume
         B_M(n_f) = v(n_f,j);
-        
 
         a_M(2,3) = -max( 0, -rho(2,j)*v_n(2,j)/dx);    % a_C
         a_M(2,2) = rho_f(2,j)/dt + f(2)*rho_f(2,j)*abs(v(2,j))/(2*D) ...
@@ -1103,7 +1085,6 @@ for j=2:n_t
         % end
 
 
-
         %--------------- Pressure correction P' calculations ---------------------%
         a_C = zeros(n_n);
         B_C = zeros(n_n,1);
@@ -1128,6 +1109,14 @@ for j=2:n_t
             a_C(1,1) = drho_dP_n(1)/dt ...
                      - (rho_f(2,j)*d_M(1)/a_M(1,1))/dx ...
                      - drho_dP_f(1)*v_star(1)/dx ; % A_1
+        elseif strcmp(L_bound,'Kiuchi')
+            error('Kiuchi left boundary matrix coefficients not set yet.')
+            % BOUNDARY CHANGES WITH TIME
+            % Constant pressure
+            a_C(1,1) = 1;
+            a_C(1,2) = 0;
+
+            B_C(1) = 0;
         end
         
         
@@ -1155,6 +1144,14 @@ for j=2:n_t
             a_C(n_n,n_n) = drho_dP_n(n_n)/dt ...
                          - (rho_f(N_f-1,j)*d_M(end)/a_M(end,end))/dx ...
                          + drho_dP_f(N_f)*v_star(N_f)/dx;
+        elseif strcmp(R_bound,'Kiuchi')
+            error('Kiuchi right boundary matrix coefficients not set yet.')
+            % Outlet
+            a_C(n_n,n_n-1) = (rho_f(N_f-1,j)*d_M(end)/a_M(end,end))/dx...
+                           - drho_dP_f(N_f-1)*v_star(N_f-1)/dx;
+            a_C(n_n,n_n) = drho_dP_n(n_n)/dt ...
+                         - (rho_f(N_f-1,j)*d_M(end)/a_M(end,end))/dx ...
+                         + drho_dP_f(N_f)*v_star(N_f)/dx;
         end
 
 
@@ -1177,6 +1174,8 @@ for j=2:n_t
             % P_corr(1) = 0;
         elseif strcmp(R_bound,'M_const')
             P_corr(end) = 0;
+        elseif strcmp(L_bound,'Kiuchi')
+            error('Kiuchi pressure correction at boundary not set yet.')
         end
 
         rho_corr = drho_dP_n.*P_corr;
@@ -1220,7 +1219,9 @@ for j=2:n_t
     if strcmp(heat_transfer_model,'Adiabatic')
         Q(j) = 0;
     elseif strcmp(heat_transfer_model,'Isothermal')
+
     elseif strcmp(heat_transfer_model,'Sukhov')
+
     elseif strcmp(heat_transfer_model,'Steady_state')
         % neglecting effect of coating
         D_ext = D + thickness_pipe; 
@@ -1228,6 +1229,7 @@ for j=2:n_t
         Q_n(:,j) = -4*U/D*(T(:,j-1) - T_ground);
         Q(j) = sum(Q_n(:,j));
     elseif strcmp(heat_transfer_model,'Transient')
+
     elseif strcmp(Process, 'Kiuchi')
         % U = 2.84; % Chaczykowski, 2010
         U = 0; % Adiabatic
@@ -1239,7 +1241,7 @@ for j=2:n_t
     
     
     if strcmp(Process,'Kiuchi')
-        error('Isothermal assumption for Kiuchi not implemented yet')
+        % error('Isothermal assumption for Kiuchi not implemented yet')
         T(:,j) = T_ground;
     elseif strcmp(heat_transfer_model,'Isothermal')
         T(:,j) = T_ground;
@@ -1318,6 +1320,7 @@ for j=2:n_t
     
 
     % CAES process
+    % Identify and update operational state (Charging, discharging, idle)
     if strcmp(Process,'Charging_L')
         % if strcmp(L_bound,'Inlet') & P(ceil(n_n/2),j) >= P_max
         if strcmp(L_bound,'Inlet') & P(1,j) >= P_max
@@ -1373,7 +1376,24 @@ for j=2:n_t
     elseif strcmp(Process,'NCycle_L')
     elseif strcmp(Process,'NCycle_R')
     elseif strcmp(Process,'Kiuchi')
-        error('Kiuchi boundary update procedure not implemented yet')
+
+
+        % warning('Kiuchi boundary update procedure under implementation.')
+        
+        
+        if strcmp(stage,'Idle_Kiuchi') & (t(j-1) < 10*60 & t(j) >= 10*60)
+            
+            L_bound = 'P_const';
+
+            R_bound = 'Vol_const';
+
+            stage = 'Active_Kiuchi';
+        elseif strcmp(stage,'Active_Kiuchi') & (t(j-1) < 30*60 & t(j) >= 30*60)
+            L_bound = 'Wall';
+            R_bound = 'Wall';
+            stage = 'Idle';
+        end
+        stage_hist = {stage_hist;stage};
     else
         error('Process not identified.')
     end
@@ -1462,7 +1482,11 @@ elseif strcmp(Process,'Idle')
     dE = Q;
     dX = 0;
 elseif strcmp(Process,'Kiuchi')
-    error('Kiuchi energy, mass and exergy variation not implemented yet.')
+    % Not required for Kiuchi
+    dm = 0;
+    dE = 0;
+    dX = 0;
+    % error('Kiuchi energy, mass and exergy variation not implemented yet.')
 else
     error('Process not identified.')
 end
@@ -1613,6 +1637,29 @@ if strcmp(Process,'Charging_L')
     etaX_stor = ( XX(end) - XX(1) ) / sum(dXX)
 elseif strcmp(Process,'Discharging_L')
     etaX_stor = sum(dXX) / ( XX(end) - XX(1) )
+elseif strcmp(Process,'Kiuchi')
+    etaX_stor = 0;
+    figure('Color',[1 1 1])
+    plot(t./60,rho_f(1,:).*v(1,:)*A_h*3600/rho_st)
+    hold  on
+    plot(t./60,rho_f(end,:).*v(end,:)*A_h*3600/rho_st)
+    legend('Face 1','Face n')
+    ylim([-1e5 4e5])
+    ylabel('Volumetric flow rate [scmh]')
+
+    figure('Color',[1 1 1])
+    plot(t./60,rho(1,:).*v_n(1,:)*A_h*3600/rho_st,'b')
+    hold  on
+    plot(t./60,rho(end,:).*v_n(end,:)*A_h*3600/rho_st,'r')
+    legend('Node 1','Node n')
+    ylabel('Volumetric flow rate [scmh]')
+
+    figure('Color',[1 1 1])
+    plot(t./60,rho_f(1,:).*v(1,:)*A_h)
+    hold  on
+    plot(t./60,rho_f(end,:).*v(end,:)*A_h)
+    legend('Face 1','Face n')
+    ylabel('Mass flow rate [kg/s]')
 else
     error('Process not found or eta not implemented for the process.')
 end
@@ -1624,6 +1671,9 @@ if Save_data
     elseif strcmp(Process,'Discharging_L')
         filename = strcat(simType,'_',Process,'_P_',num2str(P_max/1e6),'-',num2str(P_min/1e6),'MPa_m_',num2str(m_out));
         % filename = strcat(simType,'_',Process,'_P_',num2str(P_max/1e6),'-',num2str(P_min/1e6),'MPa_m_',num2str(m_out),'_',string(year(time)),'_',string(month(time)),'_',string(day(time)));
+    elseif strcmp(Process,'Kiuchi')
+        time = now;
+        filename = strcat(Process,'_',string(month(time)),'_',string(day(time)));
     else
         error(strcat('Save data for process ',Process,' not implemented'))
     end
