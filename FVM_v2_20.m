@@ -27,7 +27,7 @@ simType = 'CAESPipe';
 % 'Cycle_R';
 % 'NCycles_R';
 % 'Kiuchi'
-Process = 'Charging_L';
+Process = 'Discharging_L';
 
 % heat_transfer_model 
 % 'Adiabatic'
@@ -43,14 +43,17 @@ if strcmp(simType,'CAESPipe')
     % Setting tolerance
     if strcmp(Process,'Discharging_R') || strcmp(Process,'Discharging_L')
         tol = 1e-5; % CAESPipe discharging
+        tol_v = 1e-4;
     elseif strcmp(Process,'Charging_R') || strcmp(Process,'Charging_L')
         tol = 1e-6; % CAESPipe Charging
+        tol_v = 1e-4;
     elseif strcmp(Process,'Cycle_L')
         tol = 1e-5;
     elseif strcmp(Process,'Idle')
         tol = 1e-5;
     elseif strcmp(Process,'Kiuchi')
         tol = 1e-5;
+        tol_v = 1e-4;
 
         n_nodes = 50;
         Delta_t = 0.01*60;
@@ -79,7 +82,7 @@ P_Corr_fig = 0;
 % Dt = 720; % Charging + discharging time (5km 0.5m pipeline)
 % Dt_charg = 360;
 % Dt = 1200; % Charging L=10 km, d=0.9 m pipeline (360s = 3.44 MWh,1054 elapsed time)
-Dt = 2*3600;
+Dt = 5*3600;
 
 % System operational limits
 P_max = 7e6;
@@ -92,7 +95,7 @@ T_in = 273.15+60;
 
 % Discharging rate
 % m_A = 417; % Huntorf
-m_out = 50;
+m_out = 100;
 
 
 if strcmp(simType,'CAESPipe')
@@ -187,11 +190,11 @@ elseif strcmp(Process,'Idle')
     L_bound = 'Wall';
     R_bound = 'Wall';
 elseif strcmp(Process,'Kiuchi')
-    P_0 = 5e6; % 5 MPa
+    P_0 = P_min; % 5 MPa
     T_0 = 273.15 + 25; % 25 oC
     v_0 = 0;
 
-    T_ground = 298;
+    T_ground = T_0;
 
     % For Kiuchi the standard state is at 0oC and 1 atm
     rho_st = CP.PropsSI('D','T',273.15,'P',101325,'Methane');
@@ -707,7 +710,8 @@ for j=2:n_t
     error_v = 10;
 
     % Momentum and mass balance loop
-    while count(j) < max_iter && max(abs(error_P)) > tol
+    % while count(j) < max_iter && max(abs(error_P)) > tol
+    while count(j) < max_iter && (max(abs(error_P)) > tol || max(abs(error_v)) > tol_v)
         % Under-relaxed corrections
         P(:,j) = P(:,j) + alpha_P*P_corr;
         rho(:,j) = alpha_rho*(rho(:,j) + rho_corr) ...
@@ -742,15 +746,11 @@ for j=2:n_t
 
             v_n(1,j) = (v(1,j) >= 0).*v(1,j) ...
             +      (v(1,j) <  0).*v(2,j);
-        elseif strcmp(L_bound,'P_const')
+        elseif strcmp(L_bound,'P_const') % Kiuchi
             
             
             % warning('Kiuchi boundary conditions under implementation.')
             
-            
-            
-            
-            % P(1,:) = P_L;
             P(1,j) = P_L;
             T(1,j) = T(2,j);
             rho(1,j) = rho(2,j);
@@ -762,6 +762,7 @@ for j=2:n_t
             rho_f(1,j) = rho(1,j);
 
             v_n(1,j) = v(1,j);
+
         elseif strcmp(L_bound,'M_const') 
             % Variation of outlet bound. condition, 
             % with known mass flow rate
@@ -1189,6 +1190,7 @@ for j=2:n_t
         v_corr = zeros(n_f,1);
         % v_corr(1)         = d(1)./a_i(1).*P_corr(1);
         v_corr(2:end-1)   = d_M(2:end-1)./a_diag(2:end-1).*(P_corr(2:end)-P_corr(1:end-1));
+
 % !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
         % Inlet boundary condition
         % v_corr(1)         = 0; 
