@@ -27,14 +27,14 @@ simType = 'CAESPipe';
 % 'Cycle_R';
 % 'NCycles_R';
 % 'Kiuchi'
-Process = 'Kiuchi';
+Process = 'Charging_L';
 
 % heat_transfer_model 
 % 'Adiabatic'
 % Not fully implemented yet:
 % 'Steady_state'
 % 'Isothermal'
-heat_transfer_model = 'Adiabatic';
+heat_transfer_model = 'Isothermal';
 
 if strcmp(simType,'CAESPipe')
     n_nodes = 40;
@@ -79,10 +79,10 @@ P_Corr_fig = 0;
 % Dt = 720; % Charging + discharging time (5km 0.5m pipeline)
 % Dt_charg = 360;
 % Dt = 1200; % Charging L=10 km, d=0.9 m pipeline (360s = 3.44 MWh,1054 elapsed time)
-Dt = 10*3600;
+Dt = 2*3600;
 
 % System operational limits
-P_max = 10e6;
+P_max = 7e6;
 DoD = 3e6; % Depth of discharge in terms of pressure
 P_min = P_max - DoD;
 
@@ -286,9 +286,8 @@ disp(strcat('Process = ',Process,'; Pressure = ',num2str(P_min./1e6),'-',num2str
 %--------------------- SIMULATION PARAMETERS ------------------------%
 
 if strcmp(simType,'CAESPipe')
-    % dx = L/(100-1); % CAESPipe n_nodes = 100 and dt = 0.25 provided low
-    % residual
-    dx = L/(n_nodes-1); 
+    % dx = L/(n_nodes-1);
+    dx = L/n_nodes;
     dt_max = dx/400; % 400 is representative of the sound speed, 
                      % it is higher than the maximum sound speed reached in the pipeline 
                      % to achieve a conservative value
@@ -677,6 +676,8 @@ if P_Corr_fig
     resFig = figure;
 end
 error_hist = [];
+error_hist_v = [];
+error_hist_rho = [];
 error_hist2 = zeros(n_n,n_t,max_iter);
 bound_hist = [string(L_bound) string(R_bound)];
 
@@ -702,6 +703,8 @@ for j=2:n_t
     v_star = v(:,j);
     count(j) = 0;
     error_P = 10;
+    error_rho = 10;
+    error_v = 10;
 
     % Momentum and mass balance loop
     while count(j) < max_iter && max(abs(error_P)) > tol
@@ -1193,12 +1196,18 @@ for j=2:n_t
         % v_corr(end)       = 0;
 % !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-        % v_corr(end)       =  % Velocity corrected based on mass balance (m_in =
+        % v_corr(end) = % Velocity corrected based on mass balance (m_in =
         % m_out)
         error_P = (P_corr./P(:,j));
+        error_rho = (rho_corr./rho(:,j));
+        error_v = (v_corr./v(:,j));
+
         error_hist = [error_hist error_P];
         error_hist2(:,j,count(j)+1) = error_P;
         
+        error_hist_rho = [error_hist_rho error_rho];
+        error_hist_v = [error_hist_v error_v];
+
         if rem(count(j),5) == 0 && P_Corr_fig
             figure(resFig)
             plot(mean(abs(error_hist)))
