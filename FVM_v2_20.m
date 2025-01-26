@@ -38,12 +38,12 @@ heat_transfer_model = 'Isothermal';
 
 if strcmp(simType,'CAESPipe')
     n_nodes = 40;
-    max_iter = 20;
+    max_iter = 80;
     
     % Setting tolerance
     if strcmp(Process,'Discharging_R') || strcmp(Process,'Discharging_L')
         tol = 1e-5; % CAESPipe discharging
-        tol_v = 1e-4;
+        tol_v = 1e-5;
     elseif strcmp(Process,'Charging_R') || strcmp(Process,'Charging_L')
         tol = 1e-6; % CAESPipe Charging
         tol_v = 1e-4;
@@ -74,6 +74,7 @@ end
 Save_data = 0;
 Figures = 0; 
 P_Corr_fig = 0;
+adapt_underrelax = 0;
 
 %----------------------- PROBLEM PARAMETERS -------------------------%
 
@@ -82,7 +83,8 @@ P_Corr_fig = 0;
 % Dt = 720; % Charging + discharging time (5km 0.5m pipeline)
 % Dt_charg = 360;
 % Dt = 1200; % Charging L=10 km, d=0.9 m pipeline (360s = 3.44 MWh,1054 elapsed time)
-Dt = 5*3600;
+% Dt = 9*3600;
+Dt = 200;
 
 % System operational limits
 P_max = 7e6;
@@ -294,8 +296,9 @@ if strcmp(simType,'CAESPipe')
     dt_max = dx/400; % 400 is representative of the sound speed, 
                      % it is higher than the maximum sound speed reached in the pipeline 
                      % to achieve a conservative value
-    dt = (Dt/ceil(Dt/dt_max)); % division of Dt in an integer number of intervals
+    dt = 0.5*(Dt/ceil(Dt/dt_max)); % division of Dt in an integer number of intervals
                             % with dt smaller than dt_max
+
     if strcmp(Process,'Kiuchi')
         dt = Delta_t;
     end
@@ -329,8 +332,13 @@ end
 % Under-relaxation (1 means no under-relaxation)
 alpha = 0.5;
 alpha_P = alpha ;  % Pressure under-relaxation factor
-alpha_v = alpha ;  % velocity under-relaxation factor
+alpha_v = alpha +0.4 ;  % velocity under-relaxation factor
 alpha_rho = alpha ;  % Density under-relaxation factor
+
+alpha_max = 0.8;
+alpha_min = 0.2;
+
+alpha_hist = [alpha_P alpha_v alpha_rho];
 %---------------------- ARRAYS INITIALIZATION ----------------------%
 t = 0:dt:Dt;
 
@@ -498,8 +506,8 @@ elseif strcmp(L_bound,'M_const')
     T_f(1,1) = T(1,1);
     rho_f(1,1) = rho(1,1);
 
-    % v(1,1) = m_L/(rho_f(1,1)*A_h);
-    v(1,1) = 0;
+    v(1,1) = m_L/(rho_f(1,1)*A_h);
+    % v(1,1) = 0;
     
     % v_n(1,1) = m_L/(rho(1,1)*A_h);
     % v_n(1,1) = (v(1,1) >= 0).*v(1,1) ...
@@ -721,6 +729,8 @@ for j=2:n_t
             + (1-alpha_v)*v_star;
         % v(1:end-1,j) = alpha_v*(v_star(1:end-1) + v_corr(1:end-1)) ...
         % + (1-alpha_v)*v_star(1:end-1);
+        
+        alpha_hist = [alpha_hist;alpha_P alpha_v alpha_rho];
 
         % Boundary conditions
         if strcmp(L_bound,'Inlet')
@@ -789,17 +799,16 @@ for j=2:n_t
             T(1,j) = 2*T(2,j) - T(3,j);
             rho(1,j) = 2*rho(2,j) - rho(3,j);
         
-            P_f(1,j) = P(1,j);
-            T_f(1,j) = T(1,j);
-            rho_f(1,j) = rho(1,j);
+            % P_f(1,j) = P(1,j);
+            % T_f(1,j) = T(1,j);
+            % rho_f(1,j) = rho(1,j);
 
-            % P_f(1,j) = 2*P_f(2,j) - P_f(3,j);
-            % T_f(1,j) = 2*T_f(2,j) - T_f(3,j);
-            % rho_f(1,j) = 2*rho_f(2,j) - rho_f(3,j);
+            P_f(1,j) = 2*P_f(2,j) - P_f(3,j);
+            T_f(1,j) = 2*T_f(2,j) - T_f(3,j);
+            rho_f(1,j) = 2*rho_f(2,j) - rho_f(3,j);
  
             v(1,j) = m_L/(rho_f(1,j)*A_h);
 
-            % v_n(1,j) = m_L/(rho(1,j)*A_h);
             % Zero-gradient assumption
             % v_n(1,j) = v(1,j);
             % Upwind scheme
@@ -1217,10 +1226,37 @@ for j=2:n_t
             drawnow % limitrate
         end
 
-        % error_rho = (rho_corr./rho(:,j));
-        % error_v = (v_corr./v(:,j));
+        % Adaptable under-relaxation factor based on error relative to
+        % tolerance
+        if adapt_underrelax
+            if max(abs(error_P)) > tol * 10  % if error is much larger than tolerance
+                alpha_P = max(alpha_P /2 , alpha_min);  % reduce relaxation factor, but not below a minimum
+            elseif max(abs(error_P)) < prev_error_P / 2
+                alpha_P = min(alpha_P *2, alpha_max);  % increase relaxation factor, but not above 1
+            end
+    
+            if max(abs(error_v)) > tol * 10  % if error is much larger than tolerance
+                alpha_v = max(alpha_v /2, alpha_min);  % reduce relaxation factor, but not below a minimum
+            elseif max(abs(error_v)) < prev_error_P / 2
+                alpha_v = min(alpha_v *2, alpha_max);  % increase relaxation factor, but not above 1
+            end
+    
+            if max(abs(error_rho)) > tol * 10  % if error is much larger than tolerance
+                alpha_rho = max(alpha_rho /2, alpha_min);  % reduce relaxation factor, but not below a minimum
+            elseif max(abs(error_rho)) < prev_error_P / 2
+                alpha_rho = min(alpha_rho *2, alpha_max);  % increase relaxation factor, but not above 1
+            end
+
+        end
+        
+        prev_error_P = max(abs(error_P));
+
         count(j) = count(j)+1;  
     end
+
+    alpha_P  = alpha;
+    alpha_v  = alpha;
+    alpha_rho = alpha;
 
     % ENERGY BALANCE
     % ASSUMING v>0
@@ -1566,6 +1602,7 @@ if strcmp(Process,'Cycle_L') | strcmp(Process,'Cycle_R')
         legend('m','$m_o + \dot{m} dt$','Interpreter','latex')
         figure('color',[1 1 1]);plot(t,E./(1e6*3600))
         hold on; plot(t,E_bal(1:end)./(1e6*3600))
+        grid on;
         legend('E [MWh]','$E_o + \dot{m} \Delta E [MWh]$','Interpreter','latex')
     
         figure('color',[1 1 1]);
@@ -1595,6 +1632,7 @@ else
         legend('m','$m_o + \dot{m} dt$','Interpreter','latex')
         figure('color',[1 1 1]);plot(t,E./(1e6*3600))
         hold on; plot(t,E_bal(1:end)./(1e6*3600))
+        grid on 
         legend('E [MWh]','$E_o + \dot{m} \Delta E [MWh]$','Interpreter','latex')
     end
 end
@@ -1614,6 +1652,9 @@ end
 if Figures
     figure('Color',[1 1 1]);
     plot(abs(mean(error_hist)))
+    xlabel('Iteration')
+    ylabel('Absolute mean of the error')
+    grid on
 end
 
 m2 = sum(rho(2:end,:)*A_h*dx);
@@ -1630,12 +1671,16 @@ if Figures
     figure;
     yyaxis left
     plot(t,m2,t,m2_bal)
+    ylabel('mass [kg]')
     yyaxis right
     plot(t,E2./(1e6*3600),t,E2_bal./(1e6*3600))
+    ylabel('Energy [MWh]')
     legend('m','m_{bal}','E','E_{bal}')
     
     figure
-    plot((E2 - E2_bal')./E2)
+    plot(t,(E2 - E2_bal')./E2)
+    xlabel(' t [s]')
+    ylabel('Relative difference between E and E_{bal}')
 end
 
 XX = sum(m_n(2:end,:).*( u(2:end,:) - u_o + P_o*R*(T(2:end,:)./P(2:end,:) - T_o/P_o) - T_o*(s(2:end,:) - s_o) ) )./(1e6*3600);
