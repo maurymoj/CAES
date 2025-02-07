@@ -1,3 +1,6 @@
+% During initial calculations the etaX_stor was computed using an
+% innapropiate formula, which was corrected using this code.
+
 Ps = 6:10;
 Pmins = Ps - 3;
 ms = 50:50:200;

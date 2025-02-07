@@ -1,3 +1,5 @@
+% Plot the full cycle of energy storage dividing the result in charging and
+% discharging processes
 if strcmp(Process,'Cycle_L') | strcmp(Process,'Cycle_R')
     figure('color',[1 1 1]);plot(t,m)
     hold on; plot(t,m_bal)

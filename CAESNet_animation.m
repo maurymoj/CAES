@@ -1,3 +1,7 @@
+% Generates a video animation for the desired property (P,T,v, m_dot or rho)
+% It is also possible to produce videos with two properties at the same
+% time (yyplot)
+
 % x = 1:40;
 clear F
 loops = 60;
@@ -30,15 +34,16 @@ open(vid)
 F(loops) = struct('cdata',[],'colormap',[]);
 figure('Color',[1 1 1])
 % dt_f = 0.1; % time between frames
-dt_f = dt;
+dt_f = 10*dt;
 dec = dt_f/dt;
 t_dec = zeros(1,floor((length(t)-1)/dec+1));
 % decimation = 1000;
 
 plot_type = 'Single';
 % plot_type = 'Double';
-Property = 'v';
+Property = 'T';
 for i=1:length(t_dec)
+% for i=floor(2*length(t_dec)/3):length(t_dec)
     t_dec(i) = t(1+dec*(i-1));
     
     if strcmp(plot_type,'Single')
@@ -66,6 +71,7 @@ for i=1:length(t_dec)
             plot(x_n,P(:,1+dec*(i-1))./1e6);
             xlabel('x [km]')
             ylabel('P [MPa]')
+            % ylim([6.93 6.98])
             % ylim([P_lower_bound-0.1 P_upper_bound+0.1])
             % ylim([P_lower_bound max(P(:,1+dec*(i-1)))./1e6+0.001])
             % ylim([min(P(:,1+dec*(i-1)))/1e6-0.001 max(P(:,1+dec*(i-1)))/1e6+0.001])
@@ -149,7 +155,7 @@ for i=1:length(t_dec)
     title(ti);
 
     grid on
-    drawnow
+    % drawnow
     F(i) = getframe(gcf);
     writeVideo(vid,F(i))
 end

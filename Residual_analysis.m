@@ -1,4 +1,5 @@
-%% Mass
+% Analysis of mass and  energy residuals along the pipeline
+%% Mass residual analysis
 dm_x = zeros(n_n,n_t);
 dm_t = zeros(n_n,n_t);
 
@@ -79,7 +80,7 @@ grid on
 % legend('end-2','end-1','end')
 % title('Mass residual for the last three nodes (dm_t - dm_x)')
 % xlabel('t [s]')
-%% Energy
+%% Energy residual analysis
 dE_x = zeros(n_n,n_t);
 dE_t = zeros(n_n,n_t);
 res_E = zeros(n_n,n_t);

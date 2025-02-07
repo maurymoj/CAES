@@ -1,7 +1,5 @@
 % Generates matrices with the values of storage efficiency, process
-% duration (charging/discharging time), and elapsed time (total time for
-% the conclusion of the simulation).
-
+% duration (charging/discharging time)
 clear
 
 Ps = 6:10;
