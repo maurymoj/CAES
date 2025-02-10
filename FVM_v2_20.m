@@ -834,6 +834,21 @@ for j=2:n_t
                 +      (v(1,j) <  0).*v(2,j);
             % Central scheme
             % v_n(1,j) = (v(1,j) + v(2,j))/2;
+            % Hybrid scheme
+            % nu_f = CP.PropsSI('viscosity','P',P_f(1,j),'D',rho_f(1,j),fluid);
+            % Pe = abs(rho_f(1,j)*v(1,j)*dx)/nu_f;
+            % if Pe > 2  % High convection, use more upwind
+            %     beta = 0.2;  % More upwind
+            % elseif Pe < 0.5  % Low convection, use more central
+            %     beta = 0.8;  % More central
+            % else
+            %     beta = 0.5;  % Balanced
+            % end
+            % 
+            % v_n(1,j) = (1 - beta) * (v(1,j) >= 0) * v(1,j) + ...
+            %            (1 - beta) * (v(1,j) <  0) * v(2,j) + ...
+            %                  beta * (v(1,j) + v(2,j)) / 2;
+
         end
 
         % R boundary
