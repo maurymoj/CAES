@@ -38,14 +38,14 @@ heat_transfer_model = 'Isothermal';
 
 if strcmp(simType,'CAESPipe')
     n_nodes = 40;
-    max_iter = 80;
+    max_iter = 40;
     
     % Setting tolerance
     if strcmp(Process,'Discharging_R') || strcmp(Process,'Discharging_L')
-        tol = 1e-5; % CAESPipe discharging
-        tol_v = 1e-5;
+        tol = 1e-4; % CAESPipe discharging
+        tol_v = 1e-4;
     elseif strcmp(Process,'Charging_R') || strcmp(Process,'Charging_L')
-        tol = 1e-6; % CAESPipe Charging
+        tol = 1e-5; % CAESPipe Charging
         tol_v = 1e-4;
     elseif strcmp(Process,'Cycle_L')
         tol = 1e-5;
@@ -74,7 +74,7 @@ end
 Save_data = 0;
 Figures = 0; 
 P_Corr_fig = 0;
-adapt_underrelax = 0;
+adapt_underrelax = 1;
 
 %----------------------- PROBLEM PARAMETERS -------------------------%
 
@@ -83,7 +83,7 @@ adapt_underrelax = 0;
 % Dt = 720; % Charging + discharging time (5km 0.5m pipeline)
 % Dt_charg = 360;
 % Dt = 1200; % Charging L=10 km, d=0.9 m pipeline (360s = 3.44 MWh,1054 elapsed time)
-% Dt = 9*3600;
+% Dt = 6*3600;
 Dt = 200;
 
 % System operational limits
@@ -93,6 +93,7 @@ P_min = P_max - DoD;
 
 % Charging rate
 m_in = 100;
+% T_in = 273.15+5;
 T_in = 273.15+60;
 
 % Discharging rate
@@ -143,7 +144,7 @@ if strcmp(Process,'Charging_L')
 elseif strcmp(Process,'Discharging_L')
     % Initial conditions
     P_0 = P_max;
-    T_0 = 273.15 + 25;
+    T_0 = 273.15 + T_ground;
     v_0 = 0;
     % v_0 = v_in;
 
@@ -315,6 +316,10 @@ else
     warning('Cant identify simulation type.')
 end
 
+Courant_number = 340*dt/dx;
+if Courant_number > 1
+    warning('The Courant number is greater than 1, simulation can become unstable.')
+end
 % disp(strcat('time step:',num2str(dt),' s'))
 
 
@@ -328,17 +333,24 @@ if strcmp(Process,'Kiuchi')
 end
 
 % Tuning
+min_iter = 10;
 
 % Under-relaxation (1 means no under-relaxation)
 alpha = 0.5;
 alpha_P = alpha ;  % Pressure under-relaxation factor
-alpha_v = alpha +0.4 ;  % velocity under-relaxation factor
+alpha_v = alpha + 0.4 ;  % velocity under-relaxation factor
+% alpha_v = alpha;  % velocity under-relaxation factor
 alpha_rho = alpha ;  % Density under-relaxation factor
+
+adapt_underrelax_hist = [alpha_P alpha_v alpha_rho];
 
 alpha_max = 0.8;
 alpha_min = 0.2;
 
 alpha_hist = [alpha_P alpha_v alpha_rho];
+
+v_threshold = 1e-6;
+
 %---------------------- ARRAYS INITIALIZATION ----------------------%
 t = 0:dt:Dt;
 
@@ -356,7 +368,6 @@ cp_f = zeros(n_f,n_t);
 h_f = zeros(n_f,n_t);
 s_f = zeros(n_f,n_t);
 u_f = zeros(n_f,n_t);
-
 
 u_sonic_f = zeros(n_f,n_t);
 % drho_dP_f = zeros(n_f,n_t);
@@ -385,6 +396,9 @@ E = zeros(1,n_t); % Total energy in pipeline
 
 m_n = zeros(n_n,n_t); % Mass at each node
 E_n = zeros(n_n,n_t); % Energy at each node
+
+% Convergence speed monitoring
+conv_speed = zeros(1,n_t);
 
 %------------------ SETTING INITIAL CONDITIONS ---------------------%
 % Basic calculations
@@ -715,7 +729,11 @@ for j=2:n_t
     count(j) = 0;
     error_P = 10;
     error_rho = 10;
-    error_v = 10;
+    error_v = 10*ones(n_f,1);
+
+    prev_error_P = error_P; 
+    prev_error_v = error_v; 
+    prev_error_rho = error_rho; 
 
     % Momentum and mass balance loop
     % while count(j) < max_iter && max(abs(error_P)) > tol
@@ -965,13 +983,15 @@ for j=2:n_t
 
             % u_sonic_n(i,j) = CP.PropsSI('speed_of_sound','P',P(i,j),'D',rho(i,j),fluid);
             drho_dP_n(i) = 1/(u_sonic_n(i,j-1)^2);
-        end
 
+        end
+        
         % u_sonic_f(end,j) = CP.PropsSI('speed_of_sound','P',P_f(end,j),'D',rho_f(end,j),fluid);
         drho_dP_f(end) = 1/(u_sonic_f(end,j-1)^2);
         if strcmp(friction_model,'Colebrook')
             nu(end) = CP.PropsSI('viscosity','P',P_f(end,j),'D',rho_f(end,j),fluid);
         end
+
 
         %---------- v* calculation - Momentum control volume ---------------------%
         
@@ -1211,7 +1231,10 @@ for j=2:n_t
         % m_out)
         error_P = (P_corr./P(:,j));
         error_rho = (rho_corr./rho(:,j));
-        error_v = (v_corr./v(:,j));
+        
+        v_mask = abs(v(:,j)) > v_threshold; % mask to use absolute values when v is too small or 0
+        error_v(v_mask) = (v_corr(v_mask)./v(v_mask,j));
+        error_v(~v_mask) = abs(v_corr(~v_mask));
 
         error_hist = [error_hist error_P];
         error_hist2(:,j,count(j)+1) = error_P;
@@ -1235,27 +1258,49 @@ for j=2:n_t
                 alpha_P = min(alpha_P *2, alpha_max);  % increase relaxation factor, but not above 1
             end
     
-            if max(abs(error_v)) > tol * 10  % if error is much larger than tolerance
+            if max(abs(error_v)) > tol_v * 10  % if error is much larger than tolerance
                 alpha_v = max(alpha_v /2, alpha_min);  % reduce relaxation factor, but not below a minimum
-            elseif max(abs(error_v)) < prev_error_P / 2
+            elseif max(abs(error_v)) < prev_error_v / 2
                 alpha_v = min(alpha_v *2, alpha_max);  % increase relaxation factor, but not above 1
             end
     
             if max(abs(error_rho)) > tol * 10  % if error is much larger than tolerance
                 alpha_rho = max(alpha_rho /2, alpha_min);  % reduce relaxation factor, but not below a minimum
-            elseif max(abs(error_rho)) < prev_error_P / 2
+            elseif max(abs(error_rho)) < prev_error_rho / 2
                 alpha_rho = min(alpha_rho *2, alpha_max);  % increase relaxation factor, but not above 1
             end
 
+            prev_error_P = max(abs(error_P));
+            prev_error_v = max(abs(error_v));
+            prev_error_rho = max(abs(error_rho));
+            adapt_underrelax_hist = [adapt_underrelax_hist;alpha_P alpha_v alpha_rho];
         end
         
         prev_error_P = max(abs(error_P));
+        
+        count(j) = count(j)+1;
+    end
+    
+    if count(j) >= 0.75*max_iter
+        conv_speed(j) = -1; % Convergence is slow
+    elseif count(j) <= 0.25*max_iter
+        conv_speed(j) = 1; % Convergence is fast
+    end
 
-        count(j) = count(j)+1;  
+    if max(abs(error_P)) >= tol 
+        P_is_conv(j) = 0;
+    else
+        P_is_conv(j) = 1;
+    end
+
+    if max(abs(error_v)) >= tol_v 
+        v_is_conv(j) = 0;
+    else
+        v_is_conv(j) = 1;
     end
 
     alpha_P  = alpha;
-    alpha_v  = alpha;
+    alpha_v  = alpha + 0.4;
     alpha_rho = alpha;
 
     % ENERGY BALANCE
@@ -1362,7 +1407,7 @@ for j=2:n_t
     T_f(2:end-1,j) = (v(1:end-2,j) >= 0).*T(1:end-1,j) ...
                      + (v(1:end-2,j) <  0).*T(2:end,j);
     
-    T_f(end,j) = T(end,j); % ASSUMING UPWIND SCHEME !!!!!!!!!!
+    T_f(end,j) = T(end,j); % ASSUMING UPWIND SCHEME WITH FLOW FROM LEFT !!!!!!!!!!
                            % Implement other cases
     
 
@@ -1460,13 +1505,13 @@ for j=2:n_t
     %     disp(strcat('t = ',num2str(t(j)),'s'))
     % end
     if t(j-1) < Dt/5 && t(j) >= Dt/5
-        disp('20% of simulation time.')
+        disp(strcat('20% of time steps.',string(timeofday(datetime) ) ) )
     elseif t(j-1) < 2*Dt/5 && t(j) >= 2*Dt/5
-        disp('40% of simulation time.')
+        disp(strcat('40% of time steps.',string(timeofday(datetime))))
     elseif t(j-1) < 3*Dt/5 && t(j) >= 3*Dt/5
-        disp('60% of simulation time.')
+        disp(strcat('60% of time steps.',string(timeofday(datetime))))
     elseif t(j-1) < 4*Dt/5 && t(j) >= 4*Dt/5
-        disp('80% of simulation time.')
+        disp(strcat('80% of time steps.',string(timeofday(datetime) )))
     end
 
 end
@@ -1561,7 +1606,11 @@ X_0 = m(1)*(u_0 - u_o + P_o*R*(T_0./P_0 - T_o/P_o) - T_o*(s_0 - s_o) )/(1e6*3600
 X_net = X - X_0;                                                 % Exergy between current state and discharged state (assuming whole pipeline at P_min)
 DeltaX_flow = sum(dX)/(1e6*3600);
 DeltaX_st = sum(X_net(:,end));
-error_X = (DeltaX_st - DeltaX_flow)/DeltaX_st
+if strcmp(Process,'Charging_L')
+    etaX_Ch = DeltaX_st/DeltaX_flow
+elseif strcmp(Process,'Discharging_L')
+    etaX_Disch = DeltaX_flow/DeltaX_st
+end
 
 % figure('Color',[1 1 1])
 % if strcmp(Process,'Cycle_L') | strcmp(Process,'Cycle_R')
@@ -1625,6 +1674,32 @@ if strcmp(Process,'Cycle_L') | strcmp(Process,'Cycle_R')
         % title('Discharging')
         % plot(t(t>=Dt_charg),X(t>=Dt_charg),t(t>=Dt_charg),X(j_disch)+cumsum(dX(t>=Dt_charg))./(1e6*3600))
     end
+elseif strcmp(Process,'Charging_L')
+    
+    if Figures
+        figure('color',[1 1 1]);plot(t,m - m(1))
+        hold on; plot(t,m_bal - m(1))
+        grid on
+        legend('$\Delta m_{storage}$','$m_{in}$','Interpreter','latex')
+
+        figure('color',[1 1 1]);plot(t,(E - E(1))./(1e6*3600))
+        hold on; plot(t,(E_bal(1:end) - E(1))./(1e6*3600))
+        grid on 
+        legend('$\Delta E_{storage}$ [MWh]','$E_{in}$ [MWh]','Interpreter','latex')
+    end
+elseif strcmp(Process,'Discharging_L')
+    if Figures
+        figure('color',[1 1 1]);plot(t,m(1)-m)
+        hold on; plot(t,m(1) - m_bal)
+        grid on
+        legend('$\Delta m_{storage}$','$m_{out}$','Interpreter','latex')
+        % legend('m','$m_o + \dot{m} dt$','Interpreter','latex')
+        
+        figure('color',[1 1 1]);plot(t,(E(1) - E)./(1e6*3600))
+        hold on; plot(t,(E(1) - E_bal(1:end))./(1e6*3600))
+        grid on 
+        legend('$\Delta E_{storage}$ [MWh]','$E_{out}$ [MWh]','Interpreter','latex')
+    end
 else
     if Figures
         figure('color',[1 1 1]);plot(t,m)
@@ -1677,6 +1752,18 @@ if Figures
     ylabel('Energy [MWh]')
     legend('m','m_{bal}','E','E_{bal}')
     
+    if strcmp(Process,'Charging_L')
+        figure('color',[1 1 1]);plot(t./3600,(E2 - E2(1))./(1e6*3600))
+        hold on; plot(t./3600,(E2_bal(1:end) - E2(1))./(1e6*3600))
+        grid on 
+        legend('$\Delta E_{storage}$ [MWh]','$E_{in}$ [MWh]','Interpreter','latex')
+    elseif strcmp(Process,'Discharging_L')
+        figure('color',[1 1 1]);plot(t./3600,(E2(1) - E2)./(1e6*3600))
+        hold on; plot(t./3600,(E2(1) - E2_bal(1:end))./(1e6*3600))
+        grid on 
+        legend('$\Delta E_{storage}$ [MWh]','$E_{out}$ [MWh]','Interpreter','latex')
+    end
+
     figure
     plot(t,(E2 - E2_bal')./E2)
     xlabel(' t [s]')
@@ -1693,6 +1780,8 @@ if strcmp(Process,'Charging_L')
     etaX_stor = ( XX(end) - XX(1) ) / sum(dXX)
 elseif strcmp(Process,'Discharging_L')
     etaX_stor = sum(dXX) / ( XX(end) - XX(1) )
+elseif strcmp(Process, 'Cycle_L')
+    error('eta_X calculation not implemented for cycles yet. ')
 elseif strcmp(Process,'Kiuchi')
     etaX_stor = 0;
     figure('Color',[1 1 1])
