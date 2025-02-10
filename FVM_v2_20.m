@@ -494,9 +494,9 @@ elseif strcmp(L_bound,'M_const')
     % Assumptions:
     % - Zero gradient for all properties except u-velocity
     % - Constant cross-sectional area
-    % P(1,1) = P(2,1);
-    % T(1,1) = T(2,1);
-    % rho(1,1) = rho(2,1);
+    P(1,1) = P(2,1);
+    T(1,1) = T(2,1);
+    rho(1,1) = rho(2,1);
 
     % v_n(1,1) = m_L/(rho(1,1)*A_h);
     % 
@@ -508,9 +508,9 @@ elseif strcmp(L_bound,'M_const')
     % rho_f(1,1) = rho(1,1);
     
 % TEST LINEAR APPROXIMATION FOR P, rho, AND T
-    P(1,1) = 2*P(2,1) - P(3,1);
-    T(1,1) = 2*T(2,1) - T(3,1);
-    rho(1,1) = 2*rho(2,1) - rho(3,1);
+    % P(1,1) = 2*P(2,1) - P(3,1);
+    % T(1,1) = 2*T(2,1) - T(3,1);
+    % rho(1,1) = 2*rho(2,1) - rho(3,1);
 
     % P_f(1,1) = 2*P_f(2,1) - P_f(3,1);
     % T_f(1,1) = 2*T_f(2,1) - T_f(3,1);
@@ -520,8 +520,8 @@ elseif strcmp(L_bound,'M_const')
     T_f(1,1) = T(1,1);
     rho_f(1,1) = rho(1,1);
 
-    v(1,1) = m_L/(rho_f(1,1)*A_h);
-    % v(1,1) = 0;
+    % v(1,1) = m_L/(rho_f(1,1)*A_h);
+    v(1,1) = 0;
     
     % v_n(1,1) = m_L/(rho(1,1)*A_h);
     % v_n(1,1) = (v(1,1) >= 0).*v(1,1) ...
@@ -797,33 +797,33 @@ for j=2:n_t
             % Assumptions:
             % - Zero gradient for all properties except u-velocity
             % - Constant cross-sectional area
-            % P(1,j) = P(2,j);
-            % T(1,j) = T(2,j);
-            % rho(1,j) = rho(2,j);
+            P(1,j) = P(2,j);
+            T(1,j) = T(2,j);
+            rho(1,j) = rho(2,j);
             % 
             % v_n(1,j) = m_L/(rho(1,j)*A_h);
             % 
             % % Upwind scheme
             % v(1,j) = v_n(1,j); % zero gradient assumption
             % 
-            % P_f(1,j) = P(1,j);
-            % T_f(1,j) = T(1,j);
-            % rho_f(1,j) = rho(1,j);
+            P_f(1,j) = P(1,j);
+            T_f(1,j) = T(1,j);
+            rho_f(1,j) = rho(1,j);
 
             % TEST LINEAR APPROXIMATION FOR P, rho, AND T
             % !!! ASSUMING FLOW ALWAYS TO THE LEFT !!!
 
-            P(1,j) = 2*P(2,j) - P(3,j);
-            T(1,j) = 2*T(2,j) - T(3,j);
-            rho(1,j) = 2*rho(2,j) - rho(3,j);
+            % P(1,j) = 2*P(2,j) - P(3,j);
+            % T(1,j) = 2*T(2,j) - T(3,j);
+            % rho(1,j) = 2*rho(2,j) - rho(3,j);
         
             % P_f(1,j) = P(1,j);
             % T_f(1,j) = T(1,j);
             % rho_f(1,j) = rho(1,j);
-
-            P_f(1,j) = 2*P_f(2,j) - P_f(3,j);
-            T_f(1,j) = 2*T_f(2,j) - T_f(3,j);
-            rho_f(1,j) = 2*rho_f(2,j) - rho_f(3,j);
+            % 
+            % P_f(1,j) = 2*P_f(2,j) - P_f(3,j);
+            % T_f(1,j) = 2*T_f(2,j) - T_f(3,j);
+            % rho_f(1,j) = 2*rho_f(2,j) - rho_f(3,j);
  
             v(1,j) = m_L/(rho_f(1,j)*A_h);
 
@@ -1248,6 +1248,17 @@ for j=2:n_t
             % ylim([0,1e-4])
             drawnow % limitrate
         end
+
+
+        if any(isnan(P_corr)) || any(isinf(P_corr))
+            warning('Divergence detected: Solution contains NaN or Inf values');
+            break;  % or take corrective action
+        end
+        
+        % if count(j) > min_iter && std(P_corr(end-min_iter+1:end)) < std(P_corr(end-min_iter*2+1:end-min_iter))
+        %     warning('Possible oscillatory behavior detected');
+        %     % Adjust under-relaxation factors or time step
+        % end
 
         % Adaptable under-relaxation factor based on error relative to
         % tolerance
