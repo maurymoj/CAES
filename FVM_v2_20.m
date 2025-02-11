@@ -34,11 +34,11 @@ Process = 'Discharging_L';
 % Not fully implemented yet:
 % 'Steady_state'
 % 'Isothermal'
-heat_transfer_model = 'Isothermal';
+heat_transfer_model = 'Adiabatic';
 
 if strcmp(simType,'CAESPipe')
     n_nodes = 100;
-    max_iter = 40;
+    max_iter = 20;
     
     % Setting tolerance
     if strcmp(Process,'Discharging_R') || strcmp(Process,'Discharging_L')
@@ -76,6 +76,8 @@ Figures = 1;
 P_Corr_fig = 0;
 adapt_underrelax = 1;
 
+t_ramp = 10;
+warning('Ramp time under implementation.')
 %----------------------- PROBLEM PARAMETERS -------------------------%
 
 % Total simulation time
@@ -84,7 +86,7 @@ adapt_underrelax = 1;
 % Dt_charg = 360;
 % Dt = 1200; % Charging L=10 km, d=0.9 m pipeline (360s = 3.44 MWh,1054 elapsed time)
 % Dt = 6*3600;
-Dt = 200;
+Dt = 6000;
 
 % System operational limits
 P_max = 7e6;
@@ -333,7 +335,7 @@ if strcmp(Process,'Kiuchi')
 end
 
 % Tuning
-min_iter = 10;
+min_iter = 6; % !!! currently unused
 
 % Under-relaxation (1 means no under-relaxation)
 alpha = 0.5;
@@ -344,8 +346,8 @@ alpha_rho = alpha ;  % Density under-relaxation factor
 
 adapt_underrelax_hist = [alpha_P alpha_v alpha_rho];
 
-alpha_max = 0.8;
-alpha_min = 0.2;
+alpha_max = 0.9;
+alpha_min = 0.1;
 
 alpha_hist = [alpha_P alpha_v alpha_rho];
 
@@ -737,7 +739,8 @@ for j=2:n_t
 
     % Momentum and mass balance loop
     % while count(j) < max_iter && max(abs(error_P)) > tol
-    while count(j) < max_iter && (max(abs(error_P)) > tol || max(abs(error_v)) > tol_v)
+    while (count(j) < max_iter && (max(abs(error_P)) > tol || max(abs(error_v)) > tol_v)) ...
+            || (count(j) < min_iter)
         % Under-relaxed corrections
         P(:,j) = P(:,j) + alpha_P*P_corr;
         rho(:,j) = alpha_rho*(rho(:,j) + rho_corr) ...
@@ -1415,7 +1418,7 @@ for j=2:n_t
     for i = 1:n_n  % PROPERTIES FROM P AND RHO          
         % T(i,j) = CP.PropsSI('T','P',P(i,j),'D',rho(i,j),fluid);
         cp(i,j) = CP.PropsSI('C','P',P(i,j),'D',rho(i,j),fluid);
-        h(i,j) = CP.PropsSI('H','P',P(i,j),'D',rho(i,j),fluid);
+        h(i,j) = CP.PropsSI('H','P',P(i,j),'D',rho(i,j),fluid);     
         s(i,j) = CP.PropsSI('S','P',P(i,j),'D',rho(i,j),fluid);
         u(i,j) = CP.PropsSI('U','P',P(i,j),'D',rho(i,j),fluid);
         u_sonic_n(i,j) = CP.PropsSI('speed_of_sound','P',P(i,j),'D',rho(i,j),fluid);
