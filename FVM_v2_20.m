@@ -37,7 +37,7 @@ Process = 'Discharging_L';
 heat_transfer_model = 'Isothermal';
 
 if strcmp(simType,'CAESPipe')
-    n_nodes = 40;
+    n_nodes = 100;
     max_iter = 40;
     
     % Setting tolerance
@@ -72,7 +72,7 @@ end
 
 % Plot figures ? [0 -> no / 1 -> yes]
 Save_data = 0;
-Figures = 0; 
+Figures = 1; 
 P_Corr_fig = 0;
 adapt_underrelax = 1;
 
@@ -144,7 +144,7 @@ if strcmp(Process,'Charging_L')
 elseif strcmp(Process,'Discharging_L')
     % Initial conditions
     P_0 = P_max;
-    T_0 = 273.15 + T_ground;
+    T_0 = T_ground;
     v_0 = 0;
     % v_0 = v_in;
 
@@ -797,29 +797,29 @@ for j=2:n_t
             % Assumptions:
             % - Zero gradient for all properties except u-velocity
             % - Constant cross-sectional area
-            P(1,j) = P(2,j);
-            T(1,j) = T(2,j);
-            rho(1,j) = rho(2,j);
+            % P(1,j) = P(2,j);
+            % T(1,j) = T(2,j);
+            % rho(1,j) = rho(2,j);
             % 
             % v_n(1,j) = m_L/(rho(1,j)*A_h);
             % 
             % % Upwind scheme
             % v(1,j) = v_n(1,j); % zero gradient assumption
             % 
-            P_f(1,j) = P(1,j);
-            T_f(1,j) = T(1,j);
-            rho_f(1,j) = rho(1,j);
+            % P_f(1,j) = P(1,j);
+            % T_f(1,j) = T(1,j);
+            % rho_f(1,j) = rho(1,j);
 
             % TEST LINEAR APPROXIMATION FOR P, rho, AND T
             % !!! ASSUMING FLOW ALWAYS TO THE LEFT !!!
 
-            % P(1,j) = 2*P(2,j) - P(3,j);
-            % T(1,j) = 2*T(2,j) - T(3,j);
-            % rho(1,j) = 2*rho(2,j) - rho(3,j);
+            P(1,j) = 2*P(2,j) - P(3,j);
+            T(1,j) = 2*T(2,j) - T(3,j);
+            rho(1,j) = 2*rho(2,j) - rho(3,j);
         
-            % P_f(1,j) = P(1,j);
-            % T_f(1,j) = T(1,j);
-            % rho_f(1,j) = rho(1,j);
+            P_f(1,j) = P(1,j);
+            T_f(1,j) = T(1,j);
+            rho_f(1,j) = rho(1,j);
             % 
             % P_f(1,j) = 2*P_f(2,j) - P_f(3,j);
             % T_f(1,j) = 2*T_f(2,j) - T_f(3,j);
@@ -1045,9 +1045,10 @@ for j=2:n_t
         d_M = zeros(n_f,1);
         B_M = zeros(n_f,1);
         
+
         a_M(1,1) = 1; % Value for v at the first momentum volume is 
-                      % known from boundary conditions
-        B_M(1) = v(1,j);
+                         % known from boundary conditions
+        B_M(1) = 1*v(1,j);
         %!!!!!!!!!!!!!!!!!!! IN DEVELOPMENT !!!!!!!!!!!!!!!!!!!!!!!!!
         % if strcmp(L_bound,'P_const') 
         %     a_M(1,1) = 1; % Value for v at the first momentum volume is 
@@ -1308,9 +1309,9 @@ for j=2:n_t
     end
     
     if count(j) >= 0.75*max_iter
-        conv_speed(j) = -1; % Convergence is slow
+        conv_speed(j) = -1; % Convergence is slow, decrease time step
     elseif count(j) <= 0.25*max_iter
-        conv_speed(j) = 1; % Convergence is fast
+        conv_speed(j) = 1; % Convergence is fast, increase time step 
     end
 
     if max(abs(error_P)) >= tol 
@@ -1543,7 +1544,7 @@ for j=2:n_t
 end
 
 elapsedTime = toc;
-if elapsedTime/60 > 10
+if elapsedTime/60 > 5
     disp(strcat('Elapsed time: ',num2str(floor(elapsedTime/60)),' min'));
 else
     disp(strcat('Elapsed time: ',num2str(floor(elapsedTime)),' s'));
