@@ -820,14 +820,17 @@ for j=2:n_t
             T(1,j) = 2*T(2,j) - T(3,j);
             rho(1,j) = 2*rho(2,j) - rho(3,j);
         
-            P_f(1,j) = P(1,j);
-            T_f(1,j) = T(1,j);
-            rho_f(1,j) = rho(1,j);
-            % 
-            % P_f(1,j) = 2*P_f(2,j) - P_f(3,j);
-            % T_f(1,j) = 2*T_f(2,j) - T_f(3,j);
-            % rho_f(1,j) = 2*rho_f(2,j) - rho_f(3,j);
- 
+            % P_f(1,j) = P(1,j);
+            % T_f(1,j) = T(1,j);
+            % rho_f(1,j) = rho(1,j);
+             
+            P_f(1,j) = 1.5*P(1,j) - 0.5*P(2,j);
+            T_f(1,j) = 2*T(1,j) - T(2,j);
+            rho_f(1,j) = 2*rho(1,j) - rho(2,j);
+            
+            % UNDER DEVELOPMENT
+            % v(1,j) = min(1 , t(j)/t_ramp)*m_L/(rho_f(1,j)*A_h); % Ramps
+            % mass flow rate from 0 up to max value based on time t_ramp
             v(1,j) = m_L/(rho_f(1,j)*A_h);
 
             % Zero-gradient assumption
