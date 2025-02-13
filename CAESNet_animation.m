@@ -34,7 +34,7 @@ open(vid)
 F(loops) = struct('cdata',[],'colormap',[]);
 figure('Color',[1 1 1])
 % dt_f = 0.1; % time between frames
-dt_f = 10*dt;
+dt_f = dt;
 dec = dt_f/dt;
 t_dec = zeros(1,floor((length(t)-1)/dec+1));
 % decimation = 1000;

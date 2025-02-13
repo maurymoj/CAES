@@ -38,14 +38,14 @@ heat_transfer_model = 'Adiabatic';
 
 if strcmp(simType,'CAESPipe')
     n_nodes = 100;
-    max_iter = 20;
+    max_iter = 40;
     
     % Setting tolerance
     if strcmp(Process,'Discharging_R') || strcmp(Process,'Discharging_L')
         tol = 1e-4; % CAESPipe discharging
         tol_v = 1e-4;
     elseif strcmp(Process,'Charging_R') || strcmp(Process,'Charging_L')
-        tol = 1e-5; % CAESPipe Charging
+        tol = 1e-4; % CAESPipe Charging
         tol_v = 1e-4;
     elseif strcmp(Process,'Cycle_L')
         tol = 1e-5;
@@ -72,11 +72,11 @@ end
 
 % Plot figures ? [0 -> no / 1 -> yes]
 Save_data = 0;
-Figures = 1; 
+Figures = 0; 
 P_Corr_fig = 0;
-adapt_underrelax = 1;
+adapt_underrelax = 0;
 
-t_ramp = 10;
+t_ramp = 0.1;
 warning('Ramp time under implementation.')
 %----------------------- PROBLEM PARAMETERS -------------------------%
 
@@ -86,7 +86,7 @@ warning('Ramp time under implementation.')
 % Dt_charg = 360;
 % Dt = 1200; % Charging L=10 km, d=0.9 m pipeline (360s = 3.44 MWh,1054 elapsed time)
 % Dt = 6*3600;
-Dt = 6000;
+Dt = 10;
 
 % System operational limits
 P_max = 7e6;
@@ -299,7 +299,7 @@ if strcmp(simType,'CAESPipe')
     dt_max = dx/400; % 400 is representative of the sound speed, 
                      % it is higher than the maximum sound speed reached in the pipeline 
                      % to achieve a conservative value
-    dt = 0.5*(Dt/ceil(Dt/dt_max)); % division of Dt in an integer number of intervals
+    dt = 0.1*(Dt/ceil(Dt/dt_max)); % division of Dt in an integer number of intervals
                             % with dt smaller than dt_max
 
     if strcmp(Process,'Kiuchi')
@@ -335,13 +335,12 @@ if strcmp(Process,'Kiuchi')
 end
 
 % Tuning
-min_iter = 6; % !!! currently unused
+min_iter = 6; % Minimum number of iterations
 
 % Under-relaxation (1 means no under-relaxation)
 alpha = 0.5;
-alpha_P = alpha ;  % Pressure under-relaxation factor
-alpha_v = alpha + 0.4 ;  % velocity under-relaxation factor
-% alpha_v = alpha;  % velocity under-relaxation factor
+alpha_P = alpha;  % Pressure under-relaxation factor
+alpha_v = alpha;  % Velocity under-relaxation factor
 alpha_rho = alpha ;  % Density under-relaxation factor
 
 adapt_underrelax_hist = [alpha_P alpha_v alpha_rho];
@@ -351,6 +350,7 @@ alpha_min = 0.1;
 
 alpha_hist = [alpha_P alpha_v alpha_rho];
 
+% Minimum absolute value of velocity to compute the relative error
 v_threshold = 1e-6;
 
 %---------------------- ARRAYS INITIALIZATION ----------------------%
@@ -496,9 +496,9 @@ elseif strcmp(L_bound,'M_const')
     % Assumptions:
     % - Zero gradient for all properties except u-velocity
     % - Constant cross-sectional area
-    P(1,1) = P(2,1);
-    T(1,1) = T(2,1);
-    rho(1,1) = rho(2,1);
+    % P(1,1) = P(2,1);
+    % T(1,1) = T(2,1);
+    % rho(1,1) = rho(2,1);
 
     % v_n(1,1) = m_L/(rho(1,1)*A_h);
     % 
@@ -510,9 +510,9 @@ elseif strcmp(L_bound,'M_const')
     % rho_f(1,1) = rho(1,1);
     
 % TEST LINEAR APPROXIMATION FOR P, rho, AND T
-    % P(1,1) = 2*P(2,1) - P(3,1);
-    % T(1,1) = 2*T(2,1) - T(3,1);
-    % rho(1,1) = 2*rho(2,1) - rho(3,1);
+    P(1,1) = 2*P(2,1) - P(3,1);
+    T(1,1) = 2*T(2,1) - T(3,1);
+    rho(1,1) = 2*rho(2,1) - rho(3,1);
 
     % P_f(1,1) = 2*P_f(2,1) - P_f(3,1);
     % T_f(1,1) = 2*T_f(2,1) - T_f(3,1);
@@ -694,7 +694,7 @@ E(1) = sum(rho(:,1)*A_h*dx.*u(:,1));
 m_n(:,1) = rho(:,1)*A_h*dx;
 E_n(:,1) = rho(:,1)*A_h*dx.*u(:,1);
 
-count = zeros(n_t,1);
+n_iters = zeros(n_t,1);
 
 % Friction factor based on Nikuradse
 f_guess = (2*log10(1/epsD)+1.14)^(-2);
@@ -707,6 +707,9 @@ error_hist_v = [];
 error_hist_rho = [];
 error_hist2 = zeros(n_n,n_t,max_iter);
 bound_hist = [string(L_bound) string(R_bound)];
+
+P_is_conv = zeros(n_t,1);
+v_is_conv = zeros(n_t,1);
 
 for j=2:n_t
     % Initial guess for next time step is the same props as the previous t step
@@ -728,7 +731,7 @@ for j=2:n_t
     v_corr = zeros(n_f,1);
     
     v_star = v(:,j);
-    count(j) = 0;
+    n_iters(j) = 0;
     error_P = 10;
     error_rho = 10;
     error_v = 10*ones(n_f,1);
@@ -739,8 +742,8 @@ for j=2:n_t
 
     % Momentum and mass balance loop
     % while count(j) < max_iter && max(abs(error_P)) > tol
-    while (count(j) < max_iter && (max(abs(error_P)) > tol || max(abs(error_v)) > tol_v)) ...
-            || (count(j) < min_iter)
+    while (n_iters(j) < max_iter && (max(abs(error_P)) > tol || max(abs(error_v)) > tol_v)) ...
+           || (n_iters(j) <= min_iter)
         % Under-relaxed corrections
         P(:,j) = P(:,j) + alpha_P*P_corr;
         rho(:,j) = alpha_rho*(rho(:,j) + rho_corr) ...
@@ -829,15 +832,16 @@ for j=2:n_t
             rho_f(1,j) = 2*rho(1,j) - rho(2,j);
             
             % UNDER DEVELOPMENT
-            % v(1,j) = min(1 , t(j)/t_ramp)*m_L/(rho_f(1,j)*A_h); % Ramps
+            v(1,j) = min(1 , t(j)/t_ramp)*m_L/(rho_f(1,j)*A_h); % Ramps
             % mass flow rate from 0 up to max value based on time t_ramp
-            v(1,j) = m_L/(rho_f(1,j)*A_h);
+            % v(1,j) = m_L/(rho_f(1,j)*A_h);
 
+            % Node velocity differencing scheme 
             % Zero-gradient assumption
             % v_n(1,j) = v(1,j);
             % Upwind scheme
-            v_n(1,j) = (v(1,j) >= 0).*v(1,j) ...
-                +      (v(1,j) <  0).*v(2,j);
+            % v_n(1,j) = (v(1,j) >= 0).*v(1,j) ...
+            %     +      (v(1,j) <  0).*v(2,j);
             % Central scheme
             % v_n(1,j) = (v(1,j) + v(2,j))/2;
             % Hybrid scheme
@@ -854,7 +858,8 @@ for j=2:n_t
             % v_n(1,j) = (1 - beta) * (v(1,j) >= 0) * v(1,j) + ...
             %            (1 - beta) * (v(1,j) <  0) * v(2,j) + ...
             %                  beta * (v(1,j) + v(2,j)) / 2;
-
+            % simplified QUICK scheme
+            v_n(1,j) = v(1,j) + (1/8) * (3*v(2,j) - 3*v(1,j) + v(3,j) - v(1,j));
         end
 
         % R boundary
@@ -966,7 +971,15 @@ for j=2:n_t
         %     +      (v(1:end-1,j) <  0).*v((2:end),j);
         v_n(2:end,j) = (v(2:end-1,j) >= 0).*v((2:end-1),j) ...
             +      (v(2:end-1,j) <  0).*v((3:end),j);
+        % QUICK + Upwind scheme
+        % v_n(2:5,j) = v(2:5,j) + (1/8) * (3*v(3:6,j) - 3*v(2:5,j) + v(4:7,j) - v(1:4,j));
+        % v_n(6:end,j) = (v(6:end-1,j) >= 0).*v(6:end-1,j) ...
+        %     +      (v(6:end-1,j) <  0).*v(7:end,j);
+        % QUICK scheme
+        % v_n(i)       = v_f(i)       + (1/8) * (3*v_f(i+1)   - 3*v_f(i)       + v_f(i+2)     - v_f(i-1))
+        % v_n(2:n_n-1,j) = v(2:n_n-1,j) + (1/8) * (3*v(3:n_n,j) - 3*v(2:n_n-1,j) + v(4:n_n+1,j) - v(1:n_n-2,j));
         
+
         % Properties in nodes to faces
         P_f(2:end-1,j) = (v(2:end-1,j) >= 0).*P(1:end-1,j) ...
             +            (v(2:end-1,j) <  0).*P(2:end,j);
@@ -1063,16 +1076,18 @@ for j=2:n_t
         % end
         %!!!!!!!!!!!!!!!!!!! IN DEVELOPMENT !!!!!!!!!!!!!!!!!!!!!!!!!
 
+        % Right boundary
         a_M(n_f,n_f) = 1; % Value for v at the last momentum volume
         B_M(n_f) = v(n_f,j);
-
+        
+        % 
         a_M(2,3) = -max( 0, -rho(2,j)*v_n(2,j)/dx);    % a_C
         a_M(2,2) = rho_f(2,j)/dt + f(2)*rho_f(2,j)*abs(v(2,j))/(2*D) ...
             + (rho(2,j)*v_n(2,j) - rho(1,j)*v_n(1,j))/dx ...
             - (a_M(2,3) - max(rho(1,j)*v_n(1,j)/dx,  0) );% a_B
-                
+
         d_M(2) = -1/dx;
-        
+
         b_M(2) = (rho_f(2,j-1)*v(2,j-1)/dt)...
             - rho_f(2,j)*g*sind(theta)...
             + max(rho(1,j)*v_n(1,j)/dx,  0)*v_n(1,j); 
@@ -1133,6 +1148,9 @@ for j=2:n_t
         
         v_star = linsolve(a_M,B_M);
                 
+        % if strcmp(L_bound,'M_const')
+        %     v_star(1) = v(1,j);
+        % end
         % if strcmp(L_bound,'Outlet')
         %     v_star(1) = v_star(2);
         % elseif strcmp(R_bound,'Outlet')
@@ -1259,12 +1277,12 @@ for j=2:n_t
         error_v(~v_mask) = abs(v_corr(~v_mask));
 
         error_hist = [error_hist error_P];
-        error_hist2(:,j,count(j)+1) = error_P;
+        error_hist2(:,j,n_iters(j)+1) = error_P;
         
         error_hist_rho = [error_hist_rho error_rho];
         error_hist_v = [error_hist_v error_v];
 
-        if rem(count(j),5) == 0 && P_Corr_fig
+        if rem(n_iters(j),5) == 0 && P_Corr_fig
             figure(resFig)
             plot(mean(abs(error_hist)))
             % ylim([0,1e-4])
@@ -1300,7 +1318,7 @@ for j=2:n_t
             if max(abs(error_rho)) > tol * 10  % if error is much larger than tolerance
                 alpha_rho = max(alpha_rho /2, alpha_min);  % reduce relaxation factor, but not below a minimum
             elseif max(abs(error_rho)) < prev_error_rho / 2
-                alpha_rho = min(alpha_rho *2, alpha_max);  % increase relaxation factor, but not above 1
+                alpha_rho = min(alpha_rho *2, alpha_max);  % increase relaxation factor, but not above a maximum
             end
 
             prev_error_P = max(abs(error_P));
@@ -1311,12 +1329,12 @@ for j=2:n_t
         
         prev_error_P = max(abs(error_P));
         
-        count(j) = count(j)+1;
+        n_iters(j) = n_iters(j)+1;
     end
     
-    if count(j) >= 0.75*max_iter
+    if n_iters(j) >= 0.75*max_iter
         conv_speed(j) = -1; % Convergence is slow, decrease time step
-    elseif count(j) <= 0.25*max_iter
+    elseif n_iters(j) <= 0.25*max_iter
         conv_speed(j) = 1; % Convergence is fast, increase time step 
     end
 
@@ -1332,9 +1350,9 @@ for j=2:n_t
         v_is_conv(j) = 1;
     end
 
-    alpha_P  = alpha;
-    alpha_v  = alpha + 0.4;
-    alpha_rho = alpha;
+    % alpha_P  = alpha;
+    % alpha_v  = alpha + 0.4;
+    % alpha_rho = alpha;
 
     % ENERGY BALANCE
     % ASSUMING v>0
