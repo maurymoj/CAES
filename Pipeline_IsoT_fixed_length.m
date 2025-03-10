@@ -12,7 +12,7 @@ T_a = 15 + 273.15; % T = 15 oC - ~288 K Standard temp used by the UK national ga
 P_a = 101325 ; % P = 101.325 kPa
 G = 1;      % Specific gas gravity - for air G = 1
 
-P_in = 10e6; % 7 MPa
+P_in = 9e6; % 7 MPa
 T_1 = 5 + 273.15; % Common operational condition assumption Nasr and Connor "Natural Gas Engineering and Safety Challenges"
 T_f = T_1; % Isothermal assumption
     % !!! High temperatures on the outlet of compressor stations,
@@ -46,8 +46,8 @@ E = 0.75;   % Pipeline efficiency
     % Usually varies from 0.6 to 0.92 as a function of liquid presence and age
     % "Handbook of natural gas transmission and processing"
 
-H_1 = 0;
-H_2 = 100;
+H_1 = 0; % Elevation at pipeline inlet
+H_2 = 1; % Elevation at pipeline outlet
 
 % H_1 = 30.6726; % Values from St. Fergus to Aberdeen profile 1
 % H_2 = 137.917;

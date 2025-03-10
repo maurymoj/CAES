@@ -1,4 +1,9 @@
+CP = py.importlib.import_module('CoolProp.CoolProp'); % Simplifies coolprop calls
+
 % Flow exergy
+
+T_amb = 25 + 273.15; %  25 oC
+P_amb = 101375;      % 101.375 kPa
 
 % Mass flow rate equation based on st. fergus data (5 pipelines, 1x d=0.4, 3x d=0.9 and 1x d=1.2m;
 Total_area = pi*0.45^2/4 + 3*pi*0.9^2/4 + pi*1.2^2/4;
