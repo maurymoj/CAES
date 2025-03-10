@@ -86,7 +86,7 @@ warning('Ramp time under implementation.')
 % Dt_charg = 360;
 % Dt = 1200; % Charging L=10 km, d=0.9 m pipeline (360s = 3.44 MWh,1054 elapsed time)
 % Dt = 6*3600;
-Dt = 10;
+Dt = 600;
 
 % System operational limits
 P_max = 7e6;
@@ -299,7 +299,7 @@ if strcmp(simType,'CAESPipe')
     dt_max = dx/400; % 400 is representative of the sound speed, 
                      % it is higher than the maximum sound speed reached in the pipeline 
                      % to achieve a conservative value
-    dt = 0.1*(Dt/ceil(Dt/dt_max)); % division of Dt in an integer number of intervals
+    dt = 0.5*(Dt/ceil(Dt/dt_max)); % division of Dt in an integer number of intervals
                             % with dt smaller than dt_max
 
     if strcmp(Process,'Kiuchi')
@@ -823,25 +823,25 @@ for j=2:n_t
             T(1,j) = 2*T(2,j) - T(3,j);
             rho(1,j) = 2*rho(2,j) - rho(3,j);
         
-            % P_f(1,j) = P(1,j);
-            % T_f(1,j) = T(1,j);
-            % rho_f(1,j) = rho(1,j);
+            P_f(1,j) = P(1,j);
+            T_f(1,j) = T(1,j);
+            rho_f(1,j) = rho(1,j);
              
-            P_f(1,j) = 1.5*P(1,j) - 0.5*P(2,j);
-            T_f(1,j) = 2*T(1,j) - T(2,j);
-            rho_f(1,j) = 2*rho(1,j) - rho(2,j);
+            % P_f(1,j) = 1.5*P(1,j) - 0.5*P(2,j);
+            % T_f(1,j) = 2*T(1,j) - T(2,j);
+            % rho_f(1,j) = 2*rho(1,j) - rho(2,j);
             
             % UNDER DEVELOPMENT
-            v(1,j) = min(1 , t(j)/t_ramp)*m_L/(rho_f(1,j)*A_h); % Ramps
+            % v(1,j) = min(1 , t(j)/t_ramp)*m_L/(rho_f(1,j)*A_h); % Ramps
             % mass flow rate from 0 up to max value based on time t_ramp
-            % v(1,j) = m_L/(rho_f(1,j)*A_h);
+            v(1,j) = m_L/(rho_f(1,j)*A_h);
 
             % Node velocity differencing scheme 
             % Zero-gradient assumption
             % v_n(1,j) = v(1,j);
             % Upwind scheme
-            % v_n(1,j) = (v(1,j) >= 0).*v(1,j) ...
-            %     +      (v(1,j) <  0).*v(2,j);
+            v_n(1,j) = (v(1,j) >= 0).*v(1,j) ...
+                +      (v(1,j) <  0).*v(2,j);
             % Central scheme
             % v_n(1,j) = (v(1,j) + v(2,j))/2;
             % Hybrid scheme
@@ -859,7 +859,7 @@ for j=2:n_t
             %            (1 - beta) * (v(1,j) <  0) * v(2,j) + ...
             %                  beta * (v(1,j) + v(2,j)) / 2;
             % simplified QUICK scheme
-            v_n(1,j) = v(1,j) + (1/8) * (3*v(2,j) - 3*v(1,j) + v(3,j) - v(1,j));
+            % v_n(1,j) = v(1,j) + (1/8) * (3*v(2,j) - 3*v(1,j) + v(3,j) - v(1,j));
         end
 
         % R boundary
@@ -1065,9 +1065,9 @@ for j=2:n_t
         B_M = zeros(n_f,1);
         
 
-        a_M(1,1) = 1; % Value for v at the first momentum volume is 
+        a_M(1,1) = 1e10; % Value for v at the first momentum volume is 
                          % known from boundary conditions
-        B_M(1) = 1*v(1,j);
+        B_M(1) = 1e10*v(1,j);
         %!!!!!!!!!!!!!!!!!!! IN DEVELOPMENT !!!!!!!!!!!!!!!!!!!!!!!!!
         % if strcmp(L_bound,'P_const') 
         %     a_M(1,1) = 1; % Value for v at the first momentum volume is 
@@ -1243,7 +1243,7 @@ for j=2:n_t
 
         P_corr = linsolve(a_C,B_C);
         
-        if strcmp(L_bound,'M_const') %|| strcmp(L_bound,'Inlet')
+        if strcmp(L_bound,'Inlet')
             % P_corr(1) = 0;
         elseif strcmp(R_bound,'M_const')
             P_corr(end) = 0;

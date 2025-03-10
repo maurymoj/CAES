@@ -6,12 +6,12 @@ clear
 
 Ps = 6:10;
 Pmins = Ps - 3;
-m_dots = 100:25:200;
+m_dots = 50:25:200;
 
 % Process types:
 % Charging_L
 % Discharging_L
-Process_type = 'Charging_L';
+Process_type = 'Discharging_L';
 etaX_stor_M = zeros(length(Ps),length(m_dots));
 Duration = zeros(length(Ps),length(m_dots));
 elapsedTimes = zeros(length(Ps),length(m_dots));
