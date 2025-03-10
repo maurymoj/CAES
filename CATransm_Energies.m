@@ -111,8 +111,6 @@ diams = [0.45, 0.9,1.2];
 Ps = 1e6*(4:0.25:10);
 Flow_rates = [3, 14, 25]*1000000/(24*3600); % 3, 14, and 25 Mscmd (Million of std m3 per day)
 
-LStyle = {'b','r','k','b--','r--','k--','b-.'};
-
 % % Sanity check with book equation comparisons
 % G = 0.6
 % T_a = (60 - 32)*5/9 + 273.15 % T = 15 oC - ~288 K
@@ -447,8 +445,11 @@ end
 % xlabel('$Q_{st}$ [Mscmd]','Interpreter','latex')
 % grid on
 
+% LStyle = {'k','r','b','k--','r--','b--','k-.'};
+
 % Pressure figure
 figure('Color',[1 1 1]);
+colororder({'k','r'})
 yyaxis left
 plot(Ps./1000000, psi_dot_L(:,1)./1e6)
 hold on 

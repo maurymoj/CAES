@@ -4,17 +4,20 @@ CP = py.importlib.import_module('CoolProp.CoolProp'); % Simplifies coolprop call
 
 T_amb = 25 + 273.15; %  25 oC
 P_amb = 101375;      % 101.375 kPa
+rho_amb = CP.PropsSI('D','P',P_amb,'T',T_amb,'air');
 
 % Mass flow rate equation based on st. fergus data (5 pipelines, 1x d=0.4, 3x d=0.9 and 1x d=1.2m;
 Total_area = pi*0.45^2/4 + 3*pi*0.9^2/4 + pi*1.2^2/4;
 Total_flow = 42.6 + 3*198.6 + 354.6;
 
-
 m_dot = 198.6; % [kg/s] - Value proportional to the area based on total mass flow rate into St. Fergus
-P = 7e6; % 7 MPa
-T = 298;
 
-D = 0.900;
+Q_a = 3*1e6/(24*3600);
+m_dot = rho_amb*Q_a;
+P = 9e6; % Pressure [MPa]
+T = T_amb;
+
+D = 0.45;
 
 P_o = P_amb;
 T_o = T_amb;
