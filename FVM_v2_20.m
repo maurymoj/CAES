@@ -27,17 +27,17 @@ simType = 'CAESPipe';
 % 'Cycle_R';
 % 'NCycles_R';
 % 'Kiuchi'
-Process = 'Discharging_L';
+Process = 'Cycle_L';
 
 % heat_transfer_model 
 % 'Adiabatic'
 % Not fully implemented yet:
 % 'Steady_state'
 % 'Isothermal'
-heat_transfer_model = 'Adiabatic';
+heat_transfer_model = 'Isothermal';
 
 if strcmp(simType,'CAESPipe')
-    n_nodes = 100;
+    n_nodes = 40;
     max_iter = 40;
     
     % Setting tolerance
@@ -49,8 +49,10 @@ if strcmp(simType,'CAESPipe')
         tol_v = 1e-4;
     elseif strcmp(Process,'Cycle_L')
         tol = 1e-5;
+        tol_v = 1e-5;
     elseif strcmp(Process,'Idle')
         tol = 1e-5;
+        tol_v = 1e-5;
     elseif strcmp(Process,'Kiuchi')
         tol = 1e-5;
         tol_v = 1e-4;
@@ -76,17 +78,21 @@ Figures = 0;
 P_Corr_fig = 0;
 adapt_underrelax = 0;
 
-t_ramp = 0.1;
-warning('Ramp time under implementation.')
+% t_ramp = 0.1; % Ramp up time for inlet velocity in [s]
+
 %----------------------- PROBLEM PARAMETERS -------------------------%
 
 % Total simulation time
 % Dt = 360; % Charging time for 5 km pipeline
 % Dt = 720; % Charging + discharging time (5km 0.5m pipeline)
-% Dt_charg = 360;
 % Dt = 1200; % Charging L=10 km, d=0.9 m pipeline (360s = 3.44 MWh,1054 elapsed time)
-% Dt = 6*3600;
-Dt = 600;
+% Dt = 12*3600;
+% 
+% Dt_charg = 8*3600; % Charging + idle phase duration
+
+Dt = 12*3600;
+
+Dt_charg = 6*3600; % Charging + idle phase duration
 
 % System operational limits
 P_max = 7e6;
@@ -1833,6 +1839,7 @@ elseif strcmp(Process,'Discharging_L')
     etaX_stor = sum(dXX) / ( XX(end) - XX(1) )
 elseif strcmp(Process, 'Cycle_L')
     error('eta_X calculation not implemented for cycles yet. ')
+    
 elseif strcmp(Process,'Kiuchi')
     etaX_stor = 0;
     figure('Color',[1 1 1])
