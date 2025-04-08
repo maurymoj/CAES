@@ -3,12 +3,16 @@ clc
 
 CP = py.importlib.import_module('CoolProp.CoolProp');
 
-%----------------------- PROBLEM PARAMETERS -------------------------%
-H = 35;
-D = 40;
+%--------------------------- Setup ---------------------------------
 
-A_h = pi*D^2/4;
-Vol = A_h*H;
+
+
+
+%----------------------- PROBLEM PARAMETERS -------------------------%
+
+% Cavern dimensions (assumed cylindrical)
+H = 35; % Height
+D = 40; % Diameter
 
 % Ambient conditions
 P_a = 101325;
@@ -40,6 +44,8 @@ theta = 0;
 dt = 1;
 Dt = 4*3600;
 
+A_h = pi*D^2/4;
+Vol = A_h*H;
 
 rho_in = CP.PropsSI('D','P',P_in,'T',T_in,'Air');
 cp_in = CP.PropsSI('C','P',P_in,'T',T_in,'Air');
