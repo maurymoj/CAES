@@ -48,8 +48,8 @@ if strcmp(simType,'CAESPipe')
         tol = 1e-4; % CAESPipe Charging
         tol_v = 1e-4;
     elseif strcmp(Process,'Cycle_L')
-        tol = 1e-5;
-        tol_v = 1e-5;
+        tol = 1e-4;
+        tol_v = 1e-4;
     elseif strcmp(Process,'Idle')
         tol = 1e-5;
         tol_v = 1e-5;
@@ -180,10 +180,12 @@ elseif strcmp(Process,'Discharging_R')
 
 elseif strcmp(Process,'Cycle_L')
     % Initial conditions
-    P_0 = P_min;
+    P_0 = P_min;    
     T_0 = T_ground;
     v_0 = 0;
     % v_0 = v_in;
+
+    P_0 = 4.0624189468e+06; % Final pressure after the first cycle
 
     L_bound = 'Inlet'; % OR M_CONST ??
     R_bound = 'Wall';
@@ -361,6 +363,10 @@ v_threshold = 1e-6;
 
 %---------------------- ARRAYS INITIALIZATION ----------------------%
 t = 0:dt:Dt;
+
+x = 0:dx:L;
+x_f = [0:dx:L]';
+x_n = [dx/2:dx:L]';
 
 n_n = L/dx;       % number of nodes
 % n_n = n_nodes;
@@ -1510,15 +1516,19 @@ for j=2:n_t
             stage = 'idle_charg';
             % t_ch = (j-1)*dt;
         % elseif strcmp(stage,'idle_charg') & (std(P(:,j)./P(:,j)) <= 0.1 | t(j) >= Dt_charg)
+            j_charg_end = j;
+            disp('Charging completed')
         elseif strcmp(stage,'idle_charg') & t(j) >= Dt_charg
             L_bound = 'M_const';
             j_disch = j; % index of start of discharge
             m_L = -100;
             stage = 'Discharging';
+            disp('Discharging started')
         elseif strcmp(stage,'Discharging') & P(1,j) <= P_min
             L_bound = 'Wall';
             stage = 'idle_disch';
-            
+            j_disch_end = j;
+            disp('Discharging completed')
         end
         stage_hist = {stage_hist;stage};
     elseif strcmp(Process,'Cycle_R')
@@ -1582,10 +1592,8 @@ end
 
 dm = zeros(n_t,1);
 dE = zeros(n_t,1);
-% m_bal = zeros(n_t,1);
-% E_bal = zeros(n_t,1);
 
-% As a function of inlet velocity (CONSTANT INLET CONDITIONS)
+% Mass, energy and exergy increments at each time step
 if strcmp(Process,'Charging_L')
     % dm = rho_L*v(1,:)'*A_h*dt;
     % dE = rho_L*v(1,:)'*A_h*cp_L*T_L*dt;
@@ -1620,6 +1628,7 @@ elseif strcmp(Process,'Cycle_L')
     % dE = rho_f(1,:)'.*v(1,:)'.*A_h.*h_f(1,:)'*dt;
     dE = rho_f(1,:)'.*v(1,:)'.*A_h.*( h_f(1,:)' + v(1,:)'.^2/2 )*dt;
     dX = rho_f(1,:)'.*v(1,:)'*A_h.*(h_f(1,:)' - h_o - T_o*(s_f(1,:)' - s_o))*dt;
+
 elseif strcmp(Process,'Cycle_R')
     error('Cycle_R process not implemented yet ')
 elseif strcmp(Process,'NCycles_L')
@@ -1640,24 +1649,21 @@ else
     error('Process not identified.')
 end
 
-% m_bal = m(1) + cumsum([0;dm(1:end-1)]);
-% E_bal = E(1) + cumsum([0;dE(1:end-1)]);
+% Energy and mass balance: Property at t=0 + cummulative sum of mass/energy
+% that enters the control volume
 m_bal = m(1) + cumsum(dm);
 E_bal = E(1) + cumsum(dE);
 
-x = 0:dx:L;
-x_f = [0:dx:L]';
-x_n = [dx/2:dx:L]';
-
-% Exergy
-% X = P*(A_h*L).*(P_amb./P - 1 + log(P./P_amb))./(1e6*3600);          % Pipeline Exergy [MWh]
-% X_min = P_0*(A_h*L).*(P_amb./P_0 - 1 + log(P_0./P_amb))/(1e6*3600); % Exergy when discharged [MWh] 
+% Exergy (Assuming compressed air temperature equal to environmental temperature
+% X = P*(A_h*L).*(P_amb./P - 1 + log(P./P_amb))./(1e6*3600);            % Pipeline Exergy [MWh] 
+% X_min = P_0*(A_h*L).*(P_amb./P_0 - 1 + log(P_0./P_amb))/(1e6*3600);   % Exergy when discharged [MWh] 
 % X = P*(A_h*dx).*(P_amb./P - 1 + log(P./P_amb))./(1e6*3600);           % Pipeline Exergy [MWh]
 % X_min = P_0*(A_h*dx).*(P_amb./P_0 - 1 + log(P_0./P_amb))/(1e6*3600);  % Exergy when discharged [MWh] 
 
-X = sum(m_n.*( u - u_o + P_o*R*(T./P - T_o/P_o) - T_o*(s - s_o) ) )./(1e6*3600);           % Pipeline Exergy [MWh]
-
-X_0 = m(1)*(u_0 - u_o + P_o*R*(T_0./P_0 - T_o/P_o) - T_o*(s_0 - s_o) )/(1e6*3600);  % Exergy at t = 0s [MWh] 
+% Total Exergy in the pipeline at each time step [MWh]
+X = sum(m_n.*( u - u_o + P_o*R*(T./P - T_o/P_o) - T_o*(s - s_o) ) )./(1e6*3600);
+% Exergy at t = 0s [MWh] 
+X_0 = m(1)*(u_0 - u_o + P_o*R*(T_0./P_0 - T_o/P_o) - T_o*(s_0 - s_o) )/(1e6*3600); 
 
 
 X_net = X - X_0;                                                 % Exergy between current state and discharged state (assuming whole pipeline at P_min)
@@ -1681,20 +1687,6 @@ end
 %         plot(t,X,t,X_0+cumsum(dX)./(1e6*3600))
 %         legend('X','X_0 + dX')
 %     end
-% end
-
-% 
-% if strcmp(Process,'Charging_L') || strcmp(Process,'Charging_R')
-% 
-% elseif strcmp(Process,'Discharging_L') || strcmp(Process,'Discharging_R')
-% 
-% end
-
-% Figures of mass and energy over time
-% if legend('X','X_0 + dX')
-%     figure('color',[1 1 1]);plot(m)
-%     hold on; plot(mm)
-%     legend('m','\Delta m')
 % end
 
 
@@ -1874,6 +1866,8 @@ if Save_data
     elseif strcmp(Process,'Discharging_L')
         filename = strcat(simType,'_',Process,'_P_',num2str(P_max/1e6),'-',num2str(P_min/1e6),'MPa_m_',num2str(m_out));
         % filename = strcat(simType,'_',Process,'_P_',num2str(P_max/1e6),'-',num2str(P_min/1e6),'MPa_m_',num2str(m_out),'_',string(year(time)),'_',string(month(time)),'_',string(day(time)));
+    elseif strcmp(Process,'Cycle_L')
+        filename = strcat(simType,'_',Process,'_P_',num2str(P_max/1e6),'-',num2str(P_min/1e6),'MPa_m_',num2str(m_in));
     elseif strcmp(Process,'Kiuchi')
         time = now;
         filename = strcat(Process,'_',string(month(time)),'_',string(day(time)));
