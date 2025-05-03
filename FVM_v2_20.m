@@ -27,7 +27,7 @@ simType = 'CAESPipe';
 % 'Cycle_R';
 % 'NCycles_R';
 % 'Kiuchi'
-Process = 'Cycle_L';
+Process = 'Charging_L';
 
 % heat_transfer_model 
 % 'Adiabatic'
@@ -90,9 +90,10 @@ adapt_underrelax = 0;
 % 
 % Dt_charg = 8*3600; % Charging + idle phase duration
 
-Dt = 12*3600;
+% Dt = 14*3600;
+Dt = 7*3600;
 
-Dt_charg = 6*3600; % Charging + idle phase duration
+Dt_charg = 7*3600; % Charging + idle phase duration
 
 % System operational limits
 P_max = 7e6;
@@ -102,7 +103,7 @@ P_min = P_max - DoD;
 % Charging rate
 m_in = 100;
 % T_in = 273.15+5;
-T_in = 273.15+60;
+T_in = 273.15 + 60;
 
 % Discharging rate
 % m_A = 417; % Huntorf
@@ -138,7 +139,9 @@ eps = 0.04e-3; % Absolute roughness 0.04 mm
 P_amb = 101325;
 T_amb = 273.15 + 25;
 
-T_ground = 273.15 + 5; % Kostowski, 2022
+% !!!!!!!  GROUND TEMPERATURE SET TO AMBIENT TEMPERATURE TEST !!!!!!!!!!!
+% T_ground = 273.15 + 5; % Kostowski, 2022
+T_ground = T_amb;
 
 if strcmp(Process,'Charging_L')
     % Initial conditions
@@ -717,7 +720,7 @@ end
 error_hist = [];
 error_hist_v = [];
 error_hist_rho = [];
-error_hist2 = zeros(n_n,n_t,max_iter);
+% error_hist2 = zeros(n_n,n_t,max_iter);
 bound_hist = [string(L_bound) string(R_bound)];
 
 P_is_conv = zeros(n_t,1);
@@ -1289,7 +1292,7 @@ for j=2:n_t
         error_v(~v_mask) = abs(v_corr(~v_mask));
 
         error_hist = [error_hist error_P];
-        error_hist2(:,j,n_iters(j)+1) = error_P;
+        % error_hist2(:,j,n_iters(j)+1) = error_P;
         
         error_hist_rho = [error_hist_rho error_rho];
         error_hist_v = [error_hist_v error_v];
@@ -1448,30 +1451,46 @@ for j=2:n_t
     end
     % THERMODYNAMIC PROPERTIES
 
-    for i = 1:n_n  % PROPERTIES FROM P AND RHO          
-        % T(i,j) = CP.PropsSI('T','P',P(i,j),'D',rho(i,j),fluid);
-        cp(i,j) = CP.PropsSI('C','P',P(i,j),'D',rho(i,j),fluid);
-        h(i,j) = CP.PropsSI('H','P',P(i,j),'D',rho(i,j),fluid);     
-        s(i,j) = CP.PropsSI('S','P',P(i,j),'D',rho(i,j),fluid);
-        u(i,j) = CP.PropsSI('U','P',P(i,j),'D',rho(i,j),fluid);
-        u_sonic_n(i,j) = CP.PropsSI('speed_of_sound','P',P(i,j),'D',rho(i,j),fluid);
-        cp_f(i,j) = CP.PropsSI('C','P',P_f(i,j),'D',rho_f(i,j),fluid);
-        h_f(i,j) = CP.PropsSI('H','P',P_f(i,j),'D',rho_f(i,j),fluid);
-        s_f(i,j) = CP.PropsSI('S','P',P_f(i,j),'D',rho_f(i,j),fluid);
-        u_sonic_f(i,j) = CP.PropsSI('speed_of_sound','P',P_f(i,j),'D',rho_f(i,j),fluid);
-    end
-    
-    cp_f(n_f,j) = CP.PropsSI('C','P',P_f(n_f,j),'D',rho_f(n_f,j),fluid);
-    h_f(n_f,j) = CP.PropsSI('H','P',P_f(n_f,j),'D',rho_f(n_f,j),fluid);
-    s_f(n_f,j) = CP.PropsSI('S','P',P_f(n_f,j),'D',rho_f(n_f,j),fluid);
-    u_sonic_f(n_f,j) = CP.PropsSI('speed_of_sound','P',P_f(n_f,j),'D',rho_f(n_f,j),fluid);
-
     % Upwind scheme
     T_f(2:end-1,j) = (v(1:end-2,j) >= 0).*T(1:end-1,j) ...
                      + (v(1:end-2,j) <  0).*T(2:end,j);
     
     T_f(end,j) = T(end,j); % ASSUMING UPWIND SCHEME WITH FLOW FROM LEFT !!!!!!!!!!
                            % Implement other cases
+
+
+    for i = 1:n_n  % PROPERTIES FROM P AND RHO          
+        if strcmp(heat_transfer_model,'Adiabatic')
+            % T(i,j) = CP.PropsSI('T','P',P(i,j),'D',rho(i,j),fluid);
+            cp(i,j) = CP.PropsSI('C','P',P(i,j),'D',rho(i,j),fluid);
+            h(i,j) = CP.PropsSI('H','P',P(i,j),'D',rho(i,j),fluid);     
+            s(i,j) = CP.PropsSI('S','P',P(i,j),'D',rho(i,j),fluid);
+            u(i,j) = CP.PropsSI('U','P',P(i,j),'D',rho(i,j),fluid);
+            u_sonic_n(i,j) = CP.PropsSI('speed_of_sound','P',P(i,j),'D',rho(i,j),fluid);
+            cp_f(i,j) = CP.PropsSI('C','P',P_f(i,j),'D',rho_f(i,j),fluid);
+            h_f(i,j) = CP.PropsSI('H','P',P_f(i,j),'D',rho_f(i,j),fluid);
+            s_f(i,j) = CP.PropsSI('S','P',P_f(i,j),'D',rho_f(i,j),fluid);
+            u_sonic_f(i,j) = CP.PropsSI('speed_of_sound','P',P_f(i,j),'D',rho_f(i,j),fluid);
+        elseif strcmp(heat_transfer_model,'Isothermal')
+            % T(i,j) = CP.PropsSI('T','P',P(i,j),'D',rho(i,j),fluid);
+            cp(i,j) = CP.PropsSI('C','T',T(i,j),'D',rho(i,j),fluid);
+            h(i,j) = CP.PropsSI('H','T',T(i,j),'D',rho(i,j),fluid);     
+            s(i,j) = CP.PropsSI('S','T',T(i,j),'D',rho(i,j),fluid);
+            u(i,j) = CP.PropsSI('U','T',T(i,j),'D',rho(i,j),fluid);
+            u_sonic_n(i,j) = CP.PropsSI('speed_of_sound','T',T(i,j),'D',rho(i,j),fluid);
+            cp_f(i,j) = CP.PropsSI('C','T',T_f(i,j),'D',rho_f(i,j),fluid);
+            h_f(i,j) = CP.PropsSI('H','T',T_f(i,j),'D',rho_f(i,j),fluid);
+            s_f(i,j) = CP.PropsSI('S','T',T_f(i,j),'D',rho_f(i,j),fluid);
+            u_sonic_f(i,j) = CP.PropsSI('speed_of_sound','T',T_f(i,j),'D',rho_f(i,j),fluid);
+        else
+            error('Heat transfer model not identified for thermodynamic properties calculations')
+        end
+    end
+    
+    cp_f(n_f,j) = CP.PropsSI('C','P',P_f(n_f,j),'D',rho_f(n_f,j),fluid);
+    h_f(n_f,j) = CP.PropsSI('H','P',P_f(n_f,j),'D',rho_f(n_f,j),fluid);
+    s_f(n_f,j) = CP.PropsSI('S','P',P_f(n_f,j),'D',rho_f(n_f,j),fluid);
+    u_sonic_f(n_f,j) = CP.PropsSI('speed_of_sound','P',P_f(n_f,j),'D',rho_f(n_f,j),fluid);
     
 
     % CAES process
@@ -1517,18 +1536,18 @@ for j=2:n_t
             % t_ch = (j-1)*dt;
         % elseif strcmp(stage,'idle_charg') & (std(P(:,j)./P(:,j)) <= 0.1 | t(j) >= Dt_charg)
             j_charg_end = j;
-            disp('Charging completed')
+            disp(strcat('Charging completed, ',string(timeofday(datetime) ) ))
         elseif strcmp(stage,'idle_charg') & t(j) >= Dt_charg
             L_bound = 'M_const';
             j_disch = j; % index of start of discharge
             m_L = -100;
             stage = 'Discharging';
-            disp('Discharging started')
+            disp(strcat('Discharging started, ',string(timeofday(datetime)) ) )
         elseif strcmp(stage,'Discharging') & P(1,j) <= P_min
             L_bound = 'Wall';
             stage = 'idle_disch';
             j_disch_end = j;
-            disp('Discharging completed')
+            disp(strcat('Discharging completed, ',string(timeofday(datetime)) ) )
         end
         stage_hist = {stage_hist;stage};
     elseif strcmp(Process,'Cycle_R')
