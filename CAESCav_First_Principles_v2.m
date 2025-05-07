@@ -22,8 +22,7 @@
     % Not fully implemented yet:
     % 'Steady_state'
     
-    heat_transfer_model = 'Isothermal';
-    
+    heat_transfer_model = ['Isothermal'];
     
     %----------------------- PROBLEM PARAMETERS -------------------------%
     Dt = 8*3600;
