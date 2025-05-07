@@ -91,7 +91,7 @@ adapt_underrelax = 0;
 % Dt_charg = 8*3600; % Charging + idle phase duration
 
 % Dt = 14*3600;
-Dt = 7*3600;
+Dt = 100;
 
 Dt_charg = 7*3600; % Charging + idle phase duration
 

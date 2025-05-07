@@ -14,7 +14,7 @@
     % 'Charging';
     % 'Cycle';
     % 'Idle'
-    Process = 'Cycle';
+    Process = 'Charging';
     
     % heat_transfer_model 
     % 'Adiabatic'
@@ -22,12 +22,12 @@
     % Not fully implemented yet:
     % 'Steady_state'
     
-    heat_transfer_model = 'Adiabatic';
+    heat_transfer_model = 'Isothermal';
     
     
     %----------------------- PROBLEM PARAMETERS -------------------------%
-    Dt = 14*3600;
-    Dt_charg = 7*3600;
+    Dt = 8*3600;
+    Dt_charg = 8*3600;
     
     % Cavern dimensions (assumed cylindrical)
     H = 50.625; % Height - To achieve volume similar to 0.9m, 100 km pipeline
@@ -43,10 +43,10 @@
     % DoD = 3e6; % Depth of discharge (in terms of pressure in Pa)
     % P_min = P_max - DoD;
     
-    % P_max = 6.959e6;
-    % P_min = 4.056e6;
-    P_max = 7e6;
-    P_min = 4e6;
+    P_max = 6.959e6;
+    P_min = 4.056e6;
+    % P_max = 7e6;
+    % P_min = 4e6;
     
     if strcmp(Process,'Charging') || strcmp(Process,'Cycle') 
         P_in = P_max;
@@ -98,6 +98,7 @@
     if strcmp(Process,'Charging') || strcmp(Process,'Cycle')
         P_0 = P_min;
         T_0 = T_amb;
+        % T_0 = 278.15;
         m_dot = m_in;
         stage = 'Charging';
     elseif strcmp(Process,'Discharging')
@@ -119,7 +120,7 @@
     % end
     
     P(1) = P_0;
-    T(1) = T_amb;
+    T(1) = T_0;
     rho(1) = CP.PropsSI('D','P',P(1),'T',T(1),'Air');
     cp(1) = CP.PropsSI('C','P',P(1),'T',T(1),'Air');
     
@@ -144,7 +145,7 @@
             if strcmp(stage,'Charging') & P(i-1) >= P_max
                 m_dot = 0;
                 i_charg_end = i;
-                stage = 'Idle';
+                stage = 'Idle_charg';
                 disp('Charging completed')
             end
         elseif strcmp(Process,'Cycle')
@@ -214,6 +215,7 @@
         cp(i) = CP.PropsSI('C','D',rho(i),'T',T(i),'Air');
     
         v(i) = 1/rho(i);
+        % u(i) = CP.PropsSI('U','P',P(i),'D',rho(i),'Air');
         u(i) = CP.PropsSI('U','D',rho(i),'T',T(i),'Air');
         s(i) = CP.PropsSI('S','D',rho(i),'T',T(i),'Air');    
         
@@ -221,12 +223,13 @@
     
     if strcmp(heat_transfer_model,'Isothermal')
         X = ( m.*R*T_o.*(P_o./P-1+log(P./P_o)) )./(3600*1e6); % [MWh]
+        X_coolprop = m.*( (u-u_o) + P_o*(v-v_o) -T_o*(s-s_o) )./(3600*1e6); % [MWh]
     elseif strcmp(heat_transfer_model,'Adiabatic')
-        X_coolprop = (u-u_o) + P_o*(v-v_o) -T_o*(s-s_o);
-        X_ideal_gas = cp.*(T - T_o - T_o*log(T./T_o))...
+        X_coolprop =  m.*( (u-u_o) + P_o*(v-v_o) -T_o*(s-s_o) )./(3600*1e6); % [MWh]
+        X_ideal_gas = m.*( cp.*(T - T_o - T_o*log(T./T_o))...
             + R*T.*(P_o./P - 1) ...
-            +R*T_o*log(P/P_o);
-        X = X_coolprop;
+            +R*T_o*log(P/P_o) )./(3600*1e6); % [MWh]
+        X = X_coolprop; 
         % X = cp.*(T - To - To*log(T./To))  )
         % ( m.*R*T_o.*(P_o./P-1+log(P./P_o)) )./(3600*1e6); % [MWh]
     else
@@ -241,6 +244,6 @@
     ylabel('P [MPa]')
     yyaxis right
     plot(t./3600,X-X(1))
-    ylabel('\Psi [MWh]')
+    ylabel('X [MWh]')
     xlabel('t [h]')
     grid on
