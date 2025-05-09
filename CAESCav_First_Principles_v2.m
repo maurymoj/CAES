@@ -14,7 +14,7 @@
     % 'Charging';
     % 'Cycle';
     % 'Idle'
-    Process = 'Charging';
+    Process = 'Cycle';
     
     % heat_transfer_model 
     % 'Adiabatic'
@@ -25,7 +25,7 @@
     heat_transfer_model = ['Isothermal'];
     
     %----------------------- PROBLEM PARAMETERS -------------------------%
-    Dt = 8*3600;
+    Dt = 16*3600;
     Dt_charg = 8*3600;
     
     % Cavern dimensions (assumed cylindrical)
@@ -42,10 +42,10 @@
     % DoD = 3e6; % Depth of discharge (in terms of pressure in Pa)
     % P_min = P_max - DoD;
     
-    P_max = 6.959e6;
-    P_min = 4.056e6;
-    % P_max = 7e6;
-    % P_min = 4e6;
+    % P_max = 6.95941e6;
+    % P_min = 4.056e6;
+    P_max = 7e6;
+    P_min = 4e6;
     
     if strcmp(Process,'Charging') || strcmp(Process,'Cycle') 
         P_in = P_max;
@@ -74,7 +74,7 @@
     theta = 0;
     
     %--------------------- SIMULATION PARAMETERS ------------------------%
-    dt = 60; % [s]
+    dt = 10; % [s]
     
     
     %---------------------- ARRAYS INITIALIZATION ----------------------%

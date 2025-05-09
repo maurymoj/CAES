@@ -27,7 +27,7 @@ simType = 'CAESPipe';
 % 'Cycle_R';
 % 'NCycles_R';
 % 'Kiuchi'
-Process = 'Charging_L';
+Process = 'Cycle_L';
 
 % heat_transfer_model 
 % 'Adiabatic'
@@ -78,6 +78,8 @@ Figures = 0;
 P_Corr_fig = 0;
 adapt_underrelax = 0;
 
+save_errors = 0;
+
 % t_ramp = 0.1; % Ramp up time for inlet velocity in [s]
 
 %----------------------- PROBLEM PARAMETERS -------------------------%
@@ -90,10 +92,9 @@ adapt_underrelax = 0;
 % 
 % Dt_charg = 8*3600; % Charging + idle phase duration
 
-% Dt = 14*3600;
-Dt = 100;
+Dt = 16*3600;
 
-Dt_charg = 7*3600; % Charging + idle phase duration
+Dt_charg = 8*3600; % Charging + idle phase duration
 
 % System operational limits
 P_max = 7e6;
@@ -717,10 +718,13 @@ f_guess = (2*log10(1/epsD)+1.14)^(-2);
 if P_Corr_fig    
     resFig = figure;
 end
-error_hist = [];
-error_hist_v = [];
-error_hist_rho = [];
-% error_hist2 = zeros(n_n,n_t,max_iter);
+
+if save_errors || P_Corr_fig
+    error_hist = [];
+    error_hist_v = [];
+    error_hist_rho = [];
+    % error_hist2 = zeros(n_n,n_t,max_iter);
+end
 bound_hist = [string(L_bound) string(R_bound)];
 
 P_is_conv = zeros(n_t,1);
@@ -763,6 +767,11 @@ for j=2:n_t
         P(:,j) = P(:,j) + alpha_P*P_corr;
         rho(:,j) = alpha_rho*(rho(:,j) + rho_corr) ...
             + (1-alpha_rho)*rho(:,j);
+        if strcmp(heat_transfer_model,'Isothermal')
+            for i=1:n_n
+                rho(i,j) = CP.PropsSI('D','P',P(i,j),'T',T_ground,'air');
+            end
+        end
 
         v(:,j) = alpha_v*(v_star + v_corr) ...
             + (1-alpha_v)*v_star;
@@ -1290,12 +1299,14 @@ for j=2:n_t
         v_mask = abs(v(:,j)) > v_threshold; % mask to use absolute values when v is too small or 0
         error_v(v_mask) = (v_corr(v_mask)./v(v_mask,j));
         error_v(~v_mask) = abs(v_corr(~v_mask));
-
-        error_hist = [error_hist error_P];
-        % error_hist2(:,j,n_iters(j)+1) = error_P;
         
-        error_hist_rho = [error_hist_rho error_rho];
-        error_hist_v = [error_hist_v error_v];
+        if save_errors || P_Corr_fig
+            error_hist = [error_hist error_P];
+            % error_hist2(:,j,n_iters(j)+1) = error_P;
+        
+            error_hist_rho = [error_hist_rho error_rho];
+            error_hist_v = [error_hist_v error_v];
+        end
 
         if rem(n_iters(j),5) == 0 && P_Corr_fig
             figure(resFig)
