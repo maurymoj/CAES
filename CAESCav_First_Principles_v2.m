@@ -89,6 +89,7 @@
     v = zeros(n_t,1);
     u = zeros(n_t,1);
     s = zeros(n_t,1);
+    h_flow = zeros(n_t,1);
     
     % Sanity check
     m = zeros(n_t,1); % Total mass in pipeline
@@ -112,7 +113,7 @@
     %--------------------- Properties at t=0 --------------------------%
     rho_in = CP.PropsSI('D','P',P_in,'T',T_in,'Air');
     cp_flow = CP.PropsSI('C','P',P_in,'T',T_in,'Air');
-    h_flow = CP.PropsSI('H','P',P_in,'T',T_in,'Air');
+    h_in = CP.PropsSI('H','P',P_in,'T',T_in,'Air');
     
     % if strcmp(Process,'Charging') || strcmp(Process,'Cycle')
     % elseif strcmp(Process,'Discharging')
@@ -163,7 +164,8 @@
                 stage = 'Idle_disch';
                 disp('Discharging completed')
             end
-            stage_hist{end+1} = stage;
+            stage_hist = [stage_hist;stage];
+            % stage_hist{end+1} = stage;
         elseif strcmp(Process,'Discharging')
             if strcmp(stage,'Discharging') & P(i) <= P_min
                 m_dot = 0;
@@ -174,7 +176,7 @@
         else
             error('Process not identified/implemented')
         end
-    
+        
         m(i) = m(i-1) + m_dot*dt;
         rho(i) = m(i)/Vol;
         
@@ -182,14 +184,14 @@
             % cp_flow = CP.PropsSI('C','P',P_in,'T',T_in,'Air');
             % E(i) = E(i-1) + m_dot*cp_flow*T_in*dt;
 
-            h_flow = CP.PropsSI('H','P',P_in,'T',T_in,'Air');
-            E(i) = E(i-1) + m_dot*h_flow*dt;
+            h_flow(i) = h_in;
+            E(i) = E(i-1) + m_dot*h_flow(i)*dt;
         elseif strcmp(stage,'Discharging')
             % cp_flow = CP.PropsSI('C','P',P(i-1),'T',T(i-1),'Air');
             % E(i) = E(i-1) + m_dot*cp_flow*T(i-1)*dt;
 
-            h_flow = CP.PropsSI('H','P',P(i-1),'T',T(i-1),'Air');
-            E(i) = E(i-1) + m_dot*h_flow*dt;
+            h_flow(i) = CP.PropsSI('H','P',P(i-1),'T',T(i-1),'Air');
+            E(i) = E(i-1) + m_dot*h_flow(i)*dt;
         elseif strcmp(stage,'Idle_charg') || strcmp(stage,'Idle_disch')
             E(i) = E(i-1);
         else

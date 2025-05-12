@@ -195,7 +195,7 @@ elseif strcmp(Process,'Cycle_L')
     R_bound = 'Wall';
 
     stage = 'Charging';
-    stage_hist = stage;
+    stage_hist = {stage};
 elseif strcmp(Process,'Cycle_R')
 elseif strcmp(Process,'NCycles_L')
 elseif strcmp(Process,'NCycles_R')
@@ -1560,7 +1560,7 @@ for j=2:n_t
             j_disch_end = j;
             disp(strcat('Discharging completed, ',string(timeofday(datetime)) ) )
         end
-        stage_hist = {stage_hist;stage};
+        stage_hist = [stage_hist;stage];
     elseif strcmp(Process,'Cycle_R')
     elseif strcmp(Process,'NCycle_L')
     elseif strcmp(Process,'NCycle_R')
@@ -1582,7 +1582,7 @@ for j=2:n_t
             R_bound = 'Wall';
             stage = 'Idle';
         end
-        stage_hist = {stage_hist;stage};
+        stage_hist = [stage_hist;stage];
     else
         error('Process not identified.')
     end
