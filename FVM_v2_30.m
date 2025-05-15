@@ -27,7 +27,7 @@ simType = 'CAESPipe';
 % 'Cycle_R';
 % 'NCycles_R';
 % 'Kiuchi'
-Process = 'Cycle_L';
+Process = 'Charging_L';
 
 % heat_transfer_model 
 % 'Adiabatic'
@@ -88,13 +88,18 @@ save_errors = 0;
 % Dt = 360; % Charging time for 5 km pipeline
 % Dt = 720; % Charging + discharging time (5km 0.5m pipeline)
 % Dt = 1200; % Charging L=10 km, d=0.9 m pipeline (360s = 3.44 MWh,1054 elapsed time)
-% Dt = 12*3600;
-% 
-% Dt_charg = 8*3600; % Charging + idle phase duration
 
-Dt = 16*3600;
 
-Dt_charg = 8*3600; % Charging + idle phase duration
+if strcmp(Process,'Discharging_L') || strcmp(Process,'Discharging_R')
+    Dt = 8*3600;
+elseif strcmp(Process,'Charging_L') || strcmp(Process,'Charging_R')
+    Dt = 8*3600;
+elseif strcmp(Process,'Cycle_L') || strcmp(Process,'Cycle_R')
+    Dt_charg = 8*3600; % Charging + idle phase duration
+    Dt = 16*3600;
+else
+    error('Process not identified during set up of duration.')
+end
 
 % System operational limits
 P_max = 7e6;
@@ -767,14 +772,16 @@ for j=2:n_t
         P(:,j) = P(:,j) + alpha_P*P_corr;
         rho(:,j) = alpha_rho*(rho(:,j) + rho_corr) ...
             + (1-alpha_rho)*rho(:,j);
+        v(:,j) = alpha_v*(v_star + v_corr) ...
+            + (1-alpha_v)*v_star;
+
         if strcmp(heat_transfer_model,'Isothermal')
             for i=1:n_n
                 rho(i,j) = CP.PropsSI('D','P',P(i,j),'T',T_ground,'air');
+                % 
             end
         end
 
-        v(:,j) = alpha_v*(v_star + v_corr) ...
-            + (1-alpha_v)*v_star;
         % v(1:end-1,j) = alpha_v*(v_star(1:end-1) + v_corr(1:end-1)) ...
         % + (1-alpha_v)*v_star(1:end-1);
         
@@ -1049,7 +1056,6 @@ for j=2:n_t
         if strcmp(friction_model,'Colebrook')
             nu(end) = CP.PropsSI('viscosity','P',P_f(end,j),'D',rho_f(end,j),fluid);
         end
-
 
         %---------- v* calculation - Momentum control volume ---------------------%
         
@@ -1386,6 +1392,7 @@ for j=2:n_t
     b_T = zeros(n_n,1);
 
     if strcmp(heat_transfer_model,'Adiabatic')
+        Q_n(:,j) = 0;
         Q(j) = 0;
     elseif strcmp(heat_transfer_model,'Isothermal')
 
@@ -1400,7 +1407,7 @@ for j=2:n_t
     elseif strcmp(heat_transfer_model,'Transient')
 
     elseif strcmp(Process, 'Kiuchi')
-        % U = 2.84; % Chaczykowski, 2010
+        % U = 2.84; % [W/m2K] Chaczykowski, 2010
         U = 0; % Adiabatic
         Q_n(:,j) = -4*U/D*(T(:,j-1) - T_ground);
         Q(j) = sum(Q_n(:,j));
@@ -1421,7 +1428,7 @@ for j=2:n_t
             + (rho_f(2,j)*v(2,j)*cp_f(2,j-1) - rho_f(1,j)*v(1,j)*cp_f(1,j-1))/dx...
             - (a_T(1,2) - max(rho_f(1,j)*v(1,j)*cp_f(1,j-1)/dx, 0));
         
-        b_T(1) = Q(j) + (P(1,j)-P(1,j-1))/dt ...
+        b_T(1) = Q_n(1,j) + (P(1,j)-P(1,j-1))/dt ...
                 + v_n(1,j)*(P_f(2,j) - P_f(1,j))/dx ...
                 + f(1)*rho(1,j)*abs(v_n(1,j))^3/(2*D) ...
                 + rho(1,j-1)*cp(1,j-1)*T(1,j-1)/dt...
@@ -1434,7 +1441,7 @@ for j=2:n_t
             + (rho_f(n_f,j)*v(n_f,j)*cp_f(n_f,j-1) - rho_f(n_f-1,j)*v(n_f-1,j)*cp_f(n_f-1,j-1))/dx...
             - (a_T(n_n,n_n-1) - max(0, -rho_f(n_f,j)*v(n_f,j)*cp_f(n_f,j-1)/dx));
         
-        b_T(n_n) = Q(j) + (P(n_n,j)-P(n_n,j-1))/dt ...
+        b_T(n_n) = Q_n(n_n,j) + (P(n_n,j)-P(n_n,j-1))/dt ...
                 + v_n(n_n,j)*(P_f(n_f,j) - P_f(n_f-1,j))/dx ...
                 + f(n_n)*rho(n_n,j)*abs(v_n(n_n,j))^3/(2*D) ...
                 + rho(n_n,j-1)*cp(n_n,j-1)*T(n_n,j-1)/dt...
@@ -1451,7 +1458,7 @@ for j=2:n_t
                 + (rho_f(i+1,j)*v(i+1,j)*cp_f(i+1,j-1) - rho_f(i,j)*v(i,j)*cp_f(i,j-1))/dx...
                 - (a_T(i,i+1) + a_T(i,i-1));
             
-            b_T(i) = Q(j) + (P(i,j)-P(i,j-1))/dt ...
+            b_T(i) = Q_n(i,j) + (P(i,j)-P(i,j-1))/dt ...
                     + v_n(i,j)*(P_f(i+1,j) - P_f(i,j))/dx ...
                     + f(i)*rho(i,j)*abs(v_n(i,j))^3/(2*D) ...
                     + rho(i,j-1)*cp(i,j-1)*T(i,j-1)/dt;

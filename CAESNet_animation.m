@@ -34,14 +34,14 @@ open(vid)
 F(loops) = struct('cdata',[],'colormap',[]);
 figure('Color',[1 1 1])
 % dt_f = 0.1; % time between frames
-dt_f = dt;
+dt_f = 10*dt;
 dec = dt_f/dt;
 t_dec = zeros(1,floor((length(t)-1)/dec+1));
 % decimation = 1000;
 
 plot_type = 'Single';
 % plot_type = 'Double';
-Property = 'v';
+Property = 'P';
 for i=1:length(t_dec)
 % for i=floor(2*length(t_dec)/3):length(t_dec)
     t_dec(i) = t(1+dec*(i-1));

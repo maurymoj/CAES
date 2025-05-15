@@ -14,7 +14,8 @@
     % 'Charging';
     % 'Cycle';
     % 'Idle'
-    Process = 'Cycle';
+    % 'Discharging';
+    Process = 'Charging';
     
     % heat_transfer_model 
     % 'Adiabatic'
@@ -25,10 +26,16 @@
     heat_transfer_model = ['Isothermal'];
     
     %----------------------- PROBLEM PARAMETERS -------------------------%
-    Dt = 16*3600;
-    Dt_charg = 8*3600;
+    if strcmp(Process,'Charging') || strcmp(Process,'Discharging')
+        Dt = 8*3600;
+    elseif strcmp(Process,'Cycle')
+        Dt_charg = 8*3600;
+        Dt = 16*3600;
+    else
+        error('Process not identified.')
+    end
     
-    % Cavern dimensions (assumed cylindrical)
+        % Cavern dimensions (assumed cylindrical)
     H = 50.625; % Height - To achieve volume similar to 0.9m, 100 km pipeline
     D = 40; % Diameter
     
@@ -111,13 +118,16 @@
     end
     
     %--------------------- Properties at t=0 --------------------------%
-    rho_in = CP.PropsSI('D','P',P_in,'T',T_in,'Air');
-    cp_flow = CP.PropsSI('C','P',P_in,'T',T_in,'Air');
-    h_in = CP.PropsSI('H','P',P_in,'T',T_in,'Air');
     
-    % if strcmp(Process,'Charging') || strcmp(Process,'Cycle')
-    % elseif strcmp(Process,'Discharging')
-    % end
+    
+    
+    if strcmp(Process,'Charging') || strcmp(Process,'Cycle')
+        rho_in = CP.PropsSI('D','P',P_in,'T',T_in,'Air');
+        cp_flow = CP.PropsSI('C','P',P_in,'T',T_in,'Air');
+        h_in = CP.PropsSI('H','P',P_in,'T',T_in,'Air');
+    elseif strcmp(Process,'Discharging')
+        
+    end
     
     P(1) = P_0;
     T(1) = T_0;
@@ -167,7 +177,7 @@
             stage_hist = [stage_hist;stage];
             % stage_hist{end+1} = stage;
         elseif strcmp(Process,'Discharging')
-            if strcmp(stage,'Discharging') & P(i) <= P_min
+            if strcmp(stage,'Discharging') & P(i-1) <= P_min
                 m_dot = 0;
                 i_disch_end = i;
                 stage = 'Idle_disch';
