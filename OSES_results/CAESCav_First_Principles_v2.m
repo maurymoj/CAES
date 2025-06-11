@@ -15,7 +15,7 @@
     % 'Cycle';
     % 'Idle'
     % 'Discharging';
-    Process = 'Cycle';
+    Process = 'Charging';
     
     % heat_transfer_model 
     % 'Adiabatic'
@@ -29,14 +29,14 @@
     if strcmp(Process,'Charging') || strcmp(Process,'Discharging')
         Dt = 8*3600;
     elseif strcmp(Process,'Cycle')
-        Dt_charg = 4*3600;
-        Dt = 8*3600;
+        Dt_charg = 8*3600;
+        Dt = 16*3600;
     else
         error('Process not identified.')
     end
     
         % Cavern dimensions (assumed cylindrical)
-    H = 50.625/2; % Height - To achieve volume similar to 0.9m, 100 km pipeline
+    H = 50.625; % Height - To achieve volume similar to 0.9m, 100 km pipeline
     D = 40; % Diameter
     
     % Ambient conditions

@@ -27,13 +27,13 @@ simType = 'CAESPipe';
 % 'Cycle_R';
 % 'NCycles_R';
 % 'Kiuchi'
-Process = 'Cycle_L';
+Process = 'Charging_L';
 
 % heat_transfer_model 
 % 'Adiabatic'
-% 'Isothermal'
 % Not fully implemented yet:
 % 'Steady_state'
+% 'Isothermal'
 heat_transfer_model = 'Isothermal';
 
 if strcmp(simType,'CAESPipe')
@@ -95,8 +95,8 @@ if strcmp(Process,'Discharging_L') || strcmp(Process,'Discharging_R')
 elseif strcmp(Process,'Charging_L') || strcmp(Process,'Charging_R')
     Dt = 8*3600;
 elseif strcmp(Process,'Cycle_L') || strcmp(Process,'Cycle_R')
-    Dt_charg = 4*3600; % Charging + idle phase duration
-    Dt = 8*3600;
+    Dt_charg = 8*3600; % Charging + idle phase duration
+    Dt = 16*3600;
 else
     error('Process not identified during set up of duration.')
 end
@@ -115,10 +115,10 @@ T_in = 273.15 + 60;
 % m_A = 417; % Huntorf
 m_out = 100;
 
+
 if strcmp(simType,'CAESPipe')
     % L = 213333; % Length for eq. vol with Huntorf
-    % L = 100000; % Reference case
-    L = 50000; % 50 km
+    L = 100000; % Reference case
     D = 0.9;
 elseif strcmp(simType,'CAESCav')
     % L = 300; % Volume shape similar to Huntorf
@@ -1490,18 +1490,6 @@ for j=2:n_t
             s_f(i,j) = CP.PropsSI('S','P',P_f(i,j),'D',rho_f(i,j),fluid);
             u_sonic_f(i,j) = CP.PropsSI('speed_of_sound','P',P_f(i,j),'D',rho_f(i,j),fluid);
         elseif strcmp(heat_transfer_model,'Isothermal')
-            % T(i,j) = CP.PropsSI('T','P',P(i,j),'D',rho(i,j),fluid);
-            cp(i,j) = CP.PropsSI('C','T',T(i,j),'D',rho(i,j),fluid);
-            h(i,j) = CP.PropsSI('H','T',T(i,j),'D',rho(i,j),fluid);     
-            s(i,j) = CP.PropsSI('S','T',T(i,j),'D',rho(i,j),fluid);
-            u(i,j) = CP.PropsSI('U','T',T(i,j),'D',rho(i,j),fluid);
-            u_sonic_n(i,j) = CP.PropsSI('speed_of_sound','T',T(i,j),'D',rho(i,j),fluid);
-            cp_f(i,j) = CP.PropsSI('C','T',T_f(i,j),'D',rho_f(i,j),fluid);
-            h_f(i,j) = CP.PropsSI('H','T',T_f(i,j),'D',rho_f(i,j),fluid);
-            s_f(i,j) = CP.PropsSI('S','T',T_f(i,j),'D',rho_f(i,j),fluid);
-            u_sonic_f(i,j) = CP.PropsSI('speed_of_sound','T',T_f(i,j),'D',rho_f(i,j),fluid);
-        elseif strcmp(heat_transfer_model,'Steady_state')
-            error('Steady state under implementation.')
             % T(i,j) = CP.PropsSI('T','P',P(i,j),'D',rho(i,j),fluid);
             cp(i,j) = CP.PropsSI('C','T',T(i,j),'D',rho(i,j),fluid);
             h(i,j) = CP.PropsSI('H','T',T(i,j),'D',rho(i,j),fluid);     
