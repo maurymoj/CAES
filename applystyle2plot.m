@@ -1,4 +1,4 @@
-function applystyle2plot(varargin)
+    function applystyle2plot(varargin)
 % PURPOSE:  Applies figure style to the corrent figure. It changes the 
 % properties of the current plot such as
 % background color, font, font size, figure aspecct ratio, etc,

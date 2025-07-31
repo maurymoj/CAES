@@ -27,7 +27,7 @@ simType = 'CAESPipe';
 % 'Cycle_R';
 % 'NCycles_R';
 % 'Kiuchi'
-Process = 'Discharging_L';
+Process = 'Charging_L';
 
 % heat_transfer_model 
 % 'Adiabatic'
@@ -35,7 +35,7 @@ Process = 'Discharging_L';
 % Not fully implemented yet:
 % 'Kiuchi'
 % 'Steady_state'
-heat_transfer_model = 'Isothermal';
+heat_transfer_model = 'Steady_state';
 
 if strcmp(simType,'CAESPipe')
     n_nodes = 40;
@@ -93,10 +93,10 @@ save_errors = 0;
 
 if strcmp(Process,'Discharging_L') || strcmp(Process,'Discharging_R')
     % Dt = 8*3600;
-    Dt = 5*3600;
+    Dt = 4*3600;
 elseif strcmp(Process,'Charging_L') || strcmp(Process,'Charging_R')
     % Dt = 8*3600;
-    Dt = 5*3600;
+    Dt = 4*3600;
 elseif strcmp(Process,'Cycle_L') || strcmp(Process,'Cycle_R')
     Dt_charg = 4*3600; % Charging + idle phase duration
     Dt = 8*3600;
