@@ -79,7 +79,7 @@ Figures = 0;
 P_Corr_fig = 0;
 adapt_underrelax = 0;
 
-save_errors = 0;
+save_errors = 1;
 
 % t_ramp = 0.1; % Ramp up time for inlet velocity in [s]
 
@@ -94,6 +94,7 @@ save_errors = 0;
 if strcmp(Process,'Discharging_L') || strcmp(Process,'Discharging_R')
     % Dt = 8*3600;
     Dt = 5*3600;
+    % Dt = 600;
 elseif strcmp(Process,'Charging_L') || strcmp(Process,'Charging_R')
     % Dt = 8*3600;
     Dt = 5*3600;
@@ -854,9 +855,10 @@ for j=2:n_t
             % TEST LINEAR APPROXIMATION FOR P, rho, AND T
             % !!! ASSUMING FLOW ALWAYS TO THE LEFT !!!
 
-            P(1,j) = 2*P(2,j) - P(3,j);
+            % P(1,j) = 2*P(2,j) - P(3,j);
             T(1,j) = 2*T(2,j) - T(3,j);
-            rho(1,j) = 2*rho(2,j) - rho(3,j);
+            % rho(1,j) = 2*rho(2,j) - rho(3,j);
+            rho(1,j) = CP.PropsSI('D','P',P(1,j),'T',T(1,j),fluid);
         
             P_f(1,j) = P(1,j);
             T_f(1,j) = T(1,j);
@@ -873,10 +875,10 @@ for j=2:n_t
 
             % Node velocity differencing scheme 
             % Zero-gradient assumption
-            % v_n(1,j) = v(1,j);
+            v_n(1,j) = v(1,j);
             % Upwind scheme
-            v_n(1,j) = (v(1,j) >= 0).*v(1,j) ...
-                +      (v(1,j) <  0).*v(2,j);
+            % v_n(1,j) = (v(1,j) >= 0).*v(1,j) ...
+            %     +      (v(1,j) <  0).*v(2,j);
             % Central scheme
             % v_n(1,j) = (v(1,j) + v(2,j))/2;
             % Hybrid scheme
@@ -1088,8 +1090,7 @@ for j=2:n_t
         else
             error('Friction model not identified')
         end
-        
-        
+         
 
         % Matrix/vector initialization (only need to solve for the inner faces -
         % boundary faces are dealt with the boundary conditions)
@@ -1099,6 +1100,7 @@ for j=2:n_t
         B_M = zeros(n_f,1);
         
 
+        
         a_M(1,1) = 1e10; % Value for v at the first momentum volume is 
                          % known from boundary conditions
         B_M(1) = 1e10*v(1,j);
