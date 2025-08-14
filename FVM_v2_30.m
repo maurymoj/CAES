@@ -27,9 +27,10 @@ simType = 'CAESPipe';
 % 'Cycle_R';
 % 'NCycles_R';
 % 'Kiuchi'
-Process = 'Discharging_L';
+Process = 'Kiuchi';
 
 % heat_transfer_model 
+% Options:
 % 'Adiabatic'
 % 'Isothermal'
 % Not fully implemented yet:
@@ -58,7 +59,7 @@ if strcmp(simType,'CAESPipe')
         tol = 1e-5;
         tol_v = 1e-4;
 
-        n_nodes = 50;
+        n_nodes = 8;
         Delta_t = 0.01*60;
     else
         error('Process not found.')
@@ -79,7 +80,7 @@ Figures = 0;
 P_Corr_fig = 0;
 adapt_underrelax = 0;
 
-save_errors = 1;
+save_errors = 0;
 
 % t_ramp = 0.1; % Ramp up time for inlet velocity in [s]
 
@@ -93,8 +94,8 @@ save_errors = 1;
 
 if strcmp(Process,'Discharging_L') || strcmp(Process,'Discharging_R')
     % Dt = 8*3600;
-    Dt = 5*3600;
-    % Dt = 600;
+    % Dt = 5*3600;
+    Dt = 600;
 elseif strcmp(Process,'Charging_L') || strcmp(Process,'Charging_R')
     % Dt = 8*3600;
     Dt = 5*3600;
@@ -114,8 +115,8 @@ P_min = P_max - DoD;
 
 % Charging rate
 m_in = 100;
-% T_in = 273.15+5;
-T_in = 273.15 + 60;
+% T_in = 5 + 273.15;
+T_in = 60 + 273.15;
 
 % Discharging rate
 % m_A = 417; % Huntorf
@@ -139,7 +140,7 @@ if strcmp(Process,'Kiuchi')
     P_max = 5e6;
     P_min = 5e6;
     P_L = 5e6;
-    T_in = 273.15+25;
+    T_in = 25 + 273.15;
     warning('Kiuchi: left boundary; right boundary; boundary matrix; and boundary update under development.')
 end
 
@@ -148,10 +149,10 @@ eps = 0.04e-3; % Absolute roughness 0.04 mm
 
 % Ambient conditions
 P_amb = 101325;
-T_amb = 273.15 + 25;
+T_amb = 25 + 273.15;
 
 % !!!!!!!  GROUND TEMPERATURE SET TO AMBIENT TEMPERATURE TEST !!!!!!!!!!!
-% T_ground = 273.15 + 5; % Kostowski, 2022
+% T_ground = 5 + 273.15; % Kostowski, 2022
 T_ground = T_amb;
 
 if strcmp(Process,'Charging_L')
@@ -172,6 +173,14 @@ elseif strcmp(Process,'Discharging_L')
 
     L_bound = 'M_const';
     R_bound = 'Wall';
+    
+    % Velocity scheme options:
+    % 'Zero_gradient'
+    % 'Central'
+    % 'Upwind'
+    % 'Hybrid'
+    % 'QUICK_simp'
+    v_scheme = 'Central';
 elseif strcmp(Process,'Charging_R')
     % Initial conditions
     P_0 = P_min;
@@ -206,6 +215,15 @@ elseif strcmp(Process,'Cycle_L')
 
     stage = 'Charging';
     stage_hist = {stage};
+
+    % Velocity scheme options (during discharging):
+    % 'Zero_gradient'
+    % 'Central'
+    % 'Upwind'
+    % 'Hybrid'
+    % 'QUICK_simp'
+    v_scheme = 'Central';
+
 elseif strcmp(Process,'Cycle_R')
 elseif strcmp(Process,'NCycles_L')
 elseif strcmp(Process,'NCycles_R')
@@ -629,13 +647,6 @@ elseif strcmp(R_bound,'M_const')
     P_f(end,1) = P(end,1);
     T_f(end,1) = T(end,1);
     rho_f(end,1) = rho(end,1);    
-elseif strcmp(R_bound,'Kiuchi')    
-    % Wall
-    v(end,:) = 0;
-
-    P_f(end,1) = P(end,1); % Zero gradient assumption
-    T_f(end,1) = T(end,1);
-    rho_f(end,1) = rho(end,1);
 
 elseif strcmp(R_bound,'Outlet')
     % actual implementation happens later
@@ -782,7 +793,7 @@ for j=2:n_t
 
         if strcmp(heat_transfer_model,'Isothermal')
             for i=1:n_n
-                rho(i,j) = CP.PropsSI('D','P',P(i,j),'T',T_ground,'air');
+                rho(i,j) = CP.PropsSI('D','P',P(i,j),'T',T_ground,fluid);
                 % 
             end
         end
@@ -817,6 +828,7 @@ for j=2:n_t
             v_n(1,j) = (v(1,j) >= 0).*v(1,j) ...
             +      (v(1,j) <  0).*v(2,j);
         elseif strcmp(L_bound,'P_const') % Kiuchi
+                        
             
             
             % warning('Kiuchi boundary conditions under implementation.')
@@ -852,7 +864,7 @@ for j=2:n_t
             % T_f(1,j) = T(1,j);
             % rho_f(1,j) = rho(1,j);
 
-            % TEST LINEAR APPROXIMATION FOR P, rho, AND T
+            % TEST LINEAR APPROXIMATION T
             % !!! ASSUMING FLOW ALWAYS TO THE LEFT !!!
 
             % P(1,j) = 2*P(2,j) - P(3,j);
@@ -869,34 +881,39 @@ for j=2:n_t
             % rho_f(1,j) = 2*rho(1,j) - rho(2,j);
             
             % UNDER DEVELOPMENT
-            % v(1,j) = min(1 , t(j)/t_ramp)*m_L/(rho_f(1,j)*A_h); % Ramps
-            % mass flow rate from 0 up to max value based on time t_ramp
+            % velocity ramp up, Ramps mass flow rate from 0 up to max value 
+            % based on time t_ramp
+            % v(1,j) = min(1 , t(j)/t_ramp)*m_L/(rho_f(1,j)*A_h);
             v(1,j) = m_L/(rho_f(1,j)*A_h);
 
             % Node velocity differencing scheme 
-            % Zero-gradient assumption
-            v_n(1,j) = v(1,j);
-            % Upwind scheme
-            % v_n(1,j) = (v(1,j) >= 0).*v(1,j) ...
-            %     +      (v(1,j) <  0).*v(2,j);
-            % Central scheme
-            % v_n(1,j) = (v(1,j) + v(2,j))/2;
-            % Hybrid scheme
-            % nu_f = CP.PropsSI('viscosity','P',P_f(1,j),'D',rho_f(1,j),fluid);
-            % Pe = abs(rho_f(1,j)*v(1,j)*dx)/nu_f;
-            % if Pe > 2  % High convection, use more upwind
-            %     beta = 0.2;  % More upwind
-            % elseif Pe < 0.5  % Low convection, use more central
-            %     beta = 0.8;  % More central
-            % else
-            %     beta = 0.5;  % Balanced
-            % end
-            % 
-            % v_n(1,j) = (1 - beta) * (v(1,j) >= 0) * v(1,j) + ...
-            %            (1 - beta) * (v(1,j) <  0) * v(2,j) + ...
-            %                  beta * (v(1,j) + v(2,j)) / 2;
-            % simplified QUICK scheme
-            % v_n(1,j) = v(1,j) + (1/8) * (3*v(2,j) - 3*v(1,j) + v(3,j) - v(1,j));
+            if strcmp(v_scheme,'zero_gradient')
+                v_n(1,j) = v(1,j);
+            elseif strcmp(v_scheme,'Central')
+                v_n(1,j) = (v(1,j) + v(2,j))/2;
+            elseif strcmp(v_scheme,'Upwind')
+                v_n(1,j) = (v(1,j) >= 0).*v(1,j) ...
+                    +      (v(1,j) <  0).*v(2,j);
+            elseif strcmp(v_scheme,'Hybrid')
+                nu_f = CP.PropsSI('viscosity','P',P_f(1,j),'D',rho_f(1,j),fluid);
+                Pe = abs(rho_f(1,j)*v(1,j)*dx)/nu_f;
+                if Pe > 2  % High convection, use more upwind
+                    beta = 0.2;  % More upwind
+                elseif Pe < 0.5  % Low convection, use more central
+                    beta = 0.8;  % More central
+                else
+                    beta = 0.5;  % Balanced
+                end
+    
+                v_n(1,j) = (1 - beta) * (v(1,j) >= 0) * v(1,j) + ...
+                           (1 - beta) * (v(1,j) <  0) * v(2,j) + ...
+                                 beta * (v(1,j) + v(2,j)) / 2;
+            elseif strcmp(v_scheme,'QUICK_simp') % Simplified QUICK scheme
+                v_n(1,j) = v(1,j) + (1/8) * (3*v(2,j) - 3*v(1,j) + v(3,j) - v(1,j));
+            else
+                warning('v scheme not identified, assuming central scheme.')
+            end
+           
         end
 
         % R boundary
@@ -920,14 +937,20 @@ for j=2:n_t
             P_f(end,j) = P(end,j); % Zero gradient assumption
             T_f(end,j) = T(end,j);
             rho_f(end,j) = rho(end,j);
-
+            
+            % Central differencing scheme
+            v_n(end,j) = (v(end-1,j) + v(end,j))/2;
+            % Zero gradient assumption
             % % v_n(end,j) = v(end-1,j);
+            % Upwind differencing scheme
             % v_n(end,j) = (v(end-1,j) >= 0).*v(end-1,j) ...
             % +      (v(end-1,j) <  0).*v(end,j); 
+            
             % DOUBLE-CHECK !!!!!!
 
         elseif strcmp(R_bound,'P_const')
             % P(end,j) = P(end-1,j);
+            error('P_const for R_bond not correctly implemented yet, v(end) should be computed not pre-defined')
             P(end,j) = P_R;
             T(end,j) = T(end-1,j);
             rho(end,j) = rho(end-1,j);
@@ -1113,9 +1136,11 @@ for j=2:n_t
         %!!!!!!!!!!!!!!!!!!! IN DEVELOPMENT !!!!!!!!!!!!!!!!!!!!!!!!!
 
         % Right boundary
+        % Not applicable for all cases, only when v is known or can be
+        % extrapolated from previous node
         a_M(n_f,n_f) = 1; % Value for v at the last momentum volume
         B_M(n_f) = v(n_f,j);
-        
+        %!!!!!!!!!!!!!!!!!!! IN DEVELOPMENT !!!!!!!!!!!!!!!!!!!!!!!!!
         % 
         a_M(2,3) = -max( 0, -rho(2,j)*v_n(2,j)/dx);    % a_C
         a_M(2,2) = rho_f(2,j)/dt + f(2)*rho_f(2,j)*abs(v(2,j))/(2*D) ...
@@ -1261,6 +1286,8 @@ for j=2:n_t
             a_C(n_n,n_n) = drho_dP_n(n_n)/dt ...
                          - (rho_f(N_f-1,j)*d_M(end)/a_M(end,end))/dx ...
                          + drho_dP_f(N_f)*v_star(N_f)/dx;
+        % elses
+            % error('Boundary type not identified.')
         end
 
 
@@ -1392,7 +1419,8 @@ for j=2:n_t
     % alpha_v  = alpha + 0.4;
     % alpha_rho = alpha;
 
-    % ENERGY BALANCE
+%--------------- ENERGY BALANCE ---------------------%
+
     % ASSUMING v>0
     a_T = zeros(n_n,n_n);
     b_T = zeros(n_n,1);
@@ -1405,17 +1433,23 @@ for j=2:n_t
     elseif strcmp(heat_transfer_model,'Sukhov')
 
     elseif strcmp(heat_transfer_model,'Steady_state')
+        
+        error('steady state simulation under development')
+        
         % neglecting effect of coating
-        D_ext = D + thickness_pipe; 
+        D_ext = D + 2*thickness_pipe; 
         U = dx*k_pipe/(D*log(D_ext/D));
         Q_n(:,j) = -4*U/D*(T(:,j-1) - T_ground);
         Q(j) = sum(Q_n(:,j));
-    elseif strcmp(heat_transfer_model,'Transient')
 
+
+
+    elseif strcmp(heat_transfer_model,'Transient')
+        error('Transient heat transfer model not implemented.')
     elseif strcmp(heat_transfer_model, 'Kiuchi')
         % U = 2.84; % [W/m2K] Chaczykowski, 2010
         U = 0; % Adiabatic
-        Q_n(:,j) = -4*U/D*(T(:,j-1) - T_ground);
+        Q_n(:,j) = -4*U/D*(T(:,j-1) - T_ground); % Chaczykowski, 2010
         Q(j) = sum(Q_n(:,j));
     else
         error('Heat transfer model not identified')
@@ -1503,7 +1537,7 @@ for j=2:n_t
             s_f(i,j) = CP.PropsSI('S','T',T_f(i,j),'D',rho_f(i,j),fluid);
             u_sonic_f(i,j) = CP.PropsSI('speed_of_sound','T',T_f(i,j),'D',rho_f(i,j),fluid);
         elseif strcmp(heat_transfer_model,'Steady_state')
-            error('Steady state under implementation.')
+            error('Steady state model under development.')
             % T(i,j) = CP.PropsSI('T','P',P(i,j),'D',rho(i,j),fluid);
             cp(i,j) = CP.PropsSI('C','T',T(i,j),'D',rho(i,j),fluid);
             h(i,j) = CP.PropsSI('H','T',T(i,j),'D',rho(i,j),fluid);     
@@ -1893,21 +1927,23 @@ elseif strcmp(Process,'Discharging_L')
     etaX_stor = sum(dXX) / ( XX(end) - XX(1) )
 elseif strcmp(Process, 'Cycle_L')
     error('eta_X calculation not implemented for cycles yet. ')
-    
+    etaX_stor = (  XX(j_disch) - XX(j_disch_end) ) / ( XX(j_charg_end) - XX(1) )
+     
 elseif strcmp(Process,'Kiuchi')
     etaX_stor = 0;
-    figure('Color',[1 1 1])
-    plot(t./60,rho_f(1,:).*v(1,:)*A_h*3600/rho_st)
-    hold  on
-    plot(t./60,rho_f(end,:).*v(end,:)*A_h*3600/rho_st)
-    legend('Face 1','Face n')
-    ylim([-1e5 4e5])
-    ylabel('Volumetric flow rate [scmh]')
+    % figure('Color',[1 1 1]) % figure for faces (borders)
+    % plot(t./60,rho_f(1,:).*v(1,:)*A_h*3600/rho_st)
+    % hold  on
+    % plot(t./60,rho_f(end,:).*v(end,:)*A_h*3600/rho_st)
+    % legend('Face 1','Face n')
+    % ylim([-1e5 4e5])
+    % ylabel('Volumetric flow rate [scmh]')
 
-    figure('Color',[1 1 1])
+    figure('Color',[1 1 1]) % Graph for nodes
     plot(t./60,rho(1,:).*v_n(1,:)*A_h*3600/rho_st,'b')
     hold  on
     plot(t./60,rho(end,:).*v_n(end,:)*A_h*3600/rho_st,'r')
+    % plot(t./60,rho(2,:).*v_n(2,:)*A_h*3600/rho_st,'k')
     legend('Node 1','Node n')
     ylabel('Volumetric flow rate [scmh]')
 
@@ -1915,6 +1951,7 @@ elseif strcmp(Process,'Kiuchi')
     plot(t./60,rho_f(1,:).*v(1,:)*A_h)
     hold  on
     plot(t./60,rho_f(end,:).*v(end,:)*A_h)
+    % plot(t./60,rho_f(2,:).*v(2,:)*A_h,'k')
     legend('Face 1','Face n')
     ylabel('Mass flow rate [kg/s]')
 else
