@@ -27,16 +27,41 @@ simType = 'CAESPipe';
 % 'Cycle_R';
 % 'NCycles_R';
 % 'Kiuchi'
-Process = 'Kiuchi';
+% 'Abbaspour1' % Isothermal with convective term (friction)
+% 'Abbaspour2' % Non-isothermal with convective term (friction)
+Process = 'Cycle_L';
 
 % heat_transfer_model 
 % Options:
 % 'Adiabatic'
 % 'Isothermal'
-% Not fully implemented yet:
 % 'Kiuchi'
+% 'Abbaspour'
+% Not fully implemented yet:
 % 'Steady_state'
-heat_transfer_model = 'Isothermal';
+heat_transfer_model = 'Abbaspour';
+
+% Friction model
+% 'Nikuradse'
+% 'Colebrook'; % No significant difference and adds calculation time
+% 'Kiuchi' ; Constant friction factor f=0.008
+friction_model = 'Nikuradse'; 
+
+% Validation
+% 'Kiuchi'
+% 'Abbaspour1' % Isothermal with convective term (friction)
+% 'Abbaspour2' % Non-isothermal with convective term (friction)
+Validation = 'Abbaspour2';
+if strcmp(Validation,'Kiuchi')
+    heat_transfer_model = 'Isothermal';
+    friction_model = 'Kiuchi'; 
+elseif strcmp(Validation,'Abbaspour1') % isothermal with convective term
+    heat_transfer_model = 'Isothermal';
+    friction_model = 'Nikuradse'; 
+elseif strcmp(Validation,'Abbaspour2') % Diabatic with convective term
+    heat_transfer_model = 'Abbaspour';
+    friction_model = 'Nikuradse'; 
+end
 
 if strcmp(simType,'CAESPipe')
     n_nodes = 40;
@@ -59,7 +84,7 @@ if strcmp(simType,'CAESPipe')
         tol = 1e-5;
         tol_v = 1e-4;
 
-        n_nodes = 8;
+        n_nodes = 10;
         Delta_t = 0.01*60;
     else
         error('Process not found.')
@@ -82,7 +107,8 @@ adapt_underrelax = 0;
 
 save_errors = 0;
 
-% t_ramp = 0.1; % Ramp up time for inlet velocity in [s]
+% Ramp up time not completely implemented
+% dt_ramp = 20; % Ramp up time for inlet/outlet velocity in [s]
 
 %----------------------- PROBLEM PARAMETERS -------------------------%
 
@@ -94,11 +120,11 @@ save_errors = 0;
 
 if strcmp(Process,'Discharging_L') || strcmp(Process,'Discharging_R')
     % Dt = 8*3600;
-    % Dt = 5*3600;
-    Dt = 600;
+    Dt = 5*3600;
 elseif strcmp(Process,'Charging_L') || strcmp(Process,'Charging_R')
     % Dt = 8*3600;
     Dt = 5*3600;
+    % Dt = 100;
 elseif strcmp(Process,'Cycle_L') || strcmp(Process,'Cycle_R')
     Dt_charg = 4*3600; % Charging + idle phase duration
     Dt = 8*3600;
@@ -140,7 +166,13 @@ if strcmp(Process,'Kiuchi')
     P_max = 5e6;
     P_min = 5e6;
     P_L = 5e6;
-    T_in = 25 + 273.15;
+    
+    if strcmp(heat_transfer_model,'Isothermal')
+        T_in = 25 + 273.15; % Kiuchi
+    elseif strcmp(heat_transfer_model,'Abbaspour')
+        T_in = 60 + 273.15; % Abbaspour
+    end
+
     warning('Kiuchi: left boundary; right boundary; boundary matrix; and boundary update under development.')
 end
 
@@ -174,13 +206,14 @@ elseif strcmp(Process,'Discharging_L')
     L_bound = 'M_const';
     R_bound = 'Wall';
     
-    % Velocity scheme options:
+    % Velocity scheme options at boundaries (upwind scheme is used for the inner nodes):
     % 'Zero_gradient'
     % 'Central'
     % 'Upwind'
     % 'Hybrid'
     % 'QUICK_simp'
     v_scheme = 'Central';
+
 elseif strcmp(Process,'Charging_R')
     % Initial conditions
     P_0 = P_min;
@@ -190,16 +223,35 @@ elseif strcmp(Process,'Charging_R')
 
     L_bound = 'Wall';
     R_bound = 'Inlet';
+
+    % Velocity scheme options at boundaries (upwind scheme is used for the inner nodes):
+    % 'Zero_gradient'
+    % 'Central'
+    % 'Upwind'
+    % 'Hybrid'
+    % 'QUICK_simp'
+    v_scheme = 'Central';
+    
+    error('Discharging from R under development')
     
 elseif strcmp(Process,'Discharging_R')
     % Initial conditions
     P_0 = P_max;
     T_0 = T_ground;
     v_0 = 0;
-    % v_0 = v_in;
 
     L_bound = 'Wall';
     R_bound = 'M_const';
+
+    % Velocity scheme options at boundaries (upwind scheme is used for the inner nodes):
+    % 'Zero_gradient'
+    % 'Central'
+    % 'Upwind'
+    % 'Hybrid'
+    % 'QUICK_simp'
+    v_scheme = 'Central';
+
+    error('Discharging from R under development')
 
 elseif strcmp(Process,'Cycle_L')
     % Initial conditions
@@ -236,7 +288,7 @@ elseif strcmp(Process,'Idle')
     R_bound = 'Wall';
 elseif strcmp(Process,'Kiuchi')
     P_0 = P_min; % 5 MPa
-    T_0 = 273.15 + 25; % 25 oC
+    T_0 = 25 + 273.15; % 25 oC
     v_0 = 0;
 
     T_ground = T_0;
@@ -261,7 +313,9 @@ end
 % Not implemented yet:
 % L_bound = 'P_const';
 % L_bound = 'Outlet';
+
 if strcmp(L_bound,'Inlet')
+    
     % Q_st_in = 3e5; % standard cubic meters per hour
     % Q_a = Q_st_in/3600;
     % m_in = rho_a*Q_a;
@@ -279,7 +333,8 @@ elseif strcmp(L_bound,'Outlet')
     % m_A = m_R;
 elseif strcmp(L_bound,'P_const')
     P_L = P_min; % 4 MPa
-elseif strcmp(L_bound,'M_const')
+    T_L = T_in;
+elseif strcmp(L_bound,'M_const') % Constant mass flow rate out of volume
     m_L = -m_out; % Sign indicates flow direction
 else 
     error('Left boundary type not identified')
@@ -287,11 +342,12 @@ end
 
 % B - Right side boundary condition
 % R_bound = 'Wall';
+% R_bound = 'P_const';
 % Not implemented yet:
 % R_bound = 'Outlet';
 % R_bound = 'Inlet';
-% R_bound = 'P_const';
 % R_bound = 'M_const';
+
 if strcmp(R_bound,'Outlet')
     % m_R = m_out;
 elseif(strcmp(R_bound,'Wall'))
@@ -363,16 +419,6 @@ if Courant_number > 1
     warning('The Courant number is greater than 1, simulation can become unstable.')
 end
 % disp(strcat('time step:',num2str(dt),' s'))
-
-
-
-% Friction calculation equation
-% 'Nikuradse'
-% 'Colebrook'; % No significant difference and adds calculation time
-friction_model = 'Nikuradse';
-if strcmp(Process,'Kiuchi')
-    friction_model = 'Kiuchi';
-end
 
 % Tuning
 min_iter = 6; % Minimum number of iterations
@@ -815,8 +861,23 @@ for j=2:n_t
             T_f(1,j) = T_L; 
             % T_f(1,j) = T(1,j); 
             rho_f(1,j) = CP.PropsSI('D','P',P_f(1,j),'T',T_f(1,j),fluid);
-            v(1,j) = m_L/(rho_f(1,j)*A_h); % Sliding pressure
             
+            % Ramp implementation
+            % if strcmp(Process,'Charging_L') || strcmp(Process,'Discharging_L')
+            %     v(1,j) = min(1 , t(j)/dt_ramp)*m_L/(rho_f(1,j)*A_h);
+            %     v_n(1,j) = min(1 , t(j)/dt_ramp)*m_L/(rho(1,j)*A_h);
+            % % elseif strcmp(Process,'Cycle_L') && strcmp(stage,'Charging')
+            % %     v(1,j) = min(1 , t(j)/dt_ramp)*m_L/(rho_f(1,j)*A_h);
+            % % elseif strcmp(Process,'Cycle_L') && strcmp(stage,'Discharging')
+            % %     v(1,j) = min(1 , (t(j) - t(j_disch))/dt_ramp)*m_L/(rho_f(1,j)*A_h);
+            % 
+            % else
+            %     v(1,j) = m_L/(rho_f(1,j)*A_h); % Sliding pressure
+            % 
+            %     v_n(1,j) = m_L/(rho(1,j)*A_h);
+            % end
+
+                
             v_n(1,j) = m_L/(rho(1,j)*A_h);
 
         elseif strcmp(L_bound,'Wall')
@@ -983,7 +1044,6 @@ for j=2:n_t
 
             % warning('Kiuchi right boundary under implementation.')
             
-
             % Zero gradient assumption
             P(end,j) = P(end-1,j);
             T(end,j) = T(end-1,j);
@@ -1224,11 +1284,13 @@ for j=2:n_t
         B_C = zeros(n_n,1);
         
         % left node
+        
         a_C(1,2) = (rho_f(2,j)*d_M(2)/a_M(2,2))/dx ...
             - max(0, -drho_dP_f(2)*v_star(2)/dx); % A_2
+        
         a_C(1,1) = drho_dP_n(1)/dt + drho_dP_f(2)*v_star(2)/dx ...
                - a_C(1,2); % A_1
-        
+
         B_C(1) = (rho(1,j-1)-rho(1,j))/dt ...
             + (rho_f(1,j)*v_star(1) - rho_f(2,j)*v_star(2))/dx;
         
@@ -1451,6 +1513,7 @@ for j=2:n_t
         U = 0; % Adiabatic
         Q_n(:,j) = -4*U/D*(T(:,j-1) - T_ground); % Chaczykowski, 2010
         Q(j) = sum(Q_n(:,j));
+
     else
         error('Heat transfer model not identified')
     end      
@@ -1548,7 +1611,9 @@ for j=2:n_t
             h_f(i,j) = CP.PropsSI('H','T',T_f(i,j),'D',rho_f(i,j),fluid);
             s_f(i,j) = CP.PropsSI('S','T',T_f(i,j),'D',rho_f(i,j),fluid);
             u_sonic_f(i,j) = CP.PropsSI('speed_of_sound','T',T_f(i,j),'D',rho_f(i,j),fluid);
-        elseif strcmp(heat_transfer_model,'Kiuchi')
+
+            k_L(i,j) = CP.PropsSI('L','T',T_f(i,j),'D',rho_f(i,j),fluid);
+        elseif strcmp(heat_transfer_model,'Abbaspour')
             % T(i,j) = CP.PropsSI('T','P',P(i,j),'D',rho(i,j),fluid);
             cp(i,j) = CP.PropsSI('C','T',T(i,j),'D',rho(i,j),fluid);
             h(i,j) = CP.PropsSI('H','T',T(i,j),'D',rho(i,j),fluid);     
@@ -1637,15 +1702,16 @@ for j=2:n_t
         
         
         if strcmp(stage,'Idle_Kiuchi') & (t(j-1) < 10*60 & t(j) >= 10*60)
-            
-            L_bound = 'P_const';
+            j_start = j;
 
+            L_bound = 'P_const';
             R_bound = 'Vol_const';
 
             stage = 'Active_Kiuchi';
         elseif strcmp(stage,'Active_Kiuchi') & (t(j-1) < 30*60 & t(j) >= 30*60)
             L_bound = 'Wall';
             R_bound = 'Wall';
+
             stage = 'Idle';
         end
         stage_hist = [stage_hist;stage];
