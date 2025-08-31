@@ -944,7 +944,14 @@ for j=2:n_t
             % UNDER DEVELOPMENT
             % velocity ramp up, Ramps mass flow rate from 0 up to max value 
             % based on time t_ramp
-            % v(1,j) = min(1 , t(j)/t_ramp)*m_L/(rho_f(1,j)*A_h);
+            % if strcmp(Process,'Charging_L') || strcmp(Process,'Discharging_L')
+            %     v(1,j) = min(1 , t(j)/dt_ramp)*m_L/(rho_f(1,j)*A_h);
+            % elseif strcmp(Process,'Cycle_L') && strcmp(stage,'Charging')
+            %     v(1,j) = min(1 , t(j)/dt_ramp)*m_L/(rho_f(1,j)*A_h);
+            % elseif strcmp(Process,'Cycle_L') && strcmp(stage,'Discharging')
+            %     v(1,j) = min(1 , (t(j) - t(j_disch))/dt_ramp)*m_L/(rho_f(1,j)*A_h);
+            % end
+            
             v(1,j) = m_L/(rho_f(1,j)*A_h);
 
             % Node velocity differencing scheme 
@@ -1508,9 +1515,9 @@ for j=2:n_t
 
     elseif strcmp(heat_transfer_model,'Transient')
         error('Transient heat transfer model not implemented.')
-    elseif strcmp(heat_transfer_model, 'Kiuchi')
-        % U = 2.84; % [W/m2K] Chaczykowski, 2010
-        U = 0; % Adiabatic
+    elseif strcmp(heat_transfer_model, 'Abbaspour')
+        U = 2.84; % [W/m2K] Chaczykowski, 2010, how did they came up with this number ?
+        % U = 0; % Adiabatic
         Q_n(:,j) = -4*U/D*(T(:,j-1) - T_ground); % Chaczykowski, 2010
         Q(j) = sum(Q_n(:,j));
 
