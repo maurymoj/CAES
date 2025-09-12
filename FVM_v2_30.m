@@ -1193,13 +1193,19 @@ for j=2:n_t
                          % known from boundary conditions
         B_M(1) = 1e10*v(1,j);
         %!!!!!!!!!!!!!!!!!!! IN DEVELOPMENT !!!!!!!!!!!!!!!!!!!!!!!!!
-        % if strcmp(L_bound,'P_const') 
-        %     a_M(1,1) = 1; % Value for v at the first momentum volume is 
-        %               % known from boundary conditions
-        %     B_M(1) = v(1,j);
-        % end
-        %!!!!!!!!!!!!!!!!!!! IN DEVELOPMENT !!!!!!!!!!!!!!!!!!!!!!!!!
+        if strcmp(L_bound,'P_const') 
+            a_M(1,2) = - max( 0, - rho(1,j)*v_n(1,j)/(dx/2));
+            a_M(1,1) = rho_f(1,j)/dt - rho_f(1,j)*v(1,j)/(dx/2)...
+                + f(1)*rho_f(1,j)*abs(v(1,j))/(2*D) ...
+                + rho(1,j)*v_n(1,j)/(dx/2) - a_M(1,2);
 
+            d_M(1) = -1/(dx/2);
+
+            b_M(1) = rho_f(1,j-1)*v(1,j-1)/dt - rho_f(1,j)*g*sind(theta);
+            B_M(1) = d_M(1)*( P(1,j) - P_f(1,j) ) + b_M(1);
+        end
+        
+        
         % Right boundary
         % Not applicable for all cases, only when v is known or can be
         % extrapolated from previous node
@@ -1207,10 +1213,15 @@ for j=2:n_t
         B_M(n_f) = v(n_f,j);
         %!!!!!!!!!!!!!!!!!!! IN DEVELOPMENT !!!!!!!!!!!!!!!!!!!!!!!!!
         % 
-        a_M(2,3) = -max( 0, -rho(2,j)*v_n(2,j)/dx);    % a_C
+        
+        % Temp
+        a_M(2,1) = -max(rho(1,j)*v_n(1,j)/dx, 0);
+        % Temp    
+
+        a_M(2,3) = -max( 0, - rho(2,j)*v_n(2,j)/dx);    % a_C
         a_M(2,2) = rho_f(2,j)/dt + f(2)*rho_f(2,j)*abs(v(2,j))/(2*D) ...
             + (rho(2,j)*v_n(2,j) - rho(1,j)*v_n(1,j))/dx ...
-            - (a_M(2,3) - max(rho(1,j)*v_n(1,j)/dx,  0) );% a_B
+            - (a_M(2,1) + a_M(2,3) - max(rho(1,j)*v_n(1,j)/dx,  0) );% a_B
 
         d_M(2) = -1/dx;
 
@@ -1222,7 +1233,17 @@ for j=2:n_t
         B_M(2) = d_M(2)*(P(2,j)-P(1,j)) ...
             + b_M(2);
 
+        if strcmp(L_bound,'P_const') 
+            a_M(2,2) = rho_f(2,j)/dt + f(2)*rho_f(2,j)*abs(v(2,j))/(2*D) ...
+            + (rho(2,j)*v_n(2,j) - rho(1,j)*v_n(1,j))/dx ...
+            - (a_M(2,1) + a_M(2,3)) + (rho(2,j)*v_n(2,j)/dx - rho(1,j)*v_n(1,j)/dx);% a_B
 
+            b_M(2) = (rho_f(2,j-1)*v(2,j-1)/dt)...
+            - rho_f(2,j)*g*sind(theta);
+
+            B_M(2) = d_M(2)*(P(2,j)-P(1,j)) ...
+            + b_M(2);
+        end
 
         % if strcmp(L_bound,'M_const') % Assumed outlet
         %     a(1,2) = rho(2,j)*v_n(2,j)/dx;    % a_C
@@ -1299,25 +1320,39 @@ for j=2:n_t
         B_C(1) = (rho(1,j-1)-rho(1,j))/dt ...
             + (rho_f(1,j)*v_star(1) - rho_f(2,j)*v_star(2))/dx;
         
-        if strcmp(L_bound,'P_const')
-            a_C(1,1) = 1;
-            a_C(1,2) = 0;
+        % a_C(1,1) = drho_dP_n(1)/dt ...
+        %          - (rho_f(2,j)*d_M(2)/a_M(2,2))/dx ...
+        %          + max( v_star(2)*drho_dP_f(2)/dx, 0);
+        % 
+        % a_C(1,2) = (rho_f(2,j)*d_M(2)/a_M(2,2))/dx ...
+        %     - max( v_star(2)*drho_dP_f(2)/dx, 0);
+        % 
+        % B_C(1) = ( rho(1,j-1) - rho(1,j) )/dt...
+        %     + ( rho_f(1,j)*v(1,j) - rho_f(2,j)*v(2,j) )/dx;
 
-            B_C(1) = 0;
+        if strcmp(L_bound,'P_const')
+            a_C(1,1) = drho_dP_n(1)/dt ...
+                     - (rho_f(2,j)*d_M(2)/a_M(2,2))/dx ...
+                     + max( v_star(2)*drho_dP_f(2)/dx, 0);
+            
+            a_C(1,2) = (rho_f(2,j)*d_M(2)/a_M(2,2))/dx ...
+                - max( v_star(2)*drho_dP_f(2)/dx, 0);
+            
+            B_C(1) = ( rho(1,j-1) - rho(1,j) )/dt...
+                + ( rho_f(1,j)*v(1,j) - rho_f(2,j)*v(2,j) )/dx;
+
+            % a_C(1,1) = 1;
+            % a_C(1,2) = 0;
+            % 
+            % B_C(1) = 0;
+            j;
         elseif strcmp(L_bound,'Outlet')
             %???
             a_C(1,2) = -drho_dP_f(2)*v_star(2)/dx + rho_f(2,j)*(d_M(1)/a_M(1,1))/dx; % A_2
             a_C(1,1) = drho_dP_n(1)/dt ...
                      - (rho_f(2,j)*d_M(1)/a_M(1,1))/dx ...
                      - drho_dP_f(1)*v_star(1)/dx ; % A_1
-        elseif strcmp(L_bound,'Kiuchi')
-            error('Kiuchi left boundary matrix coefficients not set yet.')
-            % BOUNDARY CHANGES WITH TIME
-            % Constant pressure
-            a_C(1,1) = 1;
-            a_C(1,2) = 0;
 
-            B_C(1) = 0;
         end
         
         
@@ -1390,6 +1425,9 @@ for j=2:n_t
         % v_corr(1)         = d(1)./a_i(1).*P_corr(1);
         v_corr(2:end-1)   = d_M(2:end-1)./a_diag(2:end-1).*(P_corr(2:end)-P_corr(1:end-1));
 
+        if strcmp(L_bound,'P_const')
+            v_corr(1) = d_M(1)./a_diag(1).*P_corr(1);
+        end
 % !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
         % Inlet boundary condition
         % v_corr(1)         = 0; 
@@ -1506,7 +1544,10 @@ for j=2:n_t
         % neglecting effect of coating
         D_ext = D + 2*thickness_pipe; 
         U = dx*k_pipe/(D*log(D_ext/D));
-        Q_n(:,j) = -4*U/D*(T(:,j-1) - T_ground);
+
+        U = dx*k_L(:,j)/(D*log(D_ext/D));
+
+        Q_n(:,j) = -4*U/D.*(T(:,j-1) - T_ground);
         Q(j) = sum(Q_n(:,j));
 
 
