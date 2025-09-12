@@ -60,7 +60,7 @@ elseif strcmp(Validation,'Abbaspour1') % isothermal with convective term
     friction_model = 'Nikuradse'; 
 elseif strcmp(Validation,'Abbaspour2') % Diabatic with convective term
     heat_transfer_model = 'Abbaspour';
-    friction_model = 'Nikuradse'; 
+    friction_model = 'Nikuradse';     
 end
 
 if strcmp(simType,'CAESPipe')
@@ -600,9 +600,10 @@ elseif strcmp(L_bound,'M_const')
     % rho_f(1,1) = rho(1,1);
     
 % TEST LINEAR APPROXIMATION FOR P, rho, AND T
-    P(1,1) = 2*P(2,1) - P(3,1);
+    % P(1,1) = 2*P(2,1) - P(3,1);
     T(1,1) = 2*T(2,1) - T(3,1);
-    rho(1,1) = 2*rho(2,1) - rho(3,1);
+    % rho(1,1) = 2*rho(2,1) - rho(3,1);
+    rho(1,1) = CP.PropsSI('D','P',P(1,1),'T',T(1,1),fluid);
 
     % P_f(1,1) = 2*P_f(2,1) - P_f(3,1);
     % T_f(1,1) = 2*T_f(2,1) - T_f(3,1);
@@ -613,7 +614,7 @@ elseif strcmp(L_bound,'M_const')
     rho_f(1,1) = rho(1,1);
 
     % v(1,1) = m_L/(rho_f(1,1)*A_h);
-    v(1,1) = 0;
+    % v(1,1) = 0;
     
     % v_n(1,1) = m_L/(rho(1,1)*A_h);
     % v_n(1,1) = (v(1,1) >= 0).*v(1,1) ...
@@ -877,6 +878,7 @@ for j=2:n_t
             %     v_n(1,j) = m_L/(rho(1,j)*A_h);
             % end
 
+            v(1,j) = m_L/(rho_f(1,j)*A_h); % Sliding pressure
                 
             v_n(1,j) = m_L/(rho(1,j)*A_h);
 
@@ -886,25 +888,23 @@ for j=2:n_t
             T_f(1,j) = T(1,j);
             rho_f(1,j) = rho(1,j);
 
-            v_n(1,j) = (v(1,j) >= 0).*v(1,j) ...
-            +      (v(1,j) <  0).*v(2,j);
+            % v_n(1,j) = (v(1,j) >= 0).*v(1,j) ...
+            % +      (v(1,j) <  0).*v(2,j);
+            % Central differences scheme
+            v_n(1,j) = (v(1,j) + v(2,j))/2;
+
         elseif strcmp(L_bound,'P_const') % Kiuchi
                         
-            
-            
-            % warning('Kiuchi boundary conditions under implementation.')
-            
-            P(1,j) = P_L;
-            T(1,j) = T(2,j);
-            rho(1,j) = rho(2,j);
+            P_f(1,j) = P_L;
+            T_f(1,j) = T_in;
+            rho_f(1,j) = CP.PropsSI('D','P',P_f(1,j),'T',T_f(1,j),fluid);
 
-            v(1,j) = v(2,j);
-        
-            P_f(1,j) = P(1,j);
-            T_f(1,j) = T(1,j);
-            rho_f(1,j) = rho(1,j);
+            
+            rho(1,j) = CP.PropsSI('D','P',P(1,j),'T',T(1,j),fluid);
 
-            v_n(1,j) = v(1,j);
+            v_n(1,j) = (v(1,j) + v(2,j))/2;
+
+            % v_n(1,j) = v(1,j);
 
         elseif strcmp(L_bound,'M_const') 
             % Variation of outlet bound. condition, 
@@ -928,18 +928,12 @@ for j=2:n_t
             % TEST LINEAR APPROXIMATION T
             % !!! ASSUMING FLOW ALWAYS TO THE LEFT !!!
 
-            % P(1,j) = 2*P(2,j) - P(3,j);
             T(1,j) = 2*T(2,j) - T(3,j);
-            % rho(1,j) = 2*rho(2,j) - rho(3,j);
             rho(1,j) = CP.PropsSI('D','P',P(1,j),'T',T(1,j),fluid);
         
             P_f(1,j) = P(1,j);
             T_f(1,j) = T(1,j);
             rho_f(1,j) = rho(1,j);
-             
-            % P_f(1,j) = 1.5*P(1,j) - 0.5*P(2,j);
-            % T_f(1,j) = 2*T(1,j) - T(2,j);
-            % rho_f(1,j) = 2*rho(1,j) - rho(2,j);
             
             % UNDER DEVELOPMENT
             % velocity ramp up, Ramps mass flow rate from 0 up to max value 
@@ -1052,9 +1046,9 @@ for j=2:n_t
             % warning('Kiuchi right boundary under implementation.')
             
             % Zero gradient assumption
-            P(end,j) = P(end-1,j);
-            T(end,j) = T(end-1,j);
-            rho(end,j) = rho(end-1,j);
+            % P(end,j) = P(end-1,j);
+            % T(end,j) = T(end-1,j);
+            rho(end,j) = CP.PropsSI('D','P',P(end,j),'T',T(end,j),fluid);
         
             P_f(end,j) = P(end,j);
             T_f(end,j) = T(end,j);
@@ -1064,7 +1058,7 @@ for j=2:n_t
             % m_dot_st = rho_st*vol_st; % Standard mass flow rate
             v(end,j) = m_dot_st/(rho_f(end,j)*A_h);
             
-            v_n(end,j) = v(end,j);
+            v_n(end,j) = (v(end,j) + v(end-1,j))/2;
             % v_n(end,j) = (rho(1,j)*v_n(1,j))/rho(end,j); % Velocity correction            
 
         end 
@@ -1096,8 +1090,12 @@ for j=2:n_t
         % Upwind scheme
         % v_n(:,j) = (v(1:end-1,j) >= 0).*v((1:end-1),j) ...
         %     +      (v(1:end-1,j) <  0).*v((2:end),j);
-        v_n(2:end,j) = (v(2:end-1,j) >= 0).*v((2:end-1),j) ...
-            +      (v(2:end-1,j) <  0).*v((3:end),j);
+        % v_n(2:end,j) = (v(2:end-1,j) >= 0).*v((2:end-1),j) ...
+        %     +      (v(2:end-1,j) <  0).*v((3:end),j);
+
+        v_n(2:end-1,j) = (v(2:end-2,j) >= 0).*v((2:end-2),j) ...
+            +      (v(2:end-2,j) <  0).*v((3:end-1),j);
+
         % QUICK + Upwind scheme
         % v_n(2:5,j) = v(2:5,j) + (1/8) * (3*v(3:6,j) - 3*v(2:5,j) + v(4:7,j) - v(1:4,j));
         % v_n(6:end,j) = (v(6:end-1,j) >= 0).*v(6:end-1,j) ...
