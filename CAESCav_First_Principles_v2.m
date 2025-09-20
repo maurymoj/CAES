@@ -15,7 +15,7 @@
     % 'Cycle';
     % 'Idle'
     % 'Discharging';
-    Process = 'Cycle';
+    Process = 'Discharging';
     
     % heat_transfer_model 
     % 'Adiabatic'
@@ -23,11 +23,11 @@
     % Not fully implemented yet:
     % 'Steady_state'
     
-    heat_transfer_model = ['Isothermal'];
+    heat_transfer_model = ['Steady_state'];
     
     %----------------------- PROBLEM PARAMETERS -------------------------%
     if strcmp(Process,'Charging') || strcmp(Process,'Discharging')
-        Dt = 8*3600;
+        Dt = 15*3600;
     elseif strcmp(Process,'Cycle')
         Dt_charg = 4*3600;
         Dt = 8*3600;
@@ -38,6 +38,7 @@
         % Cavern dimensions (assumed cylindrical)
     H = 50.625/2; % Height - To achieve volume similar to 0.9m, 100 km pipeline
     D = 40; % Diameter
+    Huntorf = 1;
     
     % Ambient conditions
     P_a = 101325;
@@ -54,6 +55,13 @@
     P_max = 7e6;
     P_min = 4e6;
     
+    if Huntorf
+        P_max = 7e6;
+        % P_min = 4.6e6;
+        P_min = 0;
+        T_w = 50 + 273.15; % Wall temperature assumption
+    end
+    
     if strcmp(Process,'Charging') || strcmp(Process,'Cycle') 
         P_in = P_max;
         T_in = 273.15 + 60;
@@ -63,11 +71,18 @@
         error('Process not identified')
     end
     
-    % m_in = 108; % Huntorf
+    
     % m_in = rho_a*Q_a;
     m_in = 100;
     m_out = 100; % absolute value, sign is added later
     
+    
+    
+    if Huntorf
+        m_in = 108;
+        m_out = 417; % Huntorf - Raju and Khaitan 2012 - Modeling and simulation of compressed air storage in caverns: A case study of the Huntorf plant
+    end
+
     % Ambient conditions
     P_amb = 101325;
     T_amb = 273.15 + 25;
@@ -101,22 +116,25 @@
     % Sanity check
     m = zeros(n_t,1); % Total mass in pipeline
     E = zeros(n_t,1); % Total energy in pipeline
+
+    m_dot = zeros(n_t,1);
     
     if strcmp(Process,'Charging') || strcmp(Process,'Cycle')
         P_0 = P_min;
         T_0 = T_amb;
         % T_0 = 278.15;
-        m_dot = m_in;
+        m_dot(:) = m_in;
         stage = 'Charging';
     elseif strcmp(Process,'Discharging')
         P_0 = P_max;
         T_0 = T_amb;
-        m_dot = -m_out;
+        m_dot(:) = -m_out;
         stage = 'Discharging';
     else
         error('A valid process was not selected. Select either Charging, Discharging or Cycle.')
     end
-    
+
+
     %--------------------- Properties at t=0 --------------------------%
     
     
@@ -143,7 +161,13 @@
     s_o = CP.PropsSI('S','P',P_o,'T',T_o,'Air');
     
     A_h = pi*D^2/4;
+    A_s = 2*A_h + pi*D*H;
     Vol = A_h*H;
+    
+    if Huntorf
+        Vol = 3e5;
+        T_wall(1) = T_w;
+    end
     
     m(1) = rho(1)*Vol;
     E(1) = m(1)*u(1);
@@ -153,23 +177,19 @@
     for i = 2:length(t)
         if strcmp(Process,'Charging') 
             if strcmp(stage,'Charging') & P(i-1) >= P_max
-                m_dot = 0;
                 i_charg_end = i;
                 stage = 'Idle_charg';
                 disp('Charging completed')
             end
         elseif strcmp(Process,'Cycle')
             if strcmp(stage,'Charging') & P(i-1) >= P_max
-                m_dot = 0;
                 i_charg_end = i;
                 stage = 'Idle_charg';
                 disp('Charging completed')
             elseif strcmp(stage,'Idle_charg') & t(i) >= Dt_charg
-                m_dot = -m_out;
                 stage = 'Discharging';
                 disp('Discharging started')
             elseif strcmp(stage,'Discharging') & P(i-1) <= P_min
-                m_dot = 0;
                 i_disch_end = i;
                 stage = 'Idle_disch';
                 disp('Discharging completed')
@@ -178,7 +198,6 @@
             % stage_hist{end+1} = stage;
         elseif strcmp(Process,'Discharging')
             if strcmp(stage,'Discharging') & P(i-1) <= P_min
-                m_dot = 0;
                 i_disch_end = i;
                 stage = 'Idle_disch';
                 disp('Discharging completed')
@@ -187,7 +206,26 @@
             error('Process not identified/implemented')
         end
         
-        m(i) = m(i-1) + m_dot*dt;
+        if strcmp(stage,'Charging')
+            m_dot(i) = m_in;
+        elseif strcmp(stage,'Discharging')
+            m_dot(i) = -m_out;
+            if Huntorf
+                if t(i) <= 18000
+                    m_dot(i) = -m_out;
+                elseif t(i) > 18000
+                    % m_Raju = (213.236 - 398.428)/(12.8075 - 5.56835)
+                    %        = -25.5820;
+                    m_dot(i) = - (m_out - (25.5820)*(t(i)./3600 - 5) );
+                end
+                
+            end 
+        elseif strcmp(stage,'Idle_charg') || strcmp(stage,'Idle_disch')
+            m_dot(i) = 0;
+
+        end
+
+        m(i) = m(i-1) + m_dot(i)*dt;
         rho(i) = m(i)/Vol;
         
         if strcmp(stage,'Charging')
@@ -195,13 +233,13 @@
             % E(i) = E(i-1) + m_dot*cp_flow*T_in*dt;
 
             h_flow(i) = h_in;
-            E(i) = E(i-1) + m_dot*h_flow(i)*dt;
+            E(i) = E(i-1) + m_dot(i)*h_flow(i)*dt;
         elseif strcmp(stage,'Discharging')
             % cp_flow = CP.PropsSI('C','P',P(i-1),'T',T(i-1),'Air');
             % E(i) = E(i-1) + m_dot*cp_flow*T(i-1)*dt;
 
             h_flow(i) = CP.PropsSI('H','P',P(i-1),'T',T(i-1),'Air');
-            E(i) = E(i-1) + m_dot*h_flow(i)*dt;
+            E(i) = E(i-1) + m_dot(i)*h_flow(i)*dt;
         elseif strcmp(stage,'Idle_charg') || strcmp(stage,'Idle_disch')
             E(i) = E(i-1);
         else
@@ -218,6 +256,22 @@
             u(i) = E(i) / m(i); % Specific internal energy
             T(i) = CP.PropsSI('T', 'D', rho(i), 'U', u(i), 'Air');
             % T(i) = E(i)/(m(i)*cp(i-1));
+        elseif strcmp(heat_transfer_model,'Steady_state')
+            T_wall(i) = T_w;
+            % U_eff(i) = 10;
+            if Huntorf
+                U_eff(i) = 0.2356 + 0.0149*abs(m_dot(i))^0.8; % W/m3.K, U_eff = h_w*A_cav/Vol - Raju and Khaitan 2012 
+                Q_w(i) = U_eff(i)*(T(i-1) - T_wall(i))*dt;
+            end
+            E(i) = E(i) - Q_w(i);
+            u(i) = E(i) / m(i);
+            T(i) = CP.PropsSI('T', 'D', rho(i), 'U', u(i), 'Air');
+            % if i==2
+            %     T2(i) = CP.PropsSI('T', 'D', rho(i), 'U', u(i), 'Air');
+            % elseif i>2
+            %     Q_w(i) = U_eff(i)*(T2(i-1) - T_wall(i));
+            %     T2(i) = T2(i-1) + dt/(rho(i-1)*cp(i-1))* (-m_dot(i)/Vol*cp(i-1)*(T2(i-1) - T_wall(i-1)) + (P(i-1) - P(i-2))/dt - Q_w(i));
+            % end
         else
             error('Heat transfer model not identified')
         end
@@ -243,6 +297,12 @@
         X = X_coolprop; 
         % X = cp.*(T - To - To*log(T./To))  )
         % ( m.*R*T_o.*(P_o./P-1+log(P./P_o)) )./(3600*1e6); % [MWh]
+    elseif strcmp(heat_transfer_model,'Steady_state')
+        X_ideal_gas = m.*(cp.*(T - T_o - T_o*log(T./T_o)) ...
+                          + R*T.*(P_o./P - 1) ...
+                          + R*T_o*log(P./P_o))./(3600*1e6); % [MWh]
+        X_coolprop =  m.*( (u-u_o) + P_o*(v-v_o) -T_o*(s-s_o) )./(3600*1e6); % [MWh]
+        X = X_coolprop;
     else
         error('Heat transfer model not identified.')
     end
@@ -258,3 +318,11 @@
     ylabel('X [MWh]')
     xlabel('t [h]')
     grid on
+
+    figure;
+    plot(t./3600,T)
+    yyaxis right
+    plot(t./3600,Q_w)
+
+    figure;
+    plot(t./3600,abs(m_dot))
